@@ -24,15 +24,8 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
   const [tab, setTab] = useState<TabKey>('generate');
   const [students, setStudents] = useState<Student[]>([]);
   const [cards, setCards] = useState<Card[]>([]);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [rarity, setRarity] = useState<string>('common');
-  const [achievement, setAchievement] = useState('');
-  const [characterType, setCharacterType] = useState('');
   const [status, setStatus] = useState('');
   const [statusType, setStatusType] = useState<'default' | 'working' | 'error' | 'done'>('default');
-  const [generatedCard, setGeneratedCard] = useState<Partial<Card> & { image_url: string; students?: { name: string } } | null>(null);
-  const [savedBanner, setSavedBanner] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [geminiKey, setGeminiKey] = useState('');
   const [modal, setModal] = useState<{ type: string; data?: any } | null>(null);
   const [modalError, setModalError] = useState('');
@@ -264,81 +257,8 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
     } catch (err: any) { setPbStatus('Error: ' + err.message); }
   };
 
-  const setWorking = (msg: string) => { setStatus(msg); setStatusType('working'); };
-  const setDone = (msg: string) => { setStatus(msg); setStatusType('done'); setTimeout(() => setStatus(''), 2800); };
-  const setErr = (msg: string) => { setStatus(msg); setStatusType('error'); };
-
-  // Generate card
-  const handleGenerate = async () => {
-    if (!selectedStudent) { setErr('Select a student.'); return; }
-    if (!achievement.trim()) { setErr('Describe the achievement.'); return; }
-    setLoading(true);
-    setGeneratedCard(null);
-    setSavedBanner(false);
-    setWorking('Generating card with Gemini…');
-
-    try {
-      const data = await AI.generateCardData(selectedStudent.name, achievement, characterType, rarity);
-      setWorking('Generating character image…');
-
-      const imgUrl = AI.generateImageUrl(data.imagePrompt || data.cardName);
-      // Preload image
-      await new Promise<void>((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve();
-        img.onerror = () => resolve();
-        img.src = imgUrl;
-        setTimeout(resolve, 2000);
-      });
-
-      const cardData: Partial<Card> & { image_url: string; students?: { name: string } } = {
-        card_name: data.cardName,
-        hp: data.hp,
-        type: data.type,
-        description: data.description,
-        stat1_name: data.stat1Name,
-        stat1_val: data.stat1Val,
-        stat2_name: data.stat2Name,
-        stat2_val: data.stat2Val,
-        stat3_name: data.stat3Name,
-        stat3_val: data.stat3Val,
-        move1_name: data.move1Name,
-        move1_dmg: data.move1Dmg,
-        move2_name: data.move2Name,
-        move2_dmg: data.move2Dmg,
-        rarity: rarity as any,
-        image_url: imgUrl,
-        students: { name: selectedStudent.name },
-        student_id: selectedStudent.id,
-        teacher_id: session.user.id,
-      };
-
-      setGeneratedCard(cardData);
-      setDone('Card generated! Save it to the student\'s collection.');
-    } catch (err: any) {
-      setErr(err.message || 'Generation failed');
-    }
-    setLoading(false);
-  };
-
-  const handleSaveCard = async () => {
-    if (!generatedCard || !selectedStudent) return;
-    try {
-      const toSave = { ...generatedCard };
-      delete (toSave as any).students;
-      const saved = await Dashboard.saveCard(toSave as any);
-      setCards(prev => [saved, ...prev]);
-      setSavedBanner(true);
-      setDone('Card saved!');
-      setGeneratedCard(null);
-    } catch (err: any) {
-      setErr(err.message);
-    }
-  };
-
   const handleSaveKey = () => {
     AI.setGeminiKey(geminiKey);
-    setDone('API key saved');
   };
 
   // Filtered cards
