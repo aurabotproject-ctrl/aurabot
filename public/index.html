@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClassCard — Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .login-wrap { width:100%; max-width:420px; padding:1rem; }
+  .login-logo { text-align:center; margin-bottom:2rem; }
+  .login-logo .logo { font-size:2.4rem; }
+  .login-logo .sub { font-size:0.72rem; color:var(--text-muted); letter-spacing:0.2em; text-transform:uppercase; margin-top:4px; }
+  .login-card { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:2rem; }
+  .tab-row { display:grid; grid-template-columns:1fr 1fr; gap:0; margin-bottom:1.5rem; border-radius:8px; overflow:hidden; border:1px solid var(--border); }
+  .tab-row button { padding:10px; background:var(--panel2); border:none; color:var(--text-muted); font-family:'Nunito',sans-serif; font-size:0.85rem; font-weight:700; cursor:pointer; transition:all 0.2s; }
+  .tab-row button.active { background:rgba(200,160,0,0.15); color:var(--gold); }
+  .gen-btn {
+    width:100%; padding:13px; font-family:'Cinzel',serif; font-size:0.95rem; font-weight:700;
+    letter-spacing:0.08em; border:none; border-radius:10px; cursor:pointer; transition:all 0.25s;
+    background:linear-gradient(135deg,#c8a000,#ffe080,#c8a000); color:#2a1a00; margin-top:0.3rem;
+  }
+  .gen-btn:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(200,160,0,0.4); }
+  .gen-btn:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+  .forgot { text-align:center; margin-top:1rem; font-size:0.75rem; color:var(--text-muted); }
+  .divider-text { display:flex; align-items:center; gap:10px; margin:1rem 0; color:var(--text-muted); font-size:0.75rem; }
+  .divider-text::before, .divider-text::after { content:''; flex:1; border-top:1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<div class="login-wrap">
+  <div class="login-logo">
+    <div class="logo">✦ ClassCard ✦</div>
+    <div class="sub">Pokémon-Style Reward Cards for Schools</div>
+  </div>
+
+  <div class="login-card">
+    <div class="tab-row">
+      <button id="tabLogin" class="active" onclick="switchTab('login')">Sign In</button>
+      <button id="tabSignup" onclick="switchTab('signup')">Create Account</button>
+    </div>
+
+    <div id="alertBox"></div>
+
+    <!-- LOGIN FORM -->
+    <div id="loginForm">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="loginEmail" placeholder="you@school.edu" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="gen-btn" id="loginBtn" onclick="doLogin()">Sign In</button>
+    </div>
+
+    <!-- SIGNUP FORM (for creating your own account — Admin creates teacher/student accounts from dashboard) -->
+    <div id="signupForm" style="display:none">
+      <div class="alert alert-info" style="background:rgba(80,120,200,0.1);border:1px solid rgba(80,120,200,0.3);color:#a0b8f0;padding:10px 14px;border-radius:8px;font-size:0.78rem;margin-bottom:1rem;">
+        ℹ️ First-time setup: create the initial Admin account here. Teachers and students are created from the Admin dashboard.
+      </div>
+      <div class="form-group">
+        <label>Your Name</label>
+        <input type="text" id="signupName" placeholder="Full name">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="signupEmail" placeholder="admin@school.edu">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="signupPassword" placeholder="Min. 6 characters">
+      </div>
+      <input type="hidden" id="signupRole" value="admin">
+      <button class="gen-btn" id="signupBtn" onclick="doSignup()">Create Admin Account</button>
+    </div>
+  </div>
+
+  <div class="forgot">Having trouble? Contact your school administrator.</div>
+</div>
+
+<!-- SCRIPTS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script src="auth.js"></script>
+<script>
+  // Check if already logged in
+  (async () => {
+    const session = await Auth.getSession().catch(() => null);
+    if (session) Auth.redirectByRole(session.profile.role);
+  })();
+
+  function switchTab(tab) {
+    document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+    document.getElementById('tabSignup').classList.toggle('active', tab === 'signup');
+    document.getElementById('loginForm').style.display  = tab === 'login'  ? '' : 'none';
+    document.getElementById('signupForm').style.display = tab === 'signup' ? '' : 'none';
+    clearAlert();
+  }
+
+  function showAlert(msg, type='error') {
+    document.getElementById('alertBox').innerHTML =
+      `<div class="alert alert-${type}">${msg}</div>`;
+  }
+  function clearAlert() { document.getElementById('alertBox').innerHTML = ''; }
+
+  async function doLogin() {
+    const email    = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    if (!email || !password) return showAlert('Please enter email and password.');
+    const btn = document.getElementById('loginBtn');
+    btn.disabled = true; btn.textContent = 'Signing in…';
+    try {
+      await Auth.signIn(email, password);
+      const session = await Auth.getSession();
+      Auth.redirectByRole(session.profile.role);
+    } catch(e) {
+      showAlert(e.message || 'Login failed.');
+      btn.disabled = false; btn.textContent = 'Sign In';
+    }
+  }
+
+  async function doSignup() {
+    const name     = document.getElementById('signupName').value.trim();
+    const email    = document.getElementById('signupEmail').value.trim();
+    const password = document.getElementById('signupPassword').value;
+    if (!name || !email || !password) return showAlert('Please fill in all fields.');
+    if (password.length < 6) return showAlert('Password must be at least 6 characters.');
+    const btn = document.getElementById('signupBtn');
+    btn.disabled = true; btn.textContent = 'Creating…';
+    try {
+      await Auth.signUp(email, password, 'admin', name);
+      showAlert('Admin account created! Check your email to confirm, then sign in.', 'success');
+      btn.disabled = false; btn.textContent = 'Create Admin Account';
+      switchTab('login');
+    } catch(e) {
+      showAlert(e.message || 'Sign up failed.');
+      btn.disabled = false; btn.textContent = 'Create Admin Account';
+    }
+  }
+
+  // Allow Enter key to submit
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      if (document.getElementById('loginForm').style.display !== 'none') doLogin();
+      else doSignup();
+    }
+  });
+</script>
+</body>
+</html>
