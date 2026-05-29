@@ -1328,8 +1328,6 @@ Generate ONLY a JSON object, no markdown:
     setDbCards(prev => prev.filter(c => c.id !== id));
   };
 
-  const typeColor = DB_TYPE_OPTIONS.find(t => t.id === cardType)?.color || '#ef4444';
-  const rarityColor = DB_RARITY_OPTIONS.find(r => r.id === cardRarity)?.color || '#9ca3af';
   const currentImage = dbCroppedImage || dbImage;
 
   return (
@@ -1519,36 +1517,25 @@ Generate ONLY a JSON object, no markdown:
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
           <div className="tp-section">3 · Preview & Save</div>
 
-          {/* Mini card preview */}
-          <div style={{ width:'100%', aspectRatio:'2.5/3.5', borderRadius:14, overflow:'hidden', border:`5px solid ${typeColor}`, background:'#111827', display:'flex', flexDirection:'column', boxShadow:`0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px ${rarityColor}44`, position:'relative' }}>
-            <div style={{ position:'absolute', inset:0, background:`linear-gradient(to bottom, ${typeColor}55, transparent 50%, #000)`, pointerEvents:'none' }} />
-            {/* Header */}
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'0.5rem 0.6rem', zIndex:1, position:'relative' }}>
-              <span style={{ color:'white', fontWeight:700, fontSize:'0.78rem', textShadow:'1px 1px 3px black', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', maxWidth:'65%' }}>{cardName || 'Card Name'}</span>
-              <span style={{ fontSize:'0.52rem', fontWeight:800, padding:'2px 5px', borderRadius:4, background:rarityColor, color:'#fff', textTransform:'uppercase', letterSpacing:'0.05em', flexShrink:0 }}>{cardRarity}</span>
-            </div>
-            {/* Image */}
-            <div style={{ margin:'0 0.5rem', aspectRatio:'4/3', background:'#1a1a2e', border:'2px solid #333', borderRadius:5, overflow:'hidden', zIndex:1, position:'relative', flexShrink:0 }}>
-              {currentImage ? (
-                <img src={currentImage} alt="card art" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-              ) : (
-                <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', color:'#555', fontSize:'0.68rem', flexDirection:'column' }}>
-                  <span style={{ fontSize:'1.2rem' }}>🖼</span>No Image
-                </div>
-              )}
-            </div>
-            {/* Type */}
-            <div style={{ textAlign:'center', padding:'2px 0', fontSize:'0.58rem', fontWeight:800, color:typeColor, background:'rgba(0,0,0,0.5)', letterSpacing:'0.2em', textTransform:'uppercase', zIndex:1, position:'relative' }}>✦ {cardType} ✦</div>
-            {/* Description */}
-            <div style={{ flex:1, margin:'0.2rem 0.4rem', padding:'0.3rem 0.45rem', background:'rgba(0,0,0,0.55)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:4, overflow:'hidden', zIndex:1, position:'relative' }}>
-              <p style={{ color:'#ccc', fontSize:'0.58rem', lineHeight:1.4, fontStyle:'italic', margin:0 }}>{cardDescription || 'A mysterious creature of untold power…'}</p>
-            </div>
-            {/* Stats */}
-            <div style={{ display:'flex', justifyContent:'space-around', padding:'0.3rem 0.4rem', background:'rgba(0,0,0,0.75)', margin:'0 0.4rem 0.4rem', borderRadius:5, border:'1px solid rgba(255,255,255,0.1)', zIndex:1, position:'relative' }}>
-              <span style={{ color:'#fb923c', fontSize:'0.68rem', fontWeight:800 }}>⚔️ {stats.attack}</span>
-              <span style={{ color:'#60a5fa', fontSize:'0.68rem', fontWeight:800 }}>🛡️ {stats.defense}</span>
-              <span style={{ color:'#34d399', fontSize:'0.68rem', fontWeight:800 }}>💨 {stats.speed}</span>
-            </div>
+          {/* PokeCard live preview */}
+          <div style={{ transform:'scale(0.72)', transformOrigin:'top center', marginBottom: '-80px' }}>
+            <PokeCard card={{
+              id: 'preview',
+              student_id: '',
+              teacher_id: '',
+              card_name: cardName || 'Card Name',
+              hp: stats.hp,
+              type: cardType,
+              rarity: cardRarity as any,
+              description: cardDescription || 'A mysterious creature of untold power…',
+              stat1_name: 'Attack',  stat1_val: stats.attack,
+              stat2_name: 'Defense', stat2_val: stats.defense,
+              stat3_name: 'Speed',   stat3_val: stats.speed,
+              move1_name: move1.name || 'Strike ⚔️', move1_dmg: move1.dmg,
+              move2_name: move2.name || 'Power Blast 💥', move2_dmg: move2.dmg,
+              image_url: currentImage || '',
+              created_at: '',
+            }} showShimmerBtn />
           </div>
 
           {/* Skill points indicator */}
