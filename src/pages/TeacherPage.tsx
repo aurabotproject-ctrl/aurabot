@@ -739,13 +739,6 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         const studentCards = cards.filter(c => c.student_id === modal.data.id);
         const handleDownload = () => {
           // ── helpers ──────────────────────────────────────────────────────
-          const TYPE_COLORS: Record<string, string> = {
-            fire: '#ef4444', water: '#3b82f6', nature: '#22c55e',
-            electric: '#eab308', psychic: '#a855f7',
-          };
-          const RARITY_COLORS: Record<string, string> = {
-            common: '#9ca3af', silver: '#94a3b8', 'gold-rare': '#f59e0b', prismatic: '#a855f7',
-          };
           const RARITY_BG: Record<string, string> = {
             common:     'linear-gradient(160deg,#f5e97a 0%,#e8c830 40%,#f5e097 70%,#ffe680 100%)',
             silver:     'linear-gradient(160deg,#d8e4ee 0%,#a8bfcf 40%,#e0eaf2 70%,#c0d4e4 100%)',
