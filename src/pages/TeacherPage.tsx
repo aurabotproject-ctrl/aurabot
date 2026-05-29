@@ -7,13 +7,14 @@ import { sb } from '../lib/supabase';
 import type { Session } from '../lib/auth';
 import type { Student, Card } from '../lib/supabase';
 
-type TabKey = 'generate' | 'weekly' | 'cards' | 'students' | 'homecomms' | 'settings';
+type TabKey = 'generate' | 'weekly' | 'cards' | 'students' | 'stars' | 'homecomms' | 'settings';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'generate', label: '✦ Card Database' },
   { key: 'weekly', label: '📋 Weekly Project' },
   { key: 'cards', label: 'My Cards' },
   { key: 'students', label: 'Students' },
+  { key: 'stars', label: '⭐ Stars' },
   { key: 'homecomms', label: '🏠 Home Communication' },
   { key: 'settings', label: 'Settings' },
 ];
@@ -422,6 +423,10 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         )}
 
         {/* Home Communication Tab */}
+        {tab === 'stars' && (
+          <StarsTab students={students} session={session} />
+        )}
+
         {tab === 'homecomms' && (
           <div style={{ maxWidth: 760 }}>
             <div className="tp-section" style={{ marginBottom: 16 }}>📣 Home Communication</div>
@@ -1029,6 +1034,200 @@ function ModalForm({ fields, onSubmit, submitLabel, error, onCancel }: {
 
 
 
+
+// ══════════════════════════════════════════════════════════════════════
+// STARS TAB — Teacher awards stars to students (like ClassDojo)
+// ══════════════════════════════════════════════════════════════════════
+
+const BASE_COLORS = [
+  { light: '#e3f2fd', mid: '#90caf9', dark: '#42a5f5' }, // Sky
+  { light: '#fce4ec', mid: '#f8bbd0', dark: '#f48fb1' }, // Bubblegum
+  { light: '#f1f8e9', mid: '#c5e1a5', dark: '#8bc34a' }, // Minty
+  { light: '#fffde7', mid: '#fff176', dark: '#fdd835' }, // Lemon
+  { light: '#f3e5f5', mid: '#ce93d8', dark: '#ab47bc' }, // Grape
+  { light: '#e0f7fa', mid: '#80deea', dark: '#00bcd4' }, // Ocean
+  { light: '#fff3e0', mid: '#ffcc80', dark: '#ff9800' }, // Tangerine
+  { light: '#fce4ec', mid: '#ef9a9a', dark: '#e53935' }, // Crimson
+];
+
+// Simple inline mini-bot renderer for teacher view (no localStorage dependency)
+function MiniBotAvatar({ colorIndex, size = 90 }: { colorIndex: number; size?: number }) {
+  const theme = BASE_COLORS[colorIndex % BASE_COLORS.length];
+  const s = size;
+  const scale = s / 100;
+  return (
+    <svg width={s} height={s * 1.1} viewBox="0 0 100 110" style={{ overflow: 'visible', filter: `drop-shadow(0 4px 8px ${theme.dark}55)` }}>
+      {/* Antenna */}
+      <rect x="48" y="2" width="4" height="12" rx="2" fill={theme.mid} />
+      <circle cx="50" cy="2" r="4" fill={theme.dark} />
+      {/* Ears */}
+      <rect x="10" y="22" width="10" height="22" rx="5" fill={theme.mid} />
+      <rect x="80" y="22" width="10" height="22" rx="5" fill={theme.mid} />
+      {/* Head */}
+      <rect x="18" y="16" width="64" height="46" rx="14" fill={theme.mid} />
+      {/* Face screen */}
+      <rect x="24" y="22" width="52" height="28" rx="8" fill="#111827" />
+      {/* Eyes */}
+      <circle cx="38" cy="36" r="6" fill={theme.dark} opacity="0.9" />
+      <circle cx="62" cy="36" r="6" fill={theme.dark} opacity="0.9" />
+      <circle cx="40" cy="34" r="2" fill="white" opacity="0.7" />
+      <circle cx="64" cy="34" r="2" fill="white" opacity="0.7" />
+      {/* Neck */}
+      <rect x="43" y="62" width="14" height="8" rx="4" fill={theme.mid} />
+      {/* Arms */}
+      <rect x="6" y="72" width="16" height="36" rx="8" fill={theme.mid} />
+      <rect x="78" y="72" width="16" height="36" rx="8" fill={theme.mid} />
+      {/* Body */}
+      <rect x="20" y="70" width="60" height="28" rx="14" fill={theme.mid} />
+      {/* Chest screen */}
+      <rect x="28" y="74" width="44" height="18" rx="6" fill="#111827" />
+      <rect x="30" y="77" width="28" height="3" rx="2" fill={theme.dark} opacity="0.8" />
+      <rect x="30" y="82" width="18" height="2" rx="1" fill={theme.dark} opacity="0.5" />
+      {/* Legs */}
+      <rect x="30" y="98" width="14" height="10" rx="5" fill={theme.mid} />
+      <rect x="56" y="98" width="14" height="10" rx="5" fill={theme.mid} />
+    </svg>
+  );
+}
+
+function StarsTab({ students, session }: { students: Student[]; session: NonNullable<import('../lib/auth').Session> }) {
+  const [starPoints, setStarPoints] = React.useState<Record<string, number>>({});
+  const [loading, setLoading] = React.useState(true);
+  const [giving, setGiving] = React.useState<string | null>(null);
+  const [flash, setFlash] = React.useState<Record<string, string>>({});
+  const [colorMap, setColorMap] = React.useState<Record<string, number>>({});
+
+  React.useEffect(() => {
+    loadStars();
+    loadColors();
+  }, [students]);
+
+  const loadStars = async () => {
+    setLoading(true);
+    try {
+      const ids = students.map(s => s.id);
+      if (ids.length === 0) { setLoading(false); return; }
+      const { data } = await sb.from('student_star_points')
+        .select('student_id, points')
+        .in('student_id', ids);
+      const map: Record<string, number> = {};
+      (data || []).forEach((r: any) => { map[r.student_id] = r.points; });
+      setStarPoints(map);
+    } catch { /* table may not exist yet */ }
+    setLoading(false);
+  };
+
+  const loadColors = async () => {
+    try {
+      const ids = students.map(s => s.id);
+      if (ids.length === 0) return;
+      const { data } = await sb.from('students').select('id, robot_color_index').in('id', ids);
+      const map: Record<string, number> = {};
+      (data || []).forEach((r: any) => { map[r.id] = r.robot_color_index || 0; });
+      setColorMap(map);
+    } catch {}
+  };
+
+  const giveStars = async (studentId: string, amount: number, type: 'bronze' | 'silver' | 'gold') => {
+    setGiving(studentId);
+    try {
+      const current = starPoints[studentId] || 0;
+      const newTotal = current + amount;
+      await sb.from('student_star_points').upsert({
+        student_id: studentId,
+        teacher_id: session.user.id,
+        points: newTotal,
+      }, { onConflict: 'student_id' });
+      setStarPoints(prev => ({ ...prev, [studentId]: newTotal }));
+      setFlash(prev => ({ ...prev, [studentId]: type }));
+      setTimeout(() => setFlash(prev => { const n = { ...prev }; delete n[studentId]; return n; }), 1200);
+    } catch (err: any) { alert('Error: ' + err.message); }
+    setGiving(null);
+  };
+
+  const starColors = {
+    bronze: { bg: 'linear-gradient(135deg,#cd7f32,#a0522d)', label: '🥉', pts: 1, color: '#cd7f32' },
+    silver: { bg: 'linear-gradient(135deg,#c0c0c0,#909090)', label: '🥈', pts: 2, color: '#a0a0a0' },
+    gold:   { bg: 'linear-gradient(135deg,#ffd700,#ffa500)', label: '🥇', pts: 3, color: '#ffd700' },
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <style>{`
+        @keyframes starPop { 0% { transform:scale(1); } 40% { transform:scale(1.18); } 100% { transform:scale(1); } }
+        @keyframes flashGlow { 0%,100% { box-shadow:none; } 50% { box-shadow:0 0 28px 8px rgba(255,215,0,0.55); } }
+        .star-card-flash { animation: flashGlow 1.2s ease-out; }
+        @keyframes botBounce { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-5px); } }
+        .mini-bot { animation: botBounce 2.8s ease-in-out infinite; }
+      `}</style>
+
+      {/* Header */}
+      <div style={{ background: 'linear-gradient(135deg,rgba(255,215,0,0.12),rgba(255,165,0,0.08))', borderRadius: 20, padding: '18px 24px', border: '1.5px solid rgba(255,200,50,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <div style={{ fontSize: '1rem', fontWeight: 900, color: '#92400e', marginBottom: 4 }}>⭐ Star Points</div>
+          <div style={{ fontSize: '0.8rem', color: '#b45309', lineHeight: 1.5 }}>
+            Award stars to students — they spend them on card packs. &nbsp;
+            <span style={{ background: '#cd7f3222', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#92400e' }}>🥉 Bronze = 1pt</span>&nbsp;
+            <span style={{ background: '#c0c0c022', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#606060' }}>🥈 Silver = 2pts</span>&nbsp;
+            <span style={{ background: '#ffd70022', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#a07000' }}>🥇 Gold = 3pts</span>
+          </div>
+        </div>
+        <div style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 700 }}>
+          {students.length} students
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#9090c0', fontSize: '0.85rem' }}>Loading…</div>
+      ) : students.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#9090c0', fontSize: '0.85rem', fontStyle: 'italic' }}>No students yet — add some in the Students tab first.</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 16 }}>
+          {students.map(student => {
+            const pts = starPoints[student.id] || 0;
+            const colorIdx = colorMap[student.id] || 0;
+            const isFlashing = flash[student.id];
+            const isGiving = giving === student.id;
+            return (
+              <div key={student.id}
+                className={isFlashing ? 'star-card-flash' : ''}
+                style={{ background: 'white', borderRadius: 20, padding: '16px 12px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1.5px solid rgba(180,160,220,0.15)', transition: 'transform 0.2s', cursor: 'default', position: 'relative' }}>
+
+                {/* Star points badge */}
+                <div style={{ position: 'absolute', top: -8, right: -8, background: pts > 0 ? 'linear-gradient(135deg,#ffd700,#ff9500)' : '#e5e7eb', color: pts > 0 ? 'white' : '#9ca3af', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.8rem', boxShadow: pts > 0 ? '0 2px 8px rgba(255,165,0,0.5)' : 'none', border: '2px solid white', transition: 'all 0.3s' }}>
+                  {pts}
+                </div>
+
+                {/* Bot avatar */}
+                <div className="mini-bot" style={{ animationDelay: `${Math.random() * 2}s` }}>
+                  <MiniBotAvatar colorIndex={colorIdx} size={80} />
+                </div>
+
+                {/* Name */}
+                <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#3040a0', textAlign: 'center', lineHeight: 1.2 }}>{student.name}</div>
+
+                {/* Award buttons */}
+                <div style={{ display: 'flex', gap: 5, marginTop: 4, opacity: isGiving ? 0.5 : 1, transition: 'opacity 0.2s' }}>
+                  {(Object.entries(starColors) as [string, typeof starColors.bronze][]).map(([type, cfg]) => (
+                    <button key={type} disabled={isGiving !== null}
+                      onClick={() => giveStars(student.id, cfg.pts, type as any)}
+                      title={`+${cfg.pts} star point${cfg.pts > 1 ? 's' : ''}`}
+                      style={{ width: 34, height: 34, borderRadius: 10, border: 'none', background: cfg.bg, cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 2px 6px ${cfg.color}66`, transition: 'transform 0.15s', flexShrink: 0 }}
+                      onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.15)')}
+                      onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+                    >
+                      {cfg.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ══════════════════════════════════════════════════════════════════════
 // CARD DATABASE TAB — Teacher creates cards for the pack pool
