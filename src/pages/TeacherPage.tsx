@@ -1054,7 +1054,6 @@ const BASE_COLORS = [
 function MiniBotAvatar({ colorIndex, size = 90 }: { colorIndex: number; size?: number }) {
   const theme = BASE_COLORS[colorIndex % BASE_COLORS.length];
   const s = size;
-  const scale = s / 100;
   return (
     <svg width={s} height={s * 1.1} viewBox="0 0 100 110" style={{ overflow: 'visible', filter: `drop-shadow(0 4px 8px ${theme.dark}55)` }}>
       {/* Antenna */}
