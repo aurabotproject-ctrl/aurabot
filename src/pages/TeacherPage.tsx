@@ -1700,6 +1700,8 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
       </div>
     </div>
   );
+}
+
 // ══════════════════════════════════════════════════════════════════════
 // WEEKLY PROJECT TAB
 // ══════════════════════════════════════════════════════════════════════
