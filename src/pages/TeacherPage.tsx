@@ -1232,12 +1232,12 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
 // CARD DATABASE TAB — Teacher creates cards for the pack pool
 // ══════════════════════════════════════════════════════════════════════
 
-const DB_TYPE_OPTIONS = [
-  { id: 'fire',     label: '🔥 Fire',     color: '#ef4444' },
-  { id: 'water',    label: '💧 Water',    color: '#3b82f6' },
-  { id: 'nature',   label: '🌿 Nature',   color: '#22c55e' },
-  { id: 'electric', label: '⚡ Electric', color: '#eab308' },
-  { id: 'psychic',  label: '🔮 Psychic',  color: '#a855f7' },
+const DB_DECK_OPTIONS = [
+  { id: 'xanimals',  label: '🧬 Xanimals',  color: '#06b6d4' },
+  { id: 'animals',   label: '🐾 Animals',   color: '#22c55e' },
+  { id: 'creatures', label: '👾 Creatures',  color: '#a855f7' },
+  { id: 'humanoids', label: '🧑 Humanoids', color: '#f59e0b' },
+  { id: 'robots',    label: '🤖 Robots',    color: '#3b82f6' },
 ];
 
 const DB_RARITY_OPTIONS = [
@@ -1248,6 +1248,459 @@ const DB_RARITY_OPTIONS = [
 ];
 
 function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth').Session> }) {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Card fields
+  const [cardName, setCardName] = React.useState('');
+  const [cardDeck, setCardDeck] = React.useState('animals');
+  const [cardRarity, setCardRarity] = React.useState('common');
+  const [cardDescription, setCardDescription] = React.useState('');
+  const [isRareExclusive, setIsRareExclusive] = React.useState(false);
+  const [maxCopies, setMaxCopies] = React.useState(5);
+  const [weakActionName, setWeakActionName] = React.useState('');
+  const [strongActionName, setStrongActionName] = React.useState('');
+
+  // Stats — set randomly on rarity change
+  const [hp, setHp] = React.useState(90);
+  const [weakDmg, setWeakDmg] = React.useState(45);
+  const [strongDmg, setStrongDmg] = React.useState(60);
+
+  // Image
+  const [dbImage, setDbImage] = React.useState<string | null>(null);
+  const [dbCroppedImage, setDbCroppedImage] = React.useState<string | null>(null);
+  const [dbScale, setDbScale] = React.useState(1);
+  const [dbRotation, setDbRotation] = React.useState(0);
+  const [dbPosition, setDbPosition] = React.useState({ x: 0, y: 0 });
+  const [dbIsDragging, setDbIsDragging] = React.useState(false);
+  const [dbDragStart, setDbDragStart] = React.useState({ clientX: 0, clientY: 0, startX: 0, startY: 0 });
+
+  // Save
+  const [saving, setSaving] = React.useState(false);
+  const [savedMsg, setSavedMsg] = React.useState('');
+
+  // Database list
+  const [dbCards, setDbCards] = React.useState<any[]>([]);
+  const [loadingDb, setLoadingDb] = React.useState(true);
+
+  // Stat ranges per rarity
+  const RARITY_RANGES: Record<string, { hpMin:number; hpMax:number; weakMin:number; weakMax:number; strongMin:number; strongMax:number; skillPts:number }> = {
+    'common':    { hpMin:80,  hpMax:100, weakMin:40, weakMax:50,  strongMin:50,  strongMax:70,  skillPts:1 },
+    'silver':    { hpMin:100, hpMax:120, weakMin:50, weakMax:60,  strongMin:60,  strongMax:80,  skillPts:2 },
+    'gold-rare': { hpMin:120, hpMax:140, weakMin:60, weakMax:75,  strongMin:80,  strongMax:100, skillPts:3 },
+    'prismatic': { hpMin:150, hpMax:180, weakMin:75, weakMax:95,  strongMin:100, strongMax:130, skillPts:5 },
+  };
+
+  const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+  const rollStats = (rarity: string) => {
+    const r = RARITY_RANGES[rarity] || RARITY_RANGES['common'];
+    setHp(rand(r.hpMin, r.hpMax));
+    setWeakDmg(rand(r.weakMin, r.weakMax));
+    setStrongDmg(rand(r.strongMin, r.strongMax));
+  };
+
+  const handleRarityChange = (rarity: string) => {
+    setCardRarity(rarity);
+    rollStats(rarity);
+  };
+
+  React.useEffect(() => {
+    rollStats(cardRarity);
+    loadDbCards();
+  }, []);
+
+  const loadDbCards = async () => {
+    setLoadingDb(true);
+    try {
+      const { data } = await sb.from('card_database')
+        .select('*')
+        .eq('teacher_id', session.user.id)
+        .order('created_at', { ascending: false });
+      setDbCards(data || []);
+    } catch { }
+    setLoadingDb(false);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      setDbImage(ev.target?.result as string);
+      setDbCroppedImage(null);
+      setDbScale(1); setDbRotation(0); setDbPosition({ x: 0, y: 0 });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const cropImage = (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (!dbImage) { reject(new Error('No image')); return; }
+      const OUTPUT_W = 400; const OUTPUT_H = 300;
+      const canvas = document.createElement('canvas');
+      canvas.width = OUTPUT_W; canvas.height = OUTPUT_H;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('Canvas error')); return; }
+      const img = new Image();
+      img.onload = () => {
+        ctx.save();
+        ctx.translate(OUTPUT_W / 2, OUTPUT_H / 2);
+        ctx.rotate((dbRotation * Math.PI) / 180);
+        ctx.scale(dbScale, dbScale);
+        ctx.translate((dbPosition.x / 100) * OUTPUT_W, (dbPosition.y / 100) * OUTPUT_H);
+        const coverScale = Math.max(OUTPUT_W / img.naturalWidth, OUTPUT_H / img.naturalHeight);
+        const drawW = img.naturalWidth * coverScale;
+        const drawH = img.naturalHeight * coverScale;
+        ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+        ctx.restore();
+        resolve(canvas.toDataURL('image/jpeg', 0.92));
+      };
+      img.onerror = () => reject(new Error('Image load error'));
+      img.crossOrigin = 'anonymous';
+      img.src = dbImage;
+    });
+  };
+
+  const handleCrop = async () => {
+    try { setDbCroppedImage(await cropImage()); }
+    catch (err: any) { alert(err.message || 'Crop failed'); }
+  };
+
+  const handleSaveToDatabase = async () => {
+    if (!cardName.trim()) { setSavedMsg('Enter a card name.'); return; }
+    if (!cardDescription.trim()) { setSavedMsg('Enter a card description.'); return; }
+    if (!weakActionName.trim()) { setSavedMsg('Enter a weak action name.'); return; }
+    if (!strongActionName.trim()) { setSavedMsg('Enter a strong action name.'); return; }
+    setSaving(true); setSavedMsg('');
+    try {
+      const imageUrl = dbCroppedImage || dbImage || '';
+      const r = RARITY_RANGES[cardRarity] || RARITY_RANGES['common'];
+      const payload = {
+        teacher_id: session.user.id,
+        card_name: cardName.trim(),
+        type: cardDeck,
+        rarity: cardRarity,
+        description: cardDescription,
+        image_url: imageUrl,
+        hp,
+        stat1_name: 'HP',        stat1_val: hp,
+        stat2_name: weakActionName.trim(),  stat2_val: weakDmg,
+        stat3_name: strongActionName.trim(), stat3_val: strongDmg,
+        move1_name: weakActionName.trim(),  move1_dmg: weakDmg,
+        move2_name: strongActionName.trim(), move2_dmg: strongDmg,
+        skill_points: r.skillPts,
+        is_rare_exclusive: isRareExclusive,
+        max_copies: isRareExclusive ? maxCopies : null,
+        card_source: 'database',
+      };
+      const { error } = await sb.from('card_database').insert(payload);
+      if (error) throw error;
+      setSavedMsg('✓ Card added to database!');
+      setCardName(''); setCardDescription(''); setDbImage(null); setDbCroppedImage(null);
+      setWeakActionName(''); setStrongActionName('');
+      setIsRareExclusive(false); setMaxCopies(5);
+      setDbScale(1); setDbRotation(0); setDbPosition({ x: 0, y: 0 });
+      rollStats(cardRarity);
+      loadDbCards();
+    } catch (err: any) {
+      setSavedMsg('Error: ' + (err.message || 'Save failed'));
+    }
+    setSaving(false);
+  };
+
+  const handleDeleteCard = async (id: string) => {
+    if (!confirm('Delete this card from the database?')) return;
+    await sb.from('card_database').delete().eq('id', id);
+    setDbCards(prev => prev.filter(c => c.id !== id));
+  };
+
+  const currentImage = dbCroppedImage || dbImage;
+  const deckColor = DB_DECK_OPTIONS.find(d => d.id === cardDeck)?.color || '#3b82f6';
+  const rarityColor = DB_RARITY_OPTIONS.find(r => r.id === cardRarity)?.color || '#9ca3af';
+  const currentRange = RARITY_RANGES[cardRarity] || RARITY_RANGES['common'];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      {/* Header */}
+      <div style={{ background: 'linear-gradient(135deg,rgba(160,120,255,0.12),rgba(100,180,255,0.1))', borderRadius: 20, padding: '18px 24px', border: '1.5px solid rgba(160,140,220,0.2)' }}>
+        <div style={{ fontSize: '1rem', fontWeight: 900, color: '#3040a0', marginBottom: 4 }}>🃏 Card Database</div>
+        <div style={{ fontSize: '0.8rem', color: '#6070b0', lineHeight: 1.5 }}>
+          Create cards for the pack pool. Students spend ⭐ star points on packs — each pack pulls random cards from this database. Higher rarity cards appear less often.
+        </div>
+      </div>
+
+      {/* Card Builder */}
+      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr 260px', gap: '1.5rem', alignItems: 'start' }}>
+
+        {/* Column 1: Image */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="tp-panel">
+            <div className="tp-section">1 · Upload Image</div>
+            <div style={{ background: '#1a1a2e', borderRadius: 8, border: '2px dashed rgba(120,100,200,0.3)', minHeight: 130, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 8, position: 'relative' }}>
+              {dbImage ? (
+                <img src={dbImage} alt="preview" draggable={false}
+                  onMouseDown={e => { if (dbCroppedImage) return; e.preventDefault(); setDbIsDragging(true); setDbDragStart({ clientX: e.clientX, clientY: e.clientY, startX: dbPosition.x, startY: dbPosition.y }); }}
+                  onMouseMove={e => { if (!dbIsDragging || dbCroppedImage) return; const dx = ((e.clientX - dbDragStart.clientX) / (e.currentTarget.parentElement?.offsetWidth || 200)) * 100; const dy = ((e.clientY - dbDragStart.clientY) / (e.currentTarget.parentElement?.offsetHeight || 150)) * 100; setDbPosition({ x: dbDragStart.startX + dx, y: dbDragStart.startY + dy }); }}
+                  onMouseUp={() => setDbIsDragging(false)} onMouseLeave={() => setDbIsDragging(false)}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', transform: `translate(${dbPosition.x}%, ${dbPosition.y}%) scale(${dbScale}) rotate(${dbRotation}deg)`, cursor: dbCroppedImage ? 'default' : (dbIsDragging ? 'grabbing' : 'grab'), userSelect: 'none', minHeight: 130 }}
+                />
+              ) : (
+                <div style={{ textAlign: 'center', color: '#6070b0', fontSize: '0.75rem', padding: 16 }}><div style={{ fontSize: '2rem', marginBottom: 4 }}>🖼</div>No image</div>
+              )}
+            </div>
+            {dbImage && (
+              <div style={{ display: 'flex', gap: 4, marginBottom: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
+                {[['↺', () => setDbRotation(r => r - 90)], ['↻', () => setDbRotation(r => r + 90)], ['⟳', () => { setDbScale(1); setDbRotation(0); setDbPosition({ x:0,y:0 }); setDbCroppedImage(null); }]].map(([l, fn]: any) => (
+                  <button key={l} onClick={fn} style={{ fontSize:'0.68rem', padding:'3px 9px', border:'1px solid rgba(160,140,220,0.25)', borderRadius:4, background:'rgba(255,255,255,0.6)', cursor:'pointer', color:'#6070b0' }}>{l}</button>
+                ))}
+              </div>
+            )}
+            {dbImage && (
+              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
+                <span style={{ fontSize:'0.65rem', color:'#8090b0', flexShrink:0 }}>🔍</span>
+                <input type="range" min="0.3" max="5" step="0.05" value={dbScale}
+                  onChange={e => setDbScale(parseFloat(e.target.value))} style={{ flex:1, accentColor:'#9575cd' }} />
+                <span style={{ fontSize:'0.68rem', color:'#8090b0', width:28, textAlign:'right' }}>{dbScale.toFixed(1)}×</span>
+              </div>
+            )}
+            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} style={{ display:'none' }} />
+            <button onClick={() => fileInputRef.current?.click()} style={{ width:'100%', padding:'0.5rem', border:'1.5px dashed rgba(160,140,220,0.35)', borderRadius:8, background:'rgba(160,140,220,0.06)', color:'#6070b0', fontSize:'0.8rem', cursor:'pointer', fontWeight:700 }}>
+              📁 Upload Image
+            </button>
+            {dbImage && (
+              <>
+                <button onClick={handleCrop} style={{ width:'100%', marginTop:6, padding:'0.45rem', border:`2px solid ${dbCroppedImage ? 'rgba(80,160,80,0.5)' : 'rgba(80,160,80,0.3)'}`, borderRadius:8, background: dbCroppedImage ? 'rgba(80,160,80,0.12)' : 'rgba(80,160,80,0.06)', color:'#1a6a2a', fontSize:'0.8rem', cursor:'pointer', fontWeight:800 }}>
+                  {dbCroppedImage ? '✓ Re-crop' : '✂ Crop & Apply'}
+                </button>
+                <button onClick={() => { setDbImage(null); setDbCroppedImage(null); setDbScale(1); setDbRotation(0); setDbPosition({x:0,y:0}); }} style={{ width:'100%', marginTop:4, padding:'0.3rem', border:'1px solid rgba(200,50,50,0.2)', borderRadius:6, background:'transparent', color:'#b04040', fontSize:'0.72rem', cursor:'pointer' }}>
+                  ✕ Remove
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Column 2: Card Details */}
+        <div className="tp-panel" style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <div className="tp-section">2 · Card Details</div>
+
+          {/* Name */}
+          <div>
+            <label className="tp-label">Card Name</label>
+            <input type="text" className="tp-input" placeholder="e.g. Zephyr the Storm Fox"
+              value={cardName} onChange={e => setCardName(e.target.value)} />
+          </div>
+
+          {/* Rarity */}
+          <div>
+            <label className="tp-label">Rarity</label>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
+              {DB_RARITY_OPTIONS.map(r => (
+                <button key={r.id} onClick={() => handleRarityChange(r.id)} style={{ padding:'8px 10px', borderRadius:10, fontSize:'0.78rem', fontWeight:700, cursor:'pointer', textAlign:'left', border: cardRarity === r.id ? `2px solid ${r.color}` : '1.5px solid rgba(180,160,220,0.2)', background: cardRarity === r.id ? `${r.color}18` : 'rgba(255,255,255,0.5)', color: cardRarity === r.id ? r.color : '#8090b0' }}>
+                  <div>{r.label}</div>
+                  <div style={{ fontSize:'0.65rem', opacity:0.7, marginTop:1 }}>{r.hint}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Deck Type */}
+          <div>
+            <label className="tp-label">Deck Type</label>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              {DB_DECK_OPTIONS.map(d => (
+                <button key={d.id} onClick={() => setCardDeck(d.id)} style={{ padding:'5px 12px', borderRadius:20, fontSize:'0.76rem', fontWeight:700, cursor:'pointer', border: cardDeck === d.id ? `2px solid ${d.color}` : '1.5px solid rgba(180,160,220,0.2)', background: cardDeck === d.id ? `${d.color}18` : 'rgba(255,255,255,0.5)', color: cardDeck === d.id ? d.color : '#8090b0' }}>
+                  {d.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="tp-label">Description</label>
+            <textarea className="tp-input" rows={2} style={{ resize:'none' }}
+              placeholder="A mysterious creature that prowls the neon jungles…"
+              value={cardDescription} onChange={e => setCardDescription(e.target.value)} />
+          </div>
+
+          {/* Actions */}
+          <div>
+            <label className="tp-label">Actions</label>
+            <div style={{ background:'rgba(255,255,255,0.5)', border:'1.5px solid rgba(180,160,220,0.2)', borderRadius:12, padding:'12px 14px', display:'flex', flexDirection:'column', gap:10 }}>
+
+              {/* Weak action */}
+              <div>
+                <div style={{ fontSize:'0.72rem', color:'#8090b0', fontWeight:700, marginBottom:4 }}>⚡ Weak Action</div>
+                <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                  <input type="text" className="tp-input" style={{ flex:1 }}
+                    placeholder="e.g. Quick Scratch" value={weakActionName}
+                    onChange={e => setWeakActionName(e.target.value)} />
+                  <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                    <span style={{ fontSize:'0.75rem', fontWeight:800, color:'#f97316', minWidth:28 }}>{weakDmg}</span>
+                    <span style={{ fontSize:'0.65rem', color:'#9090c0' }}>dmg</span>
+                    <button onClick={() => setWeakDmg(rand(currentRange.weakMin, currentRange.weakMax))}
+                      title="Re-roll" style={{ fontSize:'0.75rem', padding:'3px 7px', border:'1px solid rgba(160,140,220,0.3)', borderRadius:6, background:'rgba(160,140,220,0.08)', cursor:'pointer', color:'#6070b0' }}>🎲</button>
+                  </div>
+                </div>
+                <div style={{ fontSize:'0.65rem', color:'#b0b8cc', marginTop:3 }}>Range: {currentRange.weakMin}–{currentRange.weakMax}</div>
+              </div>
+
+              {/* Strong action */}
+              <div>
+                <div style={{ fontSize:'0.72rem', color:'#8090b0', fontWeight:700, marginBottom:4 }}>💥 Strong Action</div>
+                <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                  <input type="text" className="tp-input" style={{ flex:1 }}
+                    placeholder="e.g. Thunder Strike" value={strongActionName}
+                    onChange={e => setStrongActionName(e.target.value)} />
+                  <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                    <span style={{ fontSize:'0.75rem', fontWeight:800, color:'#dc2626', minWidth:28 }}>{strongDmg}</span>
+                    <span style={{ fontSize:'0.65rem', color:'#9090c0' }}>dmg</span>
+                    <button onClick={() => setStrongDmg(rand(currentRange.strongMin, currentRange.strongMax))}
+                      title="Re-roll" style={{ fontSize:'0.75rem', padding:'3px 7px', border:'1px solid rgba(160,140,220,0.3)', borderRadius:6, background:'rgba(160,140,220,0.08)', cursor:'pointer', color:'#6070b0' }}>🎲</button>
+                  </div>
+                </div>
+                <div style={{ fontSize:'0.65rem', color:'#b0b8cc', marginTop:3 }}>Range: {currentRange.strongMin}–{currentRange.strongMax}</div>
+              </div>
+
+              {/* HP */}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:6, borderTop:'1px solid rgba(180,160,220,0.15)' }}>
+                <div>
+                  <div style={{ fontSize:'0.72rem', color:'#8090b0', fontWeight:700 }}>❤️ Hit Points</div>
+                  <div style={{ fontSize:'0.65rem', color:'#b0b8cc' }}>Range: {currentRange.hpMin}–{currentRange.hpMax}</div>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:'1rem', fontWeight:900, color:'#f87171' }}>{hp}</span>
+                  <button onClick={() => setHp(rand(currentRange.hpMin, currentRange.hpMax))}
+                    title="Re-roll HP" style={{ fontSize:'0.75rem', padding:'3px 7px', border:'1px solid rgba(160,140,220,0.3)', borderRadius:6, background:'rgba(160,140,220,0.08)', cursor:'pointer', color:'#6070b0' }}>🎲</button>
+                </div>
+              </div>
+
+              <button onClick={() => { rollStats(cardRarity); }}
+                style={{ width:'100%', padding:'6px', border:'1.5px solid rgba(160,140,220,0.3)', borderRadius:8, background:'rgba(160,140,220,0.08)', color:'#6070b0', fontSize:'0.78rem', cursor:'pointer', fontWeight:700 }}>
+                🎲 Re-roll All Stats
+              </button>
+            </div>
+          </div>
+
+          {/* Rare Exclusive */}
+          <div style={{ background: isRareExclusive ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.4)', border:`1.5px solid ${isRareExclusive ? 'rgba(245,158,11,0.3)' : 'rgba(180,160,220,0.2)'}`, borderRadius:12, padding:'10px 14px' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: isRareExclusive ? 8 : 0 }}>
+              <div>
+                <div style={{ fontSize:'0.8rem', fontWeight:800, color: isRareExclusive ? '#92400e' : '#6070b0' }}>🌟 Rare Exclusive</div>
+                <div style={{ fontSize:'0.65rem', color:'#8090b0', marginTop:2 }}>Limit how many students can own this card</div>
+              </div>
+              <button onClick={() => setIsRareExclusive(v => !v)} style={{ padding:'4px 14px', borderRadius:20, fontSize:'0.75rem', fontWeight:800, border:'none', cursor:'pointer', background: isRareExclusive ? 'rgba(245,158,11,0.2)' : 'rgba(180,160,220,0.15)', color: isRareExclusive ? '#92400e' : '#8090b0' }}>
+                {isRareExclusive ? 'ON' : 'OFF'}
+              </button>
+            </div>
+            {isRareExclusive && (
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <label className="tp-label" style={{ margin:0, flexShrink:0 }}>Max copies:</label>
+                <input type="number" min={1} max={50} value={maxCopies} onChange={e => setMaxCopies(parseInt(e.target.value)||1)}
+                  className="tp-input" style={{ width:70, textAlign:'center' }} />
+                <span style={{ fontSize:'0.7rem', color:'#9a7040' }}>students can own this</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Column 3: Preview + Save */}
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          <div className="tp-section">3 · Preview & Save</div>
+
+          {/* PokeCard preview */}
+          <div style={{ transform:'scale(0.72)', transformOrigin:'top center', marginBottom: '-80px' }}>
+            <PokeCard card={{
+              id: 'preview',
+              student_id: '',
+              teacher_id: '',
+              card_name: cardName || 'Card Name',
+              hp,
+              type: cardDeck,
+              rarity: cardRarity as any,
+              description: cardDescription || 'A mysterious creature awaits…',
+              stat1_name: 'HP',               stat1_val: hp,
+              stat2_name: weakActionName  || 'Weak Action',   stat2_val: weakDmg,
+              stat3_name: strongActionName || 'Strong Action', stat3_val: strongDmg,
+              move1_name: weakActionName  || 'Weak Action',   move1_dmg: weakDmg,
+              move2_name: strongActionName || 'Strong Action', move2_dmg: strongDmg,
+              image_url: currentImage || '',
+              created_at: '',
+            }} showShimmerBtn />
+          </div>
+
+          {/* Skill points */}
+          <div style={{ background:'rgba(255,200,50,0.1)', border:'1.5px solid rgba(255,200,50,0.3)', borderRadius:12, padding:'8px 14px', textAlign:'center' }}>
+            <div style={{ fontSize:'0.7rem', color:'#92400e', fontWeight:700 }}>⭐ Skill Points Value</div>
+            <div style={{ fontSize:'1.4rem', fontWeight:900, color:'#b45309' }}>
+              {currentRange.skillPts}
+            </div>
+            <div style={{ fontSize:'0.65rem', color:'#92400e', opacity:0.7 }}>awarded when student gets this card</div>
+          </div>
+
+          {savedMsg && (
+            <div style={{ padding:'8px 14px', borderRadius:10, fontSize:'0.8rem', fontWeight:700, background: savedMsg.startsWith('✓') ? 'rgba(80,200,120,0.1)' : 'rgba(255,80,80,0.08)', border:`1px solid ${savedMsg.startsWith('✓') ? 'rgba(80,200,120,0.3)' : 'rgba(255,80,80,0.25)'}`, color: savedMsg.startsWith('✓') ? '#1a6a3a' : '#c03030', textAlign:'center' }}>
+              {savedMsg}
+            </div>
+          )}
+
+          <button onClick={handleSaveToDatabase} disabled={saving} className="tp-btn-primary" style={{ width:'100%', fontSize:'0.88rem' }}>
+            {saving ? 'Saving…' : '💾 Add to Card Database'}
+          </button>
+
+          <p style={{ fontSize:'0.65rem', color:'#9090c0', textAlign:'center', margin:0, fontStyle:'italic' }}>
+            This card will appear in packs students buy with star points
+          </p>
+        </div>
+      </div>
+
+      {/* Existing Card Database */}
+      <div className="tp-panel">
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+          <div className="tp-section" style={{ margin:0 }}>Card Database ({dbCards.length} cards)</div>
+          <button onClick={loadDbCards} className="tp-btn-outline" style={{ fontSize:'0.72rem', padding:'5px 12px' }}>↺ Refresh</button>
+        </div>
+        {loadingDb ? (
+          <div style={{ textAlign:'center', color:'#9090c0', fontSize:'0.82rem', padding:20 }}>Loading…</div>
+        ) : dbCards.length === 0 ? (
+          <div style={{ textAlign:'center', color:'#9090c0', fontSize:'0.82rem', padding:30, fontStyle:'italic' }}>No cards yet — create your first card above!</div>
+        ) : (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:12 }}>
+            {dbCards.map(c => {
+              const dc = DB_DECK_OPTIONS.find(d => d.id === c.type)?.color || '#3b82f6';
+              const rc = DB_RARITY_OPTIONS.find(r => r.id === c.rarity)?.color || '#9ca3af';
+              return (
+                <div key={c.id} style={{ background:'rgba(255,255,255,0.6)', border:`1.5px solid ${rc}44`, borderRadius:14, overflow:'hidden', boxShadow:'0 2px 8px rgba(0,0,0,0.06)' }}>
+                  <div style={{ height:8, background:`linear-gradient(90deg,${dc},${rc})` }} />
+                  {c.image_url && <img src={c.image_url} alt={c.card_name} style={{ width:'100%', height:100, objectFit:'cover' }} />}
+                  <div style={{ padding:'8px 10px' }}>
+                    <div style={{ fontWeight:800, fontSize:'0.82rem', color:'#3040a0', marginBottom:2 }}>{c.card_name}</div>
+                    <div style={{ fontSize:'0.68rem', color:'#6070b0', marginBottom:4, fontStyle:'italic', lineHeight:1.35 }}>{c.description}</div>
+                    <div style={{ display:'flex', gap:6, marginBottom:6, flexWrap:'wrap' }}>
+                      <span style={{ fontSize:'0.62rem', padding:'2px 7px', borderRadius:10, background:`${dc}22`, color:dc, fontWeight:700 }}>{c.type}</span>
+                      <span style={{ fontSize:'0.62rem', padding:'2px 7px', borderRadius:10, background:`${rc}22`, color:rc, fontWeight:700 }}>{c.rarity}</span>
+                      {c.is_rare_exclusive && <span style={{ fontSize:'0.62rem', padding:'2px 7px', borderRadius:10, background:'rgba(245,158,11,0.15)', color:'#92400e', fontWeight:700 }}>🌟 ×{c.max_copies}</span>}
+                    </div>
+                    <div style={{ fontSize:'0.68rem', color:'#8090b0', marginBottom:6 }}>
+                      ❤️ {c.hp} &nbsp;⚡ {c.move1_dmg} &nbsp;💥 {c.move2_dmg}
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <span style={{ fontSize:'0.7rem', color:'#b45309', fontWeight:800 }}>⭐ {c.skill_points} pts</span>
+                      <button onClick={() => handleDeleteCard(c.id)} className="tp-btn-danger" style={{ fontSize:'0.68rem', padding:'3px 9px' }}>Delete</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Card fields
