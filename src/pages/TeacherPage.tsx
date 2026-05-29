@@ -1260,11 +1260,6 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
   const [weakActionName, setWeakActionName] = React.useState('');
   const [strongActionName, setStrongActionName] = React.useState('');
 
-  // Stats — set randomly on rarity change
-  const [hp, setHp] = React.useState(90);
-  const [weakDmg, setWeakDmg] = React.useState(45);
-  const [strongDmg, setStrongDmg] = React.useState(60);
-
   // Image
   const [dbImage, setDbImage] = React.useState<string | null>(null);
   const [dbCroppedImage, setDbCroppedImage] = React.useState<string | null>(null);
@@ -1282,7 +1277,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
   const [dbCards, setDbCards] = React.useState<any[]>([]);
   const [loadingDb, setLoadingDb] = React.useState(true);
 
-  // Stat ranges per rarity
+  // Stat ranges stored for reference — stats are rolled at pack-open time, not here
   const RARITY_RANGES: Record<string, { hpMin:number; hpMax:number; weakMin:number; weakMax:number; strongMin:number; strongMax:number; skillPts:number }> = {
     'common':    { hpMin:80,  hpMax:100, weakMin:40, weakMax:50,  strongMin:50,  strongMax:70,  skillPts:1 },
     'silver':    { hpMin:100, hpMax:120, weakMin:50, weakMax:60,  strongMin:60,  strongMax:80,  skillPts:2 },
@@ -1290,24 +1285,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
     'prismatic': { hpMin:150, hpMax:180, weakMin:75, weakMax:95,  strongMin:100, strongMax:130, skillPts:5 },
   };
 
-  const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
-
-  const rollStats = (rarity: string) => {
-    const r = RARITY_RANGES[rarity] || RARITY_RANGES['common'];
-    setHp(rand(r.hpMin, r.hpMax));
-    setWeakDmg(rand(r.weakMin, r.weakMax));
-    setStrongDmg(rand(r.strongMin, r.strongMax));
-  };
-
-  const handleRarityChange = (rarity: string) => {
-    setCardRarity(rarity);
-    rollStats(rarity);
-  };
-
-  React.useEffect(() => {
-    rollStats(cardRarity);
-    loadDbCards();
-  }, []);
+  React.useEffect(() => { loadDbCards(); }, []);
 
   const loadDbCards = async () => {
     setLoadingDb(true);
@@ -1318,6 +1296,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
         .order('created_at', { ascending: false });
       setDbCards(data || []);
     } catch { }
+
     setLoadingDb(false);
   };
 
@@ -1376,6 +1355,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
     try {
       const imageUrl = dbCroppedImage || dbImage || '';
       const r = RARITY_RANGES[cardRarity] || RARITY_RANGES['common'];
+      // Stats are NOT rolled here — stored as null, rolled at pack-open time
       const payload = {
         teacher_id: session.user.id,
         card_name: cardName.trim(),
@@ -1383,25 +1363,25 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
         rarity: cardRarity,
         description: cardDescription,
         image_url: imageUrl,
-        hp,
-        stat1_name: 'HP',        stat1_val: hp,
-        stat2_name: weakActionName.trim(),  stat2_val: weakDmg,
-        stat3_name: strongActionName.trim(), stat3_val: strongDmg,
-        move1_name: weakActionName.trim(),  move1_dmg: weakDmg,
-        move2_name: strongActionName.trim(), move2_dmg: strongDmg,
+        hp: null,
+        stat1_name: 'HP',                    stat1_val: null,
+        stat2_name: weakActionName.trim(),    stat2_val: null,
+        stat3_name: strongActionName.trim(),  stat3_val: null,
+        move1_name: weakActionName.trim(),    move1_dmg: null,
+        move2_name: strongActionName.trim(),  move2_dmg: null,
         skill_points: r.skillPts,
         is_rare_exclusive: isRareExclusive,
         max_copies: isRareExclusive ? maxCopies : null,
         card_source: 'database',
+        stats_sealed: true,
       };
       const { error } = await sb.from('card_database').insert(payload);
       if (error) throw error;
-      setSavedMsg('✓ Card added to database!');
+      setSavedMsg('✓ Card sealed and added to database!');
       setCardName(''); setCardDescription(''); setDbImage(null); setDbCroppedImage(null);
       setWeakActionName(''); setStrongActionName('');
       setIsRareExclusive(false); setMaxCopies(5);
       setDbScale(1); setDbRotation(0); setDbPosition({ x: 0, y: 0 });
-      rollStats(cardRarity);
       loadDbCards();
     } catch (err: any) {
       setSavedMsg('Error: ' + (err.message || 'Save failed'));
@@ -1496,7 +1476,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
             <label className="tp-label">Rarity</label>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
               {DB_RARITY_OPTIONS.map(r => (
-                <button key={r.id} onClick={() => handleRarityChange(r.id)} style={{ padding:'8px 10px', borderRadius:10, fontSize:'0.78rem', fontWeight:700, cursor:'pointer', textAlign:'left', border: cardRarity === r.id ? `2px solid ${r.color}` : '1.5px solid rgba(180,160,220,0.2)', background: cardRarity === r.id ? `${r.color}18` : 'rgba(255,255,255,0.5)', color: cardRarity === r.id ? r.color : '#8090b0' }}>
+                <button key={r.id} onClick={() => setCardRarity(r.id)} style={{ padding:'8px 10px', borderRadius:10, fontSize:'0.78rem', fontWeight:700, cursor:'pointer', textAlign:'left', border: cardRarity === r.id ? `2px solid ${r.color}` : '1.5px solid rgba(180,160,220,0.2)', background: cardRarity === r.id ? `${r.color}18` : 'rgba(255,255,255,0.5)', color: cardRarity === r.id ? r.color : '#8090b0' }}>
                   <div>{r.label}</div>
                   <div style={{ fontSize:'0.65rem', opacity:0.7, marginTop:1 }}>{r.hint}</div>
                 </button>
@@ -1526,60 +1506,34 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
 
           {/* Actions */}
           <div>
-            <label className="tp-label">Actions</label>
+            <label className="tp-label">Action Names</label>
             <div style={{ background:'rgba(255,255,255,0.5)', border:'1.5px solid rgba(180,160,220,0.2)', borderRadius:12, padding:'12px 14px', display:'flex', flexDirection:'column', gap:10 }}>
+
+              <div style={{ background:'rgba(160,140,220,0.06)', border:'1px solid rgba(160,140,220,0.15)', borderRadius:8, padding:'8px 10px', fontSize:'0.72rem', color:'#6070b0', lineHeight:1.5 }}>
+                🔒 <strong>Stats are sealed</strong> — HP and damage values are rolled randomly when a student opens their pack. Only name the actions here.
+              </div>
 
               {/* Weak action */}
               <div>
-                <div style={{ fontSize:'0.72rem', color:'#8090b0', fontWeight:700, marginBottom:4 }}>⚡ Weak Action</div>
-                <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                  <input type="text" className="tp-input" style={{ flex:1 }}
-                    placeholder="e.g. Quick Scratch" value={weakActionName}
-                    onChange={e => setWeakActionName(e.target.value)} />
-                  <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-                    <span style={{ fontSize:'0.75rem', fontWeight:800, color:'#f97316', minWidth:28 }}>{weakDmg}</span>
-                    <span style={{ fontSize:'0.65rem', color:'#9090c0' }}>dmg</span>
-                    <button onClick={() => setWeakDmg(rand(currentRange.weakMin, currentRange.weakMax))}
-                      title="Re-roll" style={{ fontSize:'0.75rem', padding:'3px 7px', border:'1px solid rgba(160,140,220,0.3)', borderRadius:6, background:'rgba(160,140,220,0.08)', cursor:'pointer', color:'#6070b0' }}>🎲</button>
-                  </div>
-                </div>
-                <div style={{ fontSize:'0.65rem', color:'#b0b8cc', marginTop:3 }}>Range: {currentRange.weakMin}–{currentRange.weakMax}</div>
+                <div style={{ fontSize:'0.72rem', color:'#8090b0', fontWeight:700, marginBottom:4 }}>⚡ Weak Action <span style={{ fontWeight:400, color:'#b0b8cc' }}>({currentRange.weakMin}–{currentRange.weakMax} dmg when opened)</span></div>
+                <input type="text" className="tp-input"
+                  placeholder="e.g. Quick Scratch" value={weakActionName}
+                  onChange={e => setWeakActionName(e.target.value)} />
               </div>
 
               {/* Strong action */}
               <div>
-                <div style={{ fontSize:'0.72rem', color:'#8090b0', fontWeight:700, marginBottom:4 }}>💥 Strong Action</div>
-                <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                  <input type="text" className="tp-input" style={{ flex:1 }}
-                    placeholder="e.g. Thunder Strike" value={strongActionName}
-                    onChange={e => setStrongActionName(e.target.value)} />
-                  <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-                    <span style={{ fontSize:'0.75rem', fontWeight:800, color:'#dc2626', minWidth:28 }}>{strongDmg}</span>
-                    <span style={{ fontSize:'0.65rem', color:'#9090c0' }}>dmg</span>
-                    <button onClick={() => setStrongDmg(rand(currentRange.strongMin, currentRange.strongMax))}
-                      title="Re-roll" style={{ fontSize:'0.75rem', padding:'3px 7px', border:'1px solid rgba(160,140,220,0.3)', borderRadius:6, background:'rgba(160,140,220,0.08)', cursor:'pointer', color:'#6070b0' }}>🎲</button>
-                  </div>
-                </div>
-                <div style={{ fontSize:'0.65rem', color:'#b0b8cc', marginTop:3 }}>Range: {currentRange.strongMin}–{currentRange.strongMax}</div>
+                <div style={{ fontSize:'0.72rem', color:'#8090b0', fontWeight:700, marginBottom:4 }}>💥 Strong Action <span style={{ fontWeight:400, color:'#b0b8cc' }}>({currentRange.strongMin}–{currentRange.strongMax} dmg when opened)</span></div>
+                <input type="text" className="tp-input"
+                  placeholder="e.g. Thunder Strike" value={strongActionName}
+                  onChange={e => setStrongActionName(e.target.value)} />
               </div>
 
-              {/* HP */}
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:6, borderTop:'1px solid rgba(180,160,220,0.15)' }}>
-                <div>
-                  <div style={{ fontSize:'0.72rem', color:'#8090b0', fontWeight:700 }}>❤️ Hit Points</div>
-                  <div style={{ fontSize:'0.65rem', color:'#b0b8cc' }}>Range: {currentRange.hpMin}–{currentRange.hpMax}</div>
-                </div>
-                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <span style={{ fontSize:'1rem', fontWeight:900, color:'#f87171' }}>{hp}</span>
-                  <button onClick={() => setHp(rand(currentRange.hpMin, currentRange.hpMax))}
-                    title="Re-roll HP" style={{ fontSize:'0.75rem', padding:'3px 7px', border:'1px solid rgba(160,140,220,0.3)', borderRadius:6, background:'rgba(160,140,220,0.08)', cursor:'pointer', color:'#6070b0' }}>🎲</button>
-                </div>
+              {/* HP range info */}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:6, borderTop:'1px solid rgba(180,160,220,0.15)', fontSize:'0.72rem', color:'#8090b0' }}>
+                <span>❤️ Hit Points</span>
+                <span style={{ fontWeight:700, color:'#b0b8cc' }}>{currentRange.hpMin}–{currentRange.hpMax} (rolled on open)</span>
               </div>
-
-              <button onClick={() => { rollStats(cardRarity); }}
-                style={{ width:'100%', padding:'6px', border:'1.5px solid rgba(160,140,220,0.3)', borderRadius:8, background:'rgba(160,140,220,0.08)', color:'#6070b0', fontSize:'0.78rem', cursor:'pointer', fontWeight:700 }}>
-                🎲 Re-roll All Stats
-              </button>
             </div>
           </div>
 
@@ -1616,27 +1570,31 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
               student_id: '',
               teacher_id: '',
               card_name: cardName || 'Card Name',
-              hp,
+              hp: 0,
               type: cardDeck,
               rarity: cardRarity as any,
               description: cardDescription || 'A mysterious creature awaits…',
-              stat1_name: 'HP',               stat1_val: hp,
-              stat2_name: weakActionName  || 'Weak Action',   stat2_val: weakDmg,
-              stat3_name: strongActionName || 'Strong Action', stat3_val: strongDmg,
-              move1_name: weakActionName  || 'Weak Action',   move1_dmg: weakDmg,
-              move2_name: strongActionName || 'Strong Action', move2_dmg: strongDmg,
+              stat1_name: 'HP',                              stat1_val: 0,
+              stat2_name: weakActionName   || 'Weak Action', stat2_val: 0,
+              stat3_name: strongActionName || 'Strong Action', stat3_val: 0,
+              move1_name: weakActionName   || 'Weak Action', move1_dmg: 0,
+              move2_name: strongActionName || 'Strong Action', move2_dmg: 0,
               image_url: currentImage || '',
               created_at: '',
             }} showShimmerBtn />
           </div>
 
-          {/* Skill points */}
-          <div style={{ background:'rgba(255,200,50,0.1)', border:'1.5px solid rgba(255,200,50,0.3)', borderRadius:12, padding:'8px 14px', textAlign:'center' }}>
-            <div style={{ fontSize:'0.7rem', color:'#92400e', fontWeight:700 }}>⭐ Skill Points Value</div>
-            <div style={{ fontSize:'1.4rem', fontWeight:900, color:'#b45309' }}>
-              {currentRange.skillPts}
+          {/* Sealed badge */}
+          <div style={{ background:'rgba(100,80,180,0.08)', border:'1.5px solid rgba(100,80,180,0.2)', borderRadius:12, padding:'10px 14px', textAlign:'center' }}>
+            <div style={{ fontSize:'0.8rem', fontWeight:800, color:'#4040a0' }}>🔒 Stats Sealed</div>
+            <div style={{ fontSize:'0.68rem', color:'#6070b0', marginTop:3, lineHeight:1.4 }}>
+              HP, damage & skill points are rolled<br/>randomly when a student opens their pack
             </div>
-            <div style={{ fontSize:'0.65rem', color:'#92400e', opacity:0.7 }}>awarded when student gets this card</div>
+            <div style={{ display:'flex', justifyContent:'center', gap:12, marginTop:8, fontSize:'0.7rem', color:'#8090b0' }}>
+              <span>❤️ {currentRange.hpMin}–{currentRange.hpMax}</span>
+              <span>⚡ {currentRange.weakMin}–{currentRange.weakMax}</span>
+              <span>💥 {currentRange.strongMin}–{currentRange.strongMax}</span>
+            </div>
           </div>
 
           {savedMsg && (
