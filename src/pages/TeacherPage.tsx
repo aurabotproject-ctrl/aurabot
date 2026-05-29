@@ -1416,8 +1416,6 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
   };
 
   const currentImage = dbCroppedImage || dbImage;
-  const deckColor = DB_DECK_OPTIONS.find(d => d.id === cardDeck)?.color || '#3b82f6';
-  const rarityColor = DB_RARITY_OPTIONS.find(r => r.id === cardRarity)?.color || '#9ca3af';
   const currentRange = RARITY_RANGES[cardRarity] || RARITY_RANGES['common'];
 
   return (
