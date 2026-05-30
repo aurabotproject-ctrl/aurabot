@@ -281,12 +281,25 @@ function LoginPage() {
     const loginPassword = currentRole === 'Student' ? studentPin : password;
     if (!loginEmail) { setError('Please enter your email.'); return; }
     if (!loginPassword) { setError(currentRole === 'Student' ? 'Please enter your PIN on the keypad.' : 'Please enter your password.'); return; }
-    if (currentRole === 'Student' && loginPassword.length !== 6) { setError('PIN must be 6 digits.'); return; }
+    if (currentRole === 'Student' && loginPassword.length !== 8) { setError('PIN must be 8 digits.'); return; }
     setLoading(true);
     try {
       await Auth.signIn(loginEmail, loginPassword);
       const s = await Auth.getSession();
-      if (s) Auth.redirectByRole(s.profile.role);
+      if (s) {
+        const dbRole = s.profile.role;
+        const selectedRole = currentRole.toLowerCase();
+        if (dbRole === 'admin') {
+          const target = selectedRole === 'admin' ? '/admin' : selectedRole === 'teacher' ? '/teacher' : '/student';
+          window.location.hash = target;
+        } else if (dbRole === selectedRole) {
+          Auth.redirectByRole(dbRole);
+        } else {
+          setError(`This account is a ${dbRole} account. Please select ${dbRole.charAt(0).toUpperCase() + dbRole.slice(1)} above.`);
+          await Auth.signOut();
+          setLoading(false);
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'Login failed. Check your credentials.');
       setLoading(false);
