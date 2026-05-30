@@ -677,7 +677,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                 setModalError('');
                 const pin = vals.password;
                 if (!/^\d{8}$/.test(pin)) { setModalError('PIN must be exactly 8 digits (numbers only).'); return; }
-                if (/^(\d)\1{7}$/.test(pin)) { setModalError('PIN cannot be 8 of the same digit (e.g. 11111111).'); return; }
+                if (/^(\d)\1{7}$/.test(pin)) { setModalError('PIN cannot be 8 of the same digit (e.g. 1111111111).'); return; }
                 try {
                   let newUser;
                   try {
@@ -928,7 +928,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
               Setting new keypad PIN for <strong>{modal.data.name}</strong>
             </p>
             <p className="text-xs mb-4" style={{ color: '#9a7a60' }}>
-              Must be exactly 8 digits. Cannot be 8 of the same number (e.g. 11111111).
+              Must be exactly 8 digits. Cannot be 8 of the same number (e.g. 1111111111).
             </p>
             <div className="mb-3">
               <label className="tp-label">New 6-Digit PIN</label>
@@ -942,7 +942,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
             <div className="flex gap-3 mt-4">
               <button className="tp-btn-gold" onClick={async () => {
                 if (!/^\d{8}$/.test(pw)) { setModalError('PIN must be exactly 8 digits.'); return; }
-                if (/^(\d)\1{7}$/.test(pw)) { setModalError('PIN cannot be 8 of the same digit (e.g. 11111111).'); return; }
+                if (/^(\d)\1{7}$/.test(pw)) { setModalError('PIN cannot be 8 of the same digit (e.g. 1111111111).'); return; }
                 if (pw !== pw2) { setModalError('PINs do not match.'); return; }
                 if (!modal.data.auth_user_id) { setModalError('Student has no linked account.'); return; }
                 try {
