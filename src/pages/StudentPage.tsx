@@ -1785,6 +1785,13 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
           {/* ── CARD CAROUSEL ── */}
           <CardCarousel cards={cards} onCardClick={setDetailCard} />
 
+          {/* ── SHOP & TRADE ── */}
+          <ShopAndTrade
+            studentId={studentId}
+            unlockedChoices={unlockedChoices}
+            onUnlock={async (choice) => { await saveUnlockChoice(choice); }}
+          />
+
           {/* ── HOME COMMUNICATION ── */}
           {(pinboard || homeComms.length > 0) && (
             <div style={{ marginTop: 28, borderRadius: 22, background: 'rgba(255,255,255,0.72)', border: '1.5px solid rgba(200,190,240,0.5)', boxShadow: '0 6px 28px rgba(160,120,220,0.10)', padding: '22px 24px', backdropFilter: 'blur(8px)' }}>
@@ -1848,6 +1855,201 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
         <WeeklyProjectModal project={weeklyProject} onClose={() => setShowProject(false)} />
       )}
     </>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// SHOP & TRADE
+// ══════════════════════════════════════════════════════════════════════
+
+const PACK_TYPES = [
+  { id: 'xanimals',  label: 'Xanimals Pack',  subtitle: 'Crossed Animals!',      color: '#7c3aed', glow: '#a855f7', emoji: '🧬' },
+  { id: 'animals',   label: 'Animals Pack',   subtitle: 'Real World Animals!',   color: '#16a34a', glow: '#22c55e', emoji: '🐾' },
+  { id: 'creatures', label: 'Creatures Pack', subtitle: 'Magical & Mythical!',   color: '#0369a1', glow: '#38bdf8', emoji: '👾' },
+  { id: 'humanoids', label: 'Humanoids Pack', subtitle: 'People & Warriors!',    color: '#b45309', glow: '#f59e0b', emoji: '🧑' },
+  { id: 'robots',    label: 'Robots Pack',    subtitle: 'Mechanical & Futuristic!', color: '#374151', glow: '#9ca3af', emoji: '🤖' },
+  { id: 'luckydip',  label: 'Lucky Dip Pack', subtitle: 'Mix of All Themes!',   color: '#be123c', glow: '#f43f5e', emoji: '🎲', isSpecial: true },
+];
+
+const UNLOCK_ITEMS = [
+  { id: 'color',    label: 'New Bot Colour',   desc: 'Unlock an extra colour for your AuraBot', emoji: '🎨', cost: 5 },
+  { id: 'face',     label: 'Face Colour Pack',  desc: 'Unlock a new face pixel colour palette',  emoji: '✨', cost: 5 },
+  { id: 'buildabot', label: 'Build-a-Bot',      desc: 'Unlock the full bot customisation studio', emoji: '🔧', cost: 5 },
+];
+
+function ShopAndTrade({ studentId, unlockedChoices, onUnlock }: {
+  studentId: string;
+  unlockedChoices: string[];
+  onUnlock: (choice: string) => Promise<void>;
+}) {
+  const [starPoints, setStarPoints] = React.useState<number | null>(null);
+  const [packImages, setPackImages] = React.useState<Record<string, string>>({});
+  const [buying, setBuying] = React.useState<string | null>(null);
+  const [unlocking, setUnlocking] = React.useState<string | null>(null);
+  const [msg, setMsg] = React.useState('');
+
+  React.useEffect(() => {
+    if (!studentId) return;
+    // Load star points
+    sb.from('student_star_points').select('points').eq('student_id', studentId).maybeSingle()
+      .then(({ data }) => setStarPoints(data?.points ?? 0));
+    // Load pack images uploaded by admin
+    sb.from('pack_images').select('pack_id, image_url')
+      .then(({ data }) => {
+        const map: Record<string, string> = {};
+        (data || []).forEach((r: any) => { map[r.pack_id] = r.image_url; });
+        setPackImages(map);
+      });
+  }, [studentId]);
+
+  const showMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
+
+  const handleBuyPack = async (packId: string) => {
+    if (starPoints === null || starPoints < 5) { showMsg('Not enough ⭐ star points! You need at least 5.'); return; }
+    setBuying(packId);
+    showMsg(`🎉 ${PACK_TYPES.find(p => p.id === packId)?.label} purchased! Cards coming soon…`);
+    setBuying(null);
+  };
+
+  const handleUnlock = async (item: typeof UNLOCK_ITEMS[0]) => {
+    if (starPoints === null || starPoints < item.cost) { showMsg(`Not enough ⭐ star points! You need ${item.cost}.`); return; }
+    if (unlockedChoices.includes(item.id)) { showMsg('Already unlocked!'); return; }
+    setUnlocking(item.id);
+    try {
+      await sb.from('student_star_points').update({ points: (starPoints || 0) - item.cost }).eq('student_id', studentId);
+      setStarPoints(p => (p || 0) - item.cost);
+      await onUnlock(item.id);
+      showMsg(`✓ ${item.label} unlocked!`);
+    } catch { showMsg('Error — try again'); }
+    setUnlocking(null);
+  };
+
+  return (
+    <div style={{ borderRadius: 22, background: 'rgba(255,255,255,0.72)', border: '1.5px solid rgba(200,190,240,0.5)', boxShadow: '0 6px 28px rgba(160,120,220,0.10)', padding: '22px 24px', backdropFilter: 'blur(8px)', marginTop: 8 }}>
+      <style>{`
+        @keyframes packFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+        .pack-card:hover { transform: translateY(-4px) scale(1.02); }
+        .pack-card { transition: all 0.25s ease; }
+        .shop-unlock:hover { transform: translateY(-2px); }
+        .shop-unlock { transition: all 0.2s; }
+      `}</style>
+
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: '1.15rem' }}>🛒</span>
+          <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#3040a0', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Shop & Trade</h2>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,rgba(255,200,50,0.15),rgba(255,165,0,0.1))', border: '1.5px solid rgba(255,200,50,0.3)', borderRadius: 20, padding: '6px 14px' }}>
+          <span style={{ fontSize: '1rem' }}>⭐</span>
+          <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#b45309' }}>{starPoints ?? '…'}</span>
+          <span style={{ fontSize: '0.68rem', color: '#92400e', fontWeight: 700 }}>star points</span>
+        </div>
+      </div>
+
+      {msg && (
+        <div style={{ background: msg.startsWith('Not') ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${msg.startsWith('Not') ? 'rgba(239,68,68,0.25)' : 'rgba(34,197,94,0.25)'}`, color: msg.startsWith('Not') ? '#dc2626' : '#16a34a', borderRadius: 10, padding: '8px 14px', fontSize: '0.82rem', fontWeight: 700, marginBottom: 16 }}>
+          {msg}
+        </div>
+      )}
+
+      {/* ── Card Packs ── */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9090c0', marginBottom: 14 }}>🃏 Card Packs — 5 ⭐ each • 3 cards per pack</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 14 }}>
+          {PACK_TYPES.map(pack => (
+            <div key={pack.id} className="pack-card" style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleBuyPack(pack.id)}>
+              {/* Pack visual */}
+              <div style={{ borderRadius: 14, overflow: 'hidden', border: `2.5px solid ${pack.color}`, boxShadow: `0 8px 24px ${pack.glow}44`, background: `linear-gradient(160deg, ${pack.color}ee, ${pack.color}99)`, position: 'relative', aspectRatio: '3/4', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', padding: '10px 8px 8px' }}>
+                {packImages[pack.id] ? (
+                  // Admin-uploaded image fills the pack
+                  <>
+                    <img src={packImages[pack.id]} alt={pack.label} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                    {/* Overlay gradient so bottom text is readable */}
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.7) 100%)', pointerEvents: 'none' }} />
+                    {/* Pack name on top of image */}
+                    <div style={{ position: 'absolute', bottom: 28, left: 0, right: 0, textAlign: 'center', zIndex: 1 }}>
+                      <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'white', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>{pack.label}</div>
+                    </div>
+                    {/* Bottom bar */}
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.75)', padding: '4px 6px', textAlign: 'center', zIndex: 1 }}>
+                      <div style={{ fontSize: '0.42rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.1em' }}>COLLECT • TRADE • BATTLE • CREATE</div>
+                    </div>
+                  </>
+                ) : (
+                  // Styled placeholder when no image uploaded
+                  <>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 8, background: 'rgba(255,255,255,0.15)' }} />
+                    <div style={{ textAlign: 'center', zIndex: 1 }}>
+                      <div style={{ fontSize: '0.55rem', fontWeight: 900, color: 'rgba(255,255,255,0.9)', letterSpacing: '0.08em' }}>AURABOT PROJECT</div>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 900, color: 'white', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>COLLECTOR CARDS</div>
+                    </div>
+                    <div style={{ background: 'rgba(0,0,0,0.5)', borderRadius: 6, padding: '3px 6px', textAlign: 'center', zIndex: 1 }}>
+                      <div style={{ fontSize: '0.6rem', fontWeight: 900, color: pack.id === 'luckydip' ? '#ffd700' : 'white', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{pack.label.replace(' Pack','')}</div>
+                      <div style={{ fontSize: '0.48rem', color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>{pack.subtitle}</div>
+                    </div>
+                    <div style={{ fontSize: '2.8rem', filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.4))', lineHeight: 1 }}>{pack.emoji}</div>
+                    <div style={{ background: 'rgba(255,255,255,0.25)', borderRadius: '50%', width: 36, height: 36, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1.5px solid rgba(255,255,255,0.5)', position: 'absolute', bottom: 28, left: 8 }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 900, color: 'white', lineHeight: 1 }}>3</span>
+                      <span style={{ fontSize: '0.3rem', fontWeight: 800, color: 'rgba(255,255,255,0.8)', lineHeight: 1.2 }}>CARDS</span>
+                    </div>
+                    <div style={{ background: 'rgba(0,0,0,0.6)', margin: '0 -8px -8px', padding: '4px 6px', textAlign: 'center', zIndex: 1, width: 'calc(100% + 16px)' }}>
+                      <div style={{ fontSize: '0.42rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.1em' }}>COLLECT • TRADE • BATTLE • CREATE</div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Buy button */}
+              <button disabled={buying === pack.id || starPoints === null || starPoints < 5}
+                onClick={e => { e.stopPropagation(); handleBuyPack(pack.id); }}
+                style={{ width: '100%', marginTop: 8, padding: '6px 0', borderRadius: 10, border: 'none', background: starPoints !== null && starPoints >= 5 ? `linear-gradient(135deg,${pack.color},${pack.glow})` : 'rgba(180,180,200,0.3)', color: starPoints !== null && starPoints >= 5 ? 'white' : '#9090b0', fontWeight: 800, fontSize: '0.72rem', cursor: starPoints !== null && starPoints >= 5 ? 'pointer' : 'not-allowed', transition: 'all 0.2s' }}>
+                {buying === pack.id ? '…' : '⭐ 5 pts — Buy'}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Unlocks Shop ── */}
+      <div style={{ borderTop: '1.5px solid rgba(200,190,240,0.4)', paddingTop: 20, marginBottom: 20 }}>
+        <div style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9090c0', marginBottom: 14 }}>🔓 Unlocks — 5 ⭐ each</div>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {UNLOCK_ITEMS.map(item => {
+            const owned = unlockedChoices.includes(item.id);
+            const canAfford = starPoints !== null && starPoints >= item.cost;
+            return (
+              <div key={item.id} className="shop-unlock"
+                style={{ flex: '1', minWidth: 160, background: owned ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.6)', border: `1.5px solid ${owned ? 'rgba(34,197,94,0.3)' : 'rgba(200,190,240,0.4)'}`, borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: '1.4rem' }}>{item.emoji}</span>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.82rem', color: owned ? '#16a34a' : '#3040a0' }}>{item.label}</div>
+                    <div style={{ fontSize: '0.68rem', color: '#8090b0', lineHeight: 1.3 }}>{item.desc}</div>
+                  </div>
+                </div>
+                <button
+                  disabled={owned || unlocking === item.id || !canAfford}
+                  onClick={() => handleUnlock(item)}
+                  style={{ width: '100%', padding: '7px 0', borderRadius: 9, border: 'none', fontWeight: 800, fontSize: '0.76rem', cursor: owned || !canAfford ? 'not-allowed' : 'pointer', background: owned ? 'rgba(34,197,94,0.15)' : canAfford ? 'linear-gradient(135deg,#7c3aed,#5b21b6)' : 'rgba(180,180,200,0.3)', color: owned ? '#16a34a' : canAfford ? 'white' : '#9090b0', transition: 'all 0.2s' }}>
+                  {owned ? '✓ Owned' : unlocking === item.id ? '…' : `⭐ ${item.cost} pts — Unlock`}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Trade ── */}
+      <div style={{ borderTop: '1.5px solid rgba(200,190,240,0.4)', paddingTop: 20 }}>
+        <div style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9090c0', marginBottom: 14 }}>🔄 Trade Cards</div>
+        <div style={{ background: 'rgba(160,120,220,0.06)', border: '1.5px dashed rgba(160,120,220,0.25)', borderRadius: 16, padding: '28px', textAlign: 'center' }}>
+          <div style={{ fontSize: '2rem', marginBottom: 8 }}>🔄</div>
+          <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#5040a0', marginBottom: 4 }}>Card Trading — Coming Soon</div>
+          <div style={{ fontSize: '0.76rem', color: '#9090c0', lineHeight: 1.5 }}>Soon you'll be able to swap cards with your classmates right here.</div>
+        </div>
+      </div>
+    </div>
   );
 }
 

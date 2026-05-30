@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Auth } from '../lib/auth';
 import { sb } from '../lib/supabase';
 import type { Session } from '../lib/auth';
@@ -249,16 +249,7 @@ function AdminPage({ session, onSignOut }: { session: NonNullable<Session>; onSi
 
         {/* Design Settings Tab */}
         {tab === 'design' && (
-          <div>
-            <div className="adm-section-title">Design Settings</div>
-            <div className="adm-coming-soon">
-              <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>🎨</div>
-              <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '1rem', fontWeight: 800, color: '#a78bfa', marginBottom: 8 }}>Coming Soon</div>
-              <div style={{ fontSize: '0.82rem', color: '#5060a0', maxWidth: 320, margin: '0 auto', lineHeight: 1.6 }}>
-                Customise colours, upload logos, and edit branding across the ClassCard app — all from here.
-              </div>
-            </div>
-          </div>
+          <PackImagesManager />
         )}
       </div>
 
@@ -509,6 +500,184 @@ function ResetPasswordForm({ teacher, onSuccess, onCancel, error, setError }: {
           {saving ? 'Updating…' : 'Set Password'}
         </button>
         <button className="adm-btn-outline" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PACK IMAGES MANAGER
+// ══════════════════════════════════════════════════════════════════════
+
+const PACK_SLOTS = [
+  { id: 'xanimals',  label: 'Xanimals Pack',  subtitle: 'Crossed Animals!',         color: '#7c3aed', emoji: '🧬' },
+  { id: 'animals',   label: 'Animals Pack',   subtitle: 'Real World Animals!',      color: '#16a34a', emoji: '🐾' },
+  { id: 'creatures', label: 'Creatures Pack', subtitle: 'Magical & Mythical!',      color: '#0369a1', emoji: '👾' },
+  { id: 'humanoids', label: 'Humanoids Pack', subtitle: 'People & Warriors!',       color: '#b45309', emoji: '🧑' },
+  { id: 'robots',    label: 'Robots Pack',    subtitle: 'Mechanical & Futuristic!', color: '#374151', emoji: '🤖' },
+  { id: 'luckydip',  label: 'Lucky Dip Pack', subtitle: 'Mix of All Themes!',      color: '#be123c', emoji: '🎲' },
+];
+
+function PackImagesManager() {
+  const [packImages, setPackImages] = useState<Record<string, string>>({});
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [msg, setMsg] = useState('');
+  const [msgType, setMsgType] = useState<'ok'|'err'>('ok');
+  const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  useEffect(() => { loadPackImages(); }, []);
+
+  const loadPackImages = async () => {
+    try {
+      const { data } = await sb.from('pack_images').select('pack_id, image_url');
+      const map: Record<string, string> = {};
+      (data || []).forEach((r: any) => { map[r.pack_id] = r.image_url; });
+      setPackImages(map);
+    } catch { /* table may not exist yet */ }
+  };
+
+  const showMsg = (m: string, type: 'ok'|'err' = 'ok') => {
+    setMsg(m); setMsgType(type);
+    setTimeout(() => setMsg(''), 4000);
+  };
+
+  const handleUpload = async (packId: string, file: File) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { showMsg('Image must be under 5MB', 'err'); return; }
+    setUploading(packId);
+    try {
+      // Convert to base64 data URL for storage (no Supabase Storage bucket needed)
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target?.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      // Upsert into pack_images table
+      const { error } = await sb.from('pack_images').upsert({
+        pack_id: packId,
+        image_url: dataUrl,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'pack_id' });
+
+      if (error) throw error;
+      setPackImages(prev => ({ ...prev, [packId]: dataUrl }));
+      showMsg(`✓ ${PACK_SLOTS.find(p => p.id === packId)?.label} image updated!`);
+    } catch (err: any) {
+      showMsg(err.message || 'Upload failed', 'err');
+    }
+    setUploading(null);
+  };
+
+  const handleRemove = async (packId: string) => {
+    if (!confirm('Remove this pack image?')) return;
+    await sb.from('pack_images').delete().eq('pack_id', packId);
+    setPackImages(prev => { const n = { ...prev }; delete n[packId]; return n; });
+    showMsg('Image removed');
+  };
+
+  return (
+    <div>
+      <div className="adm-section-title">🎨 Design Settings</div>
+
+      {/* Pack Images Section */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+          <div>
+            <div style={{ fontWeight: 800, color: '#c4b5fd', fontSize: '0.9rem', marginBottom: 4 }}>🃏 Card Pack Images</div>
+            <div style={{ fontSize: '0.76rem', color: '#5060a0', lineHeight: 1.5, maxWidth: 500 }}>
+              Upload images for each pack type. These appear in the student shop. You can also add special event packs (Easter, Christmas etc) — those slots will be added here later. Recommended: portrait orientation, min 400×530px, under 5MB.
+            </div>
+          </div>
+          <button onClick={loadPackImages} className="adm-btn-outline" style={{ fontSize: '0.72rem' }}>↺ Refresh</button>
+        </div>
+
+        {msg && (
+          <div style={{ background: msgType === 'ok' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${msgType === 'ok' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`, color: msgType === 'ok' ? '#4ade80' : '#f87171', borderRadius: 10, padding: '10px 16px', fontSize: '0.82rem', fontWeight: 700, marginBottom: 16 }}>
+            {msg}
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
+          {PACK_SLOTS.map(pack => {
+            const hasImage = !!packImages[pack.id];
+            const isUploading = uploading === pack.id;
+            return (
+              <div key={pack.id} style={{ background: 'rgba(255,255,255,0.03)', border: `1.5px solid ${hasImage ? pack.color + '44' : 'rgba(255,255,255,0.08)'}`, borderRadius: 16, overflow: 'hidden' }}>
+                {/* Pack image preview or placeholder */}
+                <div style={{ aspectRatio: '3/4', background: hasImage ? 'transparent' : `linear-gradient(160deg, ${pack.color}33, ${pack.color}11)`, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {hasImage ? (
+                    <img src={packImages[pack.id]} alt={pack.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 16 }}>
+                      <div style={{ fontSize: '3rem', marginBottom: 8, opacity: 0.5 }}>{pack.emoji}</div>
+                      <div style={{ fontSize: '0.65rem', color: '#5060a0', fontWeight: 700 }}>No image uploaded</div>
+                      <div style={{ fontSize: '0.58rem', color: '#4050a0', marginTop: 4 }}>Portrait format recommended</div>
+                    </div>
+                  )}
+                  {isUploading && (
+                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', color: 'white', fontWeight: 700 }}>
+                      Uploading…
+                    </div>
+                  )}
+                  {/* Color accent bar */}
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: pack.color }} />
+                </div>
+
+                {/* Pack info + controls */}
+                <div style={{ padding: '12px 14px' }}>
+                  <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#e0e0f0', marginBottom: 2 }}>{pack.label}</div>
+                  <div style={{ fontSize: '0.68rem', color: '#5060a0', marginBottom: 12 }}>{pack.subtitle}</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <input
+                      type="file" accept="image/*"
+                      ref={el => { fileRefs.current[pack.id] = el; }}
+                      onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(pack.id, f); e.target.value = ''; }}
+                      style={{ display: 'none' }}
+                    />
+                    <button
+                      onClick={() => fileRefs.current[pack.id]?.click()}
+                      disabled={isUploading}
+                      className="adm-btn-primary"
+                      style={{ flex: 1, fontSize: '0.72rem', padding: '6px 10px' }}
+                    >
+                      {hasImage ? '↺ Replace' : '↑ Upload'}
+                    </button>
+                    {hasImage && (
+                      <button onClick={() => handleRemove(pack.id)} className="adm-btn-danger" style={{ fontSize: '0.72rem', padding: '6px 10px' }}>
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Special Events placeholder slot */}
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1.5px dashed rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden', opacity: 0.6 }}>
+            <div style={{ aspectRatio: '3/4', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 16, gap: 8 }}>
+              <div style={{ fontSize: '2rem' }}>🎄</div>
+              <div style={{ fontSize: '0.65rem', color: '#5060a0', fontWeight: 700, textAlign: 'center' }}>Special Event Packs</div>
+              <div style={{ fontSize: '0.58rem', color: '#4050a0', textAlign: 'center', lineHeight: 1.4 }}>Easter, Christmas & more — coming soon</div>
+            </div>
+            <div style={{ padding: '12px 14px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#5060a0', marginBottom: 2 }}>Special Events</div>
+              <div style={{ fontSize: '0.68rem', color: '#4050a0' }}>Seasonal packs</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Future design settings placeholder */}
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 24 }}>
+        <div style={{ fontWeight: 800, color: '#c4b5fd', fontSize: '0.9rem', marginBottom: 8 }}>🎨 More Design Settings</div>
+        <div className="adm-coming-soon" style={{ padding: 32 }}>
+          <div style={{ fontSize: '0.82rem', color: '#5060a0', lineHeight: 1.6 }}>
+            Colours, logos, and branding customisation will be added here.
+          </div>
+        </div>
       </div>
     </div>
   );
