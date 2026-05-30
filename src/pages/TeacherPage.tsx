@@ -1354,13 +1354,12 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
     setSaving(true); setSavedMsg('');
     try {
       const imageUrl = dbCroppedImage || dbImage || '';
-      const r = RARITY_RANGES[cardRarity] || RARITY_RANGES['common'];
-      // Stats are NOT rolled here — stored as null, rolled at pack-open time
+      // Stats and rarity are NOT stored — assigned at pack-open time
       const payload = {
         teacher_id: session.user.id,
         card_name: cardName.trim(),
         type: cardDeck,
-        rarity: cardRarity,
+        rarity: null,
         description: cardDescription,
         image_url: imageUrl,
         hp: null,
@@ -1369,7 +1368,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
         stat3_name: strongActionName.trim(),  stat3_val: null,
         move1_name: weakActionName.trim(),    move1_dmg: null,
         move2_name: strongActionName.trim(),  move2_dmg: null,
-        skill_points: r.skillPts,
+        skill_points: null,
         is_rare_exclusive: isRareExclusive,
         max_copies: isRareExclusive ? maxCopies : null,
         card_source: 'database',
@@ -1471,9 +1470,9 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
               value={cardName} onChange={e => setCardName(e.target.value)} />
           </div>
 
-          {/* Rarity */}
+          {/* Rarity — preview only, does not affect card creation */}
           <div>
-            <label className="tp-label">Rarity</label>
+            <label className="tp-label">Preview Rarity <span style={{ fontWeight:400, fontSize:'0.7rem', color:'#b0b8cc', textTransform:'none', letterSpacing:0 }}>(for preview only — rarity is assigned when a pack is opened)</span></label>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
               {DB_RARITY_OPTIONS.map(r => (
                 <button key={r.id} onClick={() => setCardRarity(r.id)} style={{ padding:'8px 10px', borderRadius:10, fontSize:'0.78rem', fontWeight:700, cursor:'pointer', textAlign:'left', border: cardRarity === r.id ? `2px solid ${r.color}` : '1.5px solid rgba(180,160,220,0.2)', background: cardRarity === r.id ? `${r.color}18` : 'rgba(255,255,255,0.5)', color: cardRarity === r.id ? r.color : '#8090b0' }}>
