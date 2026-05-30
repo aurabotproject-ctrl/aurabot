@@ -931,12 +931,12 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
               Must be exactly 8 digits. Cannot be 8 of the same number (e.g. 1111111111).
             </p>
             <div className="mb-3">
-              <label className="tp-label">New 6-Digit PIN</label>
-              <input type="password" inputMode="numeric" maxLength={6} className="tp-input" placeholder="e.g. 482951" value={pw} onChange={e => setPw(e.target.value.replace(/\D/g, '').slice(0, 6))} />
+              <label className="tp-label">New 8-Digit PIN</label>
+              <input type="password" inputMode="numeric" maxLength={8} className="tp-input" placeholder="e.g. 482951" value={pw} onChange={e => setPw(e.target.value.replace(/\D/g, '').slice(0, 8))} />
             </div>
             <div className="mb-3">
               <label className="tp-label">Confirm PIN</label>
-              <input type="password" inputMode="numeric" maxLength={6} className="tp-input" placeholder="Repeat PIN" value={pw2} onChange={e => setPw2(e.target.value.replace(/\D/g, '').slice(0, 6))} />
+              <input type="password" inputMode="numeric" maxLength={8} className="tp-input" placeholder="Repeat PIN" value={pw2} onChange={e => setPw2(e.target.value.replace(/\D/g, '').slice(0, 8))} />
             </div>
             {modalError && <p className="text-sm mt-2" style={{ color: '#c82020' }}>{modalError}</p>}
             <div className="flex gap-3 mt-4">
