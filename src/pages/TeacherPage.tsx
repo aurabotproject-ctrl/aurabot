@@ -10,9 +10,9 @@ import type { Student, Card } from '../lib/supabase';
 type TabKey = 'generate' | 'weekly' | 'cards' | 'students' | 'stars' | 'homecomms' | 'settings';
 
 const TABS: { key: TabKey; label: string }[] = [
-  { key: 'generate', label: '✦ Card Database' },
+  { key: 'generate', label: '✦ Card Creation' },
   { key: 'weekly', label: '📋 Weekly Project' },
-  { key: 'cards', label: 'My Cards' },
+  { key: 'cards', label: '🃏 Card Database' },
   { key: 'students', label: 'Students' },
   { key: 'stars', label: '⭐ Stars' },
   { key: 'homecomms', label: '🏠 Home Communication' },
@@ -677,7 +677,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                 setModalError('');
                 const pin = vals.password;
                 if (!/^\d{8}$/.test(pin)) { setModalError('PIN must be exactly 8 digits (numbers only).'); return; }
-                if (/^(\d)\1{7}$/.test(pin)) { setModalError('PIN cannot be 8 of the same digit (e.g. 1111111111).'); return; }
+                if (/^(\d)\1{7}$/.test(pin)) { setModalError('PIN cannot be 8 of the same digit (e.g. 11111111).'); return; }
                 try {
                   let newUser;
                   try {
@@ -928,11 +928,11 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
               Setting new keypad PIN for <strong>{modal.data.name}</strong>
             </p>
             <p className="text-xs mb-4" style={{ color: '#9a7a60' }}>
-              Must be exactly 8 digits. Cannot be 8 of the same number (e.g. 1111111111).
+              Must be exactly 8 digits. Cannot be 8 of the same number (e.g. 11111111).
             </p>
             <div className="mb-3">
-              <label className="tp-label">New 8-Digit PIN</label>
-              <input type="password" inputMode="numeric" maxLength={8} className="tp-input" placeholder="e.g. 482951" value={pw} onChange={e => setPw(e.target.value.replace(/\D/g, '').slice(0, 8))} />
+              <label className="tp-label">New 6-Digit PIN</label>
+              <input type="password" inputMode="numeric" maxLength={8} className="tp-input" placeholder="e.g. 48295123" value={pw} onChange={e => setPw(e.target.value.replace(/\D/g, '').slice(0, 8))} />
             </div>
             <div className="mb-3">
               <label className="tp-label">Confirm PIN</label>
@@ -942,19 +942,25 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
             <div className="flex gap-3 mt-4">
               <button className="tp-btn-gold" onClick={async () => {
                 if (!/^\d{8}$/.test(pw)) { setModalError('PIN must be exactly 8 digits.'); return; }
-                if (/^(\d)\1{7}$/.test(pw)) { setModalError('PIN cannot be 8 of the same digit (e.g. 1111111111).'); return; }
+                if (/^(\d)\1{7}$/.test(pw)) { setModalError('PIN cannot be 8 of the same digit (e.g. 11111111).'); return; }
                 if (pw !== pw2) { setModalError('PINs do not match.'); return; }
                 if (!modal.data.auth_user_id) { setModalError('Student has no linked account.'); return; }
                 try {
+                  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
                   const { data: { session: s } } = await sb.auth.getSession();
-                  const res = await fetch('https://iunoahajcaaxmttdpgem.supabase.co/functions/v1/update-user-password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${s?.access_token}` },
-                    body: JSON.stringify({ userId: modal.data.auth_user_id, newPassword: pw }),
+                  const res = await fetch(`${supabaseUrl}/auth/v1/admin/users/${modal.data.auth_user_id}`, {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${s?.access_token}`,
+                      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                    },
+                    body: JSON.stringify({ password: pw }),
                   });
-                  if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
+                  if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed'); }
                   setModal(null);
-                } catch (err: any) { setModalError(err.message); }
+                  setModalError('');
+                } catch (err: any) { setModalError(err.message || 'Reset failed'); }
               }}>Set PIN</button>
               <button onClick={() => setModal(null)} className="tp-btn-outline">Cancel</button>
             </div>
@@ -1316,7 +1322,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
   const cropImage = (): Promise<string> => {
     return new Promise((resolve, reject) => {
       if (!dbImage) { reject(new Error('No image')); return; }
-      const OUTPUT_W = 400; const OUTPUT_H = 300;
+      const OUTPUT_W = 480; const OUTPUT_H = 360;
       const canvas = document.createElement('canvas');
       canvas.width = OUTPUT_W; canvas.height = OUTPUT_H;
       const ctx = canvas.getContext('2d');
@@ -1415,7 +1421,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div className="tp-panel">
             <div className="tp-section">1 · Upload Image</div>
-            <div style={{ background: '#1a1a2e', borderRadius: 8, border: '2px dashed rgba(120,100,200,0.3)', minHeight: 130, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 8, position: 'relative' }}>
+            <div style={{ background: '#1a1a2e', borderRadius: 8, border: '2px dashed rgba(120,100,200,0.3)', aspectRatio: '4/3', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 8, position: 'relative' }}>
               {dbImage ? (
                 <img src={dbImage} alt="preview" draggable={false}
                   onMouseDown={e => { if (dbCroppedImage) return; e.preventDefault(); setDbIsDragging(true); setDbDragStart({ clientX: e.clientX, clientY: e.clientY, startX: dbPosition.x, startY: dbPosition.y }); }}
