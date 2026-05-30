@@ -375,7 +375,7 @@
 
 .card-img-box {
   margin: 0 4px;
-  height: 120px;
+  aspect-ratio: 4/3;
   background: rgba(255,255,255,0.35);
   border-radius: 10px;
   border: 2px solid rgba(255,255,255,0.65);
@@ -390,7 +390,7 @@
 .card-img-box img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
 }
 
 .card-type-badge {
@@ -1065,7 +1065,6 @@
 /* ── RESPONSIVE ── */
 @media (max-width: 700px) {
   .poke-card { width: 220px; height: 316px; }
-  .card-img-box { height: 100px; }
   .mini-card { width: 180px; height: 90px; }
   .modal-card--wide { max-width: 95vw; }
 }
