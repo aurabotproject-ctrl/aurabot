@@ -1396,6 +1396,7 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
   const [detailCard, setDetailCard] = useState<Card | null>(null);
   const [studentName, setStudentName] = useState('Student');
   const [studentId, setStudentId] = useState('');
+  const [teacherIdState, setTeacherIdState] = useState('');
   const [weeklyProject, setWeeklyProject] = useState<WeeklyProject | null>(null);
   type HomeComm = { id: string; teacher_id: string; event_date: string; comment: string; created_at: string };
   const [homeComms, setHomeComms] = useState<HomeComm[]>([]);
@@ -1504,6 +1505,7 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
         // Fetch teacher's weekly project
         const { data: studentRow } = await sb.from('students').select('teacher_id').eq('id', sid).maybeSingle();
         const teacherId = studentRow?.teacher_id;
+        if (teacherId) setTeacherIdState(teacherId);
         if (teacherId) {
           const { data: proj } = await sb
             .from('weekly_projects')
@@ -1789,6 +1791,7 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
           <ShopAndTrade
             studentId={studentId}
             studentName={studentName}
+            teacherId={teacherIdState}
             unlockedChoices={unlockedChoices}
             onUnlock={async (choice) => { await saveUnlockChoice(choice); }}
           />
@@ -1880,9 +1883,10 @@ const UNLOCK_ITEMS = [
 
 const TEST_ACCOUNTS = ['Bella Clark', 'Benji Clark'];
 
-function ShopAndTrade({ studentId, studentName, unlockedChoices, onUnlock }: {
+function ShopAndTrade({ studentId, studentName, teacherId, unlockedChoices, onUnlock }: {
   studentId: string;
   studentName: string;
+  teacherId: string;
   unlockedChoices: string[];
   onUnlock: (choice: string) => Promise<void>;
 }) {
@@ -1892,6 +1896,7 @@ function ShopAndTrade({ studentId, studentName, unlockedChoices, onUnlock }: {
   const [buying, setBuying] = React.useState<string | null>(null);
   const [unlocking, setUnlocking] = React.useState<string | null>(null);
   const [msg, setMsg] = React.useState('');
+  const [openingPack, setOpeningPack] = React.useState<typeof PACK_TYPES[0] | null>(null);
 
   React.useEffect(() => {
     if (!studentId) return;
@@ -1909,11 +1914,10 @@ function ShopAndTrade({ studentId, studentName, unlockedChoices, onUnlock }: {
 
   const showMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
 
-  const handleBuyPack = async (packId: string) => {
-    if (!isTestAccount && (starPoints === null || starPoints < 5)) { showMsg('Not enough ⭐ star points! You need at least 5.'); return; }
-    setBuying(packId);
-    showMsg(`🎉 ${PACK_TYPES.find(p => p.id === packId)?.label} purchased! Cards coming soon…`);
-    setBuying(null);
+  const handleBuyPack = (packId: string) => {
+    const pack = PACK_TYPES.find(p => p.id === packId);
+    if (!pack) return;
+    setOpeningPack(pack);
   };
 
   const handleUnlock = async (item: typeof UNLOCK_ITEMS[0]) => {
@@ -1930,6 +1934,20 @@ function ShopAndTrade({ studentId, studentName, unlockedChoices, onUnlock }: {
   };
 
   return (
+    <>
+      {openingPack && (
+        <PackOpeningOverlay
+          pack={openingPack}
+          packImage={packImages[openingPack.id] || null}
+          starPoints={starPoints || 0}
+          isTestAccount={isTestAccount}
+          studentId={studentId}
+          teacherId={teacherId}
+          onClose={() => setOpeningPack(null)}
+          onStarsSpent={amt => setStarPoints(p => (p || 0) - amt)}
+          onComplete={(_cards) => { setOpeningPack(null); /* navigate to cards handled by parent */ }}
+        />
+      )}
     <div style={{ borderRadius: 22, background: 'rgba(255,255,255,0.72)', border: '1.5px solid rgba(200,190,240,0.5)', boxShadow: '0 6px 28px rgba(160,120,220,0.10)', padding: '22px 24px', backdropFilter: 'blur(8px)', marginTop: 8 }}>
       <style>{`
         @keyframes packFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
@@ -2055,7 +2073,472 @@ function ShopAndTrade({ studentId, studentName, unlockedChoices, onUnlock }: {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
 export default StudentPage;
+
+// ══════════════════════════════════════════════════════════════════════
+// PACK OPENING EXPERIENCE
+// ══════════════════════════════════════════════════════════════════════
+
+const RARITY_ODDS: Record<string, { common: number; silver: number; 'gold-rare': number; prismatic: number }> = {
+  basic:   { common: 0.70, silver: 0.22, 'gold-rare': 0.07, prismatic: 0.01 },
+  mod:     { common: 0.45, silver: 0.35, 'gold-rare': 0.16, prismatic: 0.04 },
+  premium: { common: 0.20, silver: 0.40, 'gold-rare': 0.30, prismatic: 0.10 },
+};
+
+const PACK_TIERS = [
+  { id: 'basic',   label: 'Basic Pack',   stars: 5,  color: '#6366f1', desc: 'Mostly common cards' },
+  { id: 'mod',     label: 'Mod Pack',     stars: 10, color: '#8b5cf6', desc: 'Better odds, more fun!' },
+  { id: 'premium', label: 'Premium Pack', stars: 20, color: '#f59e0b', desc: 'Best odds for rare cards' },
+];
+
+const STAT_RANGES: Record<string, { hpMin: number; hpMax: number; weakMin: number; weakMax: number; strongMin: number; strongMax: number; skillPts: number }> = {
+  common:    { hpMin: 80,  hpMax: 100, weakMin: 40, weakMax: 50,  strongMin: 50,  strongMax: 70,  skillPts: 1 },
+  silver:    { hpMin: 100, hpMax: 120, weakMin: 50, weakMax: 60,  strongMin: 60,  strongMax: 80,  skillPts: 2 },
+  'gold-rare': { hpMin: 120, hpMax: 140, weakMin: 60, weakMax: 75,  strongMin: 80,  strongMax: 100, skillPts: 3 },
+  prismatic: { hpMin: 150, hpMax: 180, weakMin: 75, weakMax: 95,  strongMin: 100, strongMax: 130, skillPts: 5 },
+};
+
+function rollRarity(tier: string): 'common' | 'silver' | 'gold-rare' | 'prismatic' {
+  const odds = RARITY_ODDS[tier] || RARITY_ODDS.basic;
+  const r = Math.random();
+  if (r < odds.prismatic) return 'prismatic';
+  if (r < odds.prismatic + odds['gold-rare']) return 'gold-rare';
+  if (r < odds.prismatic + odds['gold-rare'] + odds.silver) return 'silver';
+  return 'common';
+}
+
+function rollStats(rarity: string) {
+  const r = STAT_RANGES[rarity] || STAT_RANGES.common;
+  const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+  return { hp: rand(r.hpMin, r.hpMax), weakDmg: rand(r.weakMin, r.weakMax), strongDmg: rand(r.strongMin, r.strongMax), skillPts: r.skillPts };
+}
+
+interface OpenedCard {
+  id: string;
+  card_name: string;
+  type: string;
+  rarity: 'common' | 'silver' | 'gold-rare' | 'prismatic';
+  description: string;
+  image_url: string;
+  hp: number;
+  stat1_name: string; stat1_val: number;
+  stat2_name: string; stat2_val: number;
+  stat3_name: string; stat3_val: number;
+  move1_name: string; move1_dmg: number;
+  move2_name: string; move2_dmg: number;
+  skill_points: number;
+}
+
+interface PackOpeningProps {
+  pack: typeof PACK_TYPES[0];
+  packImage: string | null;
+  starPoints: number;
+  isTestAccount: boolean;
+  studentId: string;
+  teacherId: string;
+  onClose: () => void;
+  onComplete: (cards: OpenedCard[]) => void;
+  onStarsSpent: (amount: number) => void;
+}
+
+type OpenPhase = 'tiers' | 'confirm' | 'zoom' | 'tear' | 'reveal' | 'slots' | 'done';
+
+function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studentId, teacherId, onClose, onComplete, onStarsSpent }: PackOpeningProps) {
+  const [phase, setPhase] = React.useState<OpenPhase>('tiers');
+  const [selectedTier, setSelectedTier] = React.useState<typeof PACK_TIERS[0] | null>(null);
+  const [openedCards, setOpenedCards] = React.useState<OpenedCard[]>([]);
+  const [slottedCards, setSlottedCards] = React.useState<(OpenedCard | null)[]>([null, null, null]);
+  const [saving, setSaving] = React.useState(false);
+
+  // Tear gesture state
+  const [tearProgress, setTearProgress] = React.useState(0); // 0-1
+  const [tearComplete, setTearComplete] = React.useState(false);
+  const [slideY, setSlideY] = React.useState(0);
+  const [sliding, setSliding] = React.useState(false);
+  const tearRef = React.useRef<HTMLDivElement>(null);
+  const packRef = React.useRef<HTMLDivElement>(null);
+  const tearStartX = React.useRef(0);
+  const tearStarted = React.useRef(false);
+
+  // Card swipe state
+  const [cardPositions, setCardPositions] = React.useState([0, 0, 0]);
+  const [cardSwiped, setCardSwiped] = React.useState([false, false, false]);
+  const swipeDragIdx = React.useRef(-1);
+  const swipeStartY = React.useRef(0);
+
+  const canAfford = isTestAccount || starPoints >= (selectedTier?.stars || 0);
+
+  const handleSelectTier = (tier: typeof PACK_TIERS[0]) => {
+    setSelectedTier(tier);
+    setPhase('confirm');
+  };
+
+  const handleConfirmPurchase = async () => {
+    if (!selectedTier) return;
+    // Deduct stars (skip for test accounts)
+    if (!isTestAccount) {
+      await sb.from('student_star_points').update({ points: starPoints - selectedTier.stars }).eq('student_id', studentId);
+      onStarsSpent(selectedTier.stars);
+    }
+
+    // Roll 3 cards from database
+    const { data: dbCards } = await sb.from('card_database')
+      .select('*')
+      .eq('type', pack.id === 'luckydip' ? undefined : pack.id)
+      .limit(100);
+
+    const pool = dbCards || [];
+    const rolled: OpenedCard[] = [];
+
+    for (let i = 0; i < 3; i++) {
+      const rarity = rollRarity(selectedTier.id);
+      const stats = rollStats(rarity);
+      // Pick random card from pool
+      const card = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : null;
+      rolled.push({
+        id: `opened-${Date.now()}-${i}`,
+        card_name: card?.card_name || 'Mystery Card',
+        type: card?.type || pack.id,
+        rarity,
+        description: card?.description || 'A mysterious card from the pack...',
+        image_url: card?.image_url || '',
+        hp: stats.hp,
+        stat1_name: 'HP',                         stat1_val: stats.hp,
+        stat2_name: card?.move1_name || 'Attack',  stat2_val: stats.weakDmg,
+        stat3_name: card?.move2_name || 'Power',   stat3_val: stats.strongDmg,
+        move1_name: card?.move1_name || 'Attack',  move1_dmg: stats.weakDmg,
+        move2_name: card?.move2_name || 'Power',   move2_dmg: stats.strongDmg,
+        skill_points: stats.skillPts,
+      });
+    }
+
+    setOpenedCards(rolled);
+    setPhase('zoom');
+    setTimeout(() => setPhase('tear'), 1200);
+  };
+
+  // Tear gesture handlers
+  const onTearStart = (clientX: number) => {
+    if (tearComplete) return;
+    tearStartX.current = clientX;
+    tearStarted.current = true;
+  };
+
+  const onTearMove = (clientX: number) => {
+    if (!tearStarted.current || tearComplete) return;
+    const dx = clientX - tearStartX.current;
+    const progress = Math.min(Math.max(dx / 280, 0), 1);
+    setTearProgress(progress);
+    if (progress >= 1) {
+      setTearComplete(true);
+      tearStarted.current = false;
+    }
+  };
+
+  const onTearEnd = () => { tearStarted.current = false; };
+
+  // Pack slide handlers
+  const onSlideStart = (clientY: number) => {
+    if (!tearComplete || sliding) return;
+    setSliding(true);
+    swipeStartY.current = clientY;
+  };
+
+  const onSlideMove = (clientY: number) => {
+    if (!sliding) return;
+    const dy = Math.max(0, clientY - swipeStartY.current);
+    setSlideY(dy);
+    if (dy > 220) {
+      setSliding(false);
+      setPhase('reveal');
+    }
+  };
+
+  const onSlideEnd = () => {
+    if (slideY < 220) { setSlideY(0); }
+    setSliding(false);
+  };
+
+  // Card swipe handlers
+  const onCardSwipeStart = (idx: number, clientY: number) => {
+    if (cardSwiped[idx]) return;
+    swipeDragIdx.current = idx;
+    swipeStartY.current = clientY;
+  };
+
+  const onCardSwipeMove = (clientY: number) => {
+    const idx = swipeDragIdx.current;
+    if (idx < 0 || cardSwiped[idx]) return;
+    const dy = Math.max(0, clientY - swipeStartY.current);
+    setCardPositions(prev => prev.map((p, i) => i === idx ? dy : p));
+    if (dy > 160) {
+      setCardSwiped(prev => prev.map((s, i) => i === idx ? true : s));
+      setSlottedCards(prev => { const n = [...prev]; n[idx] = openedCards[idx]; return n; });
+      swipeDragIdx.current = -1;
+    }
+  };
+
+  const onCardSwipeEnd = () => {
+    const idx = swipeDragIdx.current;
+    if (idx >= 0 && !cardSwiped[idx]) {
+      setCardPositions(prev => prev.map((p, i) => i === idx ? 0 : p));
+    }
+    swipeDragIdx.current = -1;
+  };
+
+  const allSwiped = cardSwiped.every(Boolean);
+
+  const handleAddToCollection = async () => {
+    setSaving(true);
+    try {
+      for (const card of openedCards) {
+        await sb.from('cards').insert({
+          student_id: studentId,
+          teacher_id: teacherId,
+          card_name: card.card_name,
+          type: card.type,
+          rarity: card.rarity,
+          description: card.description,
+          image_url: card.image_url,
+          hp: card.hp,
+          stat1_name: card.stat1_name, stat1_val: card.stat1_val,
+          stat2_name: card.stat2_name, stat2_val: card.stat2_val,
+          stat3_name: card.stat3_name, stat3_val: card.stat3_val,
+          move1_name: card.move1_name, move1_dmg: card.move1_dmg,
+          move2_name: card.move2_name, move2_dmg: card.move2_dmg,
+          card_source: 'pack',
+        });
+      }
+      onComplete(openedCards);
+    } catch (err: any) {
+      alert('Error saving cards: ' + err.message);
+    }
+    setSaving(false);
+  };
+
+  const rarityGlow: Record<string, string> = {
+    common: 'rgba(156,163,175,0.4)', silver: 'rgba(148,163,184,0.6)',
+    'gold-rare': 'rgba(245,158,11,0.7)', prismatic: 'rgba(168,85,247,0.8)',
+  };
+  const rarityLabel: Record<string, string> = { common: 'Common', silver: 'Silver', 'gold-rare': 'Gold', prismatic: '🌈 Rainbow' };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(5,5,20,0.97)', zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
+      onMouseMove={e => {
+        if (phase === 'tear') { onTearMove(e.clientX); onSlideMove(e.clientY); }
+        if (phase === 'reveal') onCardSwipeMove(e.clientY);
+      }}
+      onMouseUp={() => {
+        onTearEnd(); onSlideEnd(); onCardSwipeEnd();
+      }}
+      onTouchMove={e => {
+        const t = e.touches[0];
+        if (phase === 'tear') { onTearMove(t.clientX); onSlideMove(t.clientY); }
+        if (phase === 'reveal') onCardSwipeMove(t.clientY);
+      }}
+      onTouchEnd={() => { onTearEnd(); onSlideEnd(); onCardSwipeEnd(); }}
+    >
+      <style>{`
+        @keyframes packZoomIn { from { transform: scale(0.6); opacity:0; } to { transform: scale(1); opacity:1; } }
+        @keyframes cardFlyUp { from { transform: translateY(120px) rotate(var(--rot)); opacity:0; } to { transform: translateY(0) rotate(0deg); opacity:1; } }
+        @keyframes shimmer { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
+        @keyframes fadeOther { to { opacity:0; transform:scale(0.8); } }
+        @keyframes glowPulse { 0%,100% { box-shadow: 0 0 30px var(--glow); } 50% { box-shadow: 0 0 60px var(--glow), 0 0 100px var(--glow); } }
+      `}</style>
+
+      {/* Close button */}
+      {phase !== 'reveal' && phase !== 'slots' && (
+        <button onClick={onClose} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', width: 36, height: 36, borderRadius: '50%', cursor: 'pointer', fontSize: '1rem', zIndex: 10 }}>✕</button>
+      )}
+
+      {/* ── TIER SELECTION ── */}
+      {phase === 'tiers' && (
+        <div style={{ width: '100%', maxWidth: 480, padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ textAlign: 'center', marginBottom: 8 }}>
+            <div style={{ fontSize: '1.3rem', fontWeight: 900, color: 'white', marginBottom: 4 }}>{pack.label}</div>
+            <div style={{ fontSize: '0.8rem', color: '#8080c0' }}>Choose your pack tier</div>
+          </div>
+          {PACK_TIERS.map((tier, i) => {
+            const canBuy = isTestAccount || starPoints >= tier.stars;
+            return (
+              <div key={tier.id} onClick={() => canBuy && handleSelectTier(tier)}
+                style={{ background: canBuy ? `linear-gradient(135deg, ${tier.color}22, ${tier.color}11)` : 'rgba(255,255,255,0.03)', border: `2px solid ${canBuy ? tier.color + '88' : 'rgba(255,255,255,0.08)'}`, borderRadius: 18, padding: '18px 24px', cursor: canBuy ? 'pointer' : 'not-allowed', opacity: canBuy ? 1 : 0.5, transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontWeight: 900, color: canBuy ? 'white' : '#5060a0', fontSize: '0.95rem', marginBottom: 4 }}>
+                    {['⭐', '⭐⭐', '⭐⭐⭐'][i]} {tier.label}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#7080a0' }}>{tier.desc}</div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                    {Object.entries(RARITY_ODDS[tier.id]).map(([r, v]) => (
+                      <span key={r} style={{ fontSize: '0.6rem', padding: '2px 7px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', color: r === 'prismatic' ? '#c084fc' : r === 'gold-rare' ? '#fbbf24' : r === 'silver' ? '#94a3b8' : '#9ca3af', fontWeight: 700 }}>
+                        {r === 'gold-rare' ? 'Gold' : r.charAt(0).toUpperCase() + r.slice(1)}: {(v * 100).toFixed(0)}%
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 900, color: canBuy ? tier.color : '#5060a0' }}>⭐{tier.stars}</div>
+                  <div style={{ fontSize: '0.65rem', color: '#6070a0' }}>star points</div>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#5060a0', marginTop: 4 }}>
+            You have <strong style={{ color: '#f59e0b' }}>⭐ {isTestAccount ? '∞' : starPoints}</strong> star points
+          </div>
+        </div>
+      )}
+
+      {/* ── CONFIRM ── */}
+      {phase === 'confirm' && selectedTier && (
+        <div style={{ width: '100%', maxWidth: 360, padding: 28, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 24, textAlign: 'center' }}>
+          <div style={{ fontSize: '2rem', marginBottom: 12 }}>🛒</div>
+          <div style={{ fontWeight: 900, color: 'white', fontSize: '1.1rem', marginBottom: 6 }}>Confirm Purchase</div>
+          <div style={{ fontSize: '0.85rem', color: '#8090b0', marginBottom: 20, lineHeight: 1.6 }}>
+            <strong style={{ color: 'white' }}>{pack.label} — {selectedTier.label}</strong><br />
+            Cost: <strong style={{ color: '#f59e0b' }}>⭐ {selectedTier.stars} star points</strong><br />
+            {!isTestAccount && <span>Remaining after: <strong style={{ color: '#a78bfa' }}>⭐ {starPoints - selectedTier.stars}</strong></span>}
+            {isTestAccount && <span style={{ color: '#4ade80', fontSize: '0.75rem' }}>✦ Test account — free!</span>}
+          </div>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button onClick={() => setPhase('tiers')} style={{ padding: '10px 24px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: '#8090b0', cursor: 'pointer', fontWeight: 700 }}>Back</button>
+            <button onClick={handleConfirmPurchase} style={{ padding: '10px 28px', borderRadius: 12, border: 'none', background: `linear-gradient(135deg, ${selectedTier.color}, ${selectedTier.color}bb)`, color: 'white', cursor: 'pointer', fontWeight: 900, fontSize: '0.9rem' }}>
+              Open Pack! 🎉
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── ZOOM IN ── */}
+      {phase === 'zoom' && selectedTier && (
+        <div style={{ animation: 'packZoomIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 220, aspectRatio: '3/4', borderRadius: 18, overflow: 'hidden', border: `3px solid ${selectedTier.color}`, boxShadow: `0 0 60px ${selectedTier.color}88` }}>
+            {packImage ? <img src={packImage} alt="pack" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (
+              <div style={{ width: '100%', height: '100%', background: `linear-gradient(160deg, ${pack.color}ee, ${pack.color}88)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '4rem' }}>{pack.emoji}</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── TEAR & SLIDE ── */}
+      {phase === 'tear' && selectedTier && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <div style={{ color: '#8090b0', fontSize: '0.8rem', fontWeight: 700, textAlign: 'center', marginBottom: 4 }}>
+            {!tearComplete ? '👆 Drag across the top to tear open the pack' : '👇 Slide the pack down to reveal your cards'}
+          </div>
+
+          {/* Pack with tear */}
+          <div ref={packRef} style={{ position: 'relative', width: 220, userSelect: 'none' }}>
+            {/* Torn top piece */}
+            {tearProgress > 0 && (
+              <div style={{ position: 'absolute', top: -40, left: 0, right: 0, height: 60, background: `linear-gradient(160deg, ${pack.color}cc, ${pack.color}88)`, borderRadius: '18px 18px 0 0', transformOrigin: 'right center', transform: `rotate(${tearProgress * -15}deg) translateX(${tearProgress * 20}px)`, opacity: 1 - tearProgress * 0.3, zIndex: 2, borderBottom: tearProgress > 0.1 ? `2px dashed rgba(255,255,255,0.4)` : 'none', transition: 'opacity 0.1s' }} />
+            )}
+
+            {/* Main pack body */}
+            <div
+              style={{ width: 220, aspectRatio: '3/4', borderRadius: tearComplete ? '0 0 18px 18px' : 18, overflow: 'hidden', border: `3px solid ${selectedTier.color}`, boxShadow: `0 0 40px ${selectedTier.color}66`, transform: `translateY(${slideY}px)`, transition: sliding ? 'none' : 'transform 0.3s ease', cursor: tearComplete ? 'grab' : 'crosshair' }}
+              onMouseDown={e => { if (!tearComplete) onTearStart(e.clientX); else onSlideStart(e.clientY); }}
+              onTouchStart={e => { const t = e.touches[0]; if (!tearComplete) onTearStart(t.clientX); else onSlideStart(t.clientY); }}
+            >
+              {packImage ? <img src={packImage} alt="pack" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (
+                <div style={{ width: '100%', height: '100%', background: `linear-gradient(160deg, ${pack.color}ee, ${pack.color}88)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '4rem' }}>{pack.emoji}</div>
+              )}
+            </div>
+
+            {/* Tear line indicator */}
+            {!tearComplete && (
+              <div ref={tearRef} style={{ position: 'absolute', top: 28, left: 0, right: 0, height: 4, zIndex: 3, cursor: 'crosshair' }}
+                onMouseDown={e => onTearStart(e.clientX)}
+                onTouchStart={e => onTearStart(e.touches[0].clientX)}
+              >
+                <div style={{ height: '100%', background: `linear-gradient(90deg, ${selectedTier.color}, white)`, width: `${tearProgress * 100}%`, boxShadow: `0 0 8px white`, borderRadius: 2, transition: 'width 0.05s' }} />
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderTop: '2px dashed rgba(255,255,255,0.3)' }} />
+              </div>
+            )}
+          </div>
+
+          {/* Tear progress hint */}
+          {!tearComplete && (
+            <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} style={{ width: 20, height: 4, borderRadius: 2, background: i < tearProgress * 10 ? selectedTier.color : 'rgba(255,255,255,0.1)', transition: 'background 0.1s' }} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── CARD REVEAL ── */}
+      {phase === 'reveal' && (
+        <div style={{ width: '100%', maxWidth: 500, padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ textAlign: 'center', color: '#8090b0', fontSize: '0.78rem', fontWeight: 700, marginBottom: 4 }}>
+            {allSwiped ? '✦ All cards collected!' : '👇 Swipe each card down to your collection slots'}
+          </div>
+
+          {/* Cards to swipe */}
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            {openedCards.map((card, idx) => (
+              <div key={idx}
+                style={{ width: 130, flexShrink: 0, opacity: cardSwiped[idx] ? 0 : 1, transform: `translateY(${cardPositions[idx]}px)`, transition: swipeDragIdx.current === idx ? 'none' : 'transform 0.3s ease, opacity 0.3s', animation: `cardFlyUp 0.6s ${idx * 0.15}s cubic-bezier(0.34,1.56,0.64,1) both`, '--rot': `${(idx - 1) * 8}deg` as any, cursor: cardSwiped[idx] ? 'default' : 'grab', userSelect: 'none' }}
+                onMouseDown={e => onCardSwipeStart(idx, e.clientY)}
+                onTouchStart={e => onCardSwipeStart(idx, e.touches[0].clientY)}
+              >
+                <div style={{ borderRadius: 12, overflow: 'hidden', border: `3px solid ${rarityGlow[card.rarity]}`, boxShadow: `0 0 24px ${rarityGlow[card.rarity]}`, background: '#111827' }}>
+                  {card.image_url ? <img src={card.image_url} alt={card.card_name} style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover' }} /> : (
+                    <div style={{ width: '100%', aspectRatio: '4/3', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem' }}>🃏</div>
+                  )}
+                  <div style={{ padding: '8px 10px' }}>
+                    <div style={{ fontWeight: 900, fontSize: '0.72rem', color: 'white', marginBottom: 2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{card.card_name}</div>
+                    <div style={{ fontSize: '0.6rem', color: card.rarity === 'prismatic' ? '#c084fc' : card.rarity === 'gold-rare' ? '#fbbf24' : card.rarity === 'silver' ? '#94a3b8' : '#9ca3af', fontWeight: 800, marginBottom: 4 }}>{rarityLabel[card.rarity]}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#6070a0' }}>
+                      <span>❤️ {card.hp}</span>
+                      <span>⚡ {card.move1_dmg}</span>
+                      <span>💥 {card.move2_dmg}</span>
+                    </div>
+                  </div>
+                </div>
+                {!cardSwiped[idx] && <div style={{ textAlign: 'center', marginTop: 6, fontSize: '1.2rem', animation: 'shimmer 1.5s ease-in-out infinite' }}>↓</div>}
+              </div>
+            ))}
+          </div>
+
+          {/* Collection slots */}
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8 }}>
+            {slottedCards.map((card, idx) => (
+              <div key={idx} style={{ width: 130, aspectRatio: '3/4', borderRadius: 12, border: `2px dashed ${card ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.12)'}`, background: card ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.4s', overflow: 'hidden', position: 'relative' }}>
+                {card ? (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    {card.image_url ? <img src={card.image_url} alt={card.card_name} style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover' }} /> : (
+                      <div style={{ width: '100%', aspectRatio: '4/3', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>🃏</div>
+                    )}
+                    <div style={{ padding: '6px 8px', flex: 1 }}>
+                      <div style={{ fontWeight: 900, fontSize: '0.65rem', color: 'white', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{card.card_name}</div>
+                      <div style={{ fontSize: '0.55rem', color: card.rarity === 'prismatic' ? '#c084fc' : card.rarity === 'gold-rare' ? '#fbbf24' : '#9ca3af', fontWeight: 800 }}>{rarityLabel[card.rarity]}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem' }}>
+                    <div style={{ fontSize: '1.5rem', marginBottom: 4 }}>🃏</div>
+                    Slot {idx + 1}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Add to collection button */}
+          {allSwiped && (
+            <button onClick={handleAddToCollection} disabled={saving}
+              style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)', color: 'white', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', marginTop: 8, boxShadow: '0 8px 32px rgba(124,58,237,0.4)', animation: 'glowPulse 2s ease-in-out infinite', '--glow': 'rgba(124,58,237,0.5)' as any }}>
+              {saving ? 'Saving…' : '✦ Add Cards to Collection ✦'}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
