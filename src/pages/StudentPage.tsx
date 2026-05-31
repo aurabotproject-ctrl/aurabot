@@ -2480,49 +2480,52 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
           </div>
 
           {/* Cards to swipe */}
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'flex-start' }}>
             {openedCards.map((card, idx) => (
               <div key={idx}
-                style={{ width: 130, flexShrink: 0, opacity: cardSwiped[idx] ? 0 : 1, transform: `translateY(${cardPositions[idx]}px)`, transition: swipeDragIdx.current === idx ? 'none' : 'transform 0.3s ease, opacity 0.3s', animation: `cardFlyUp 0.6s ${idx * 0.15}s cubic-bezier(0.34,1.56,0.64,1) both`, cursor: cardSwiped[idx] ? 'default' : 'grab', userSelect: 'none' }}
+                style={{ flexShrink: 0, opacity: cardSwiped[idx] ? 0 : 1, transform: `translateY(${cardPositions[idx]}px)`, transition: swipeDragIdx.current === idx ? 'none' : 'transform 0.3s ease, opacity 0.3s', animation: `cardFlyUp 0.6s ${idx * 0.15}s cubic-bezier(0.34,1.56,0.64,1) both`, cursor: cardSwiped[idx] ? 'default' : 'grab', userSelect: 'none', filter: `drop-shadow(0 0 16px ${rarityGlow[card.rarity]})` }}
                 onMouseDown={e => onCardSwipeStart(idx, e.clientY)}
                 onTouchStart={e => onCardSwipeStart(idx, e.touches[0].clientY)}
               >
-                <div style={{ borderRadius: 12, overflow: 'hidden', border: `3px solid ${rarityGlow[card.rarity]}`, boxShadow: `0 0 24px ${rarityGlow[card.rarity]}`, background: '#111827' }}>
-                  {card.image_url ? <img src={card.image_url} alt={card.card_name} style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover' }} /> : (
-                    <div style={{ width: '100%', aspectRatio: '4/3', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem' }}>🃏</div>
-                  )}
-                  <div style={{ padding: '8px 10px' }}>
-                    <div style={{ fontWeight: 900, fontSize: '0.72rem', color: 'white', marginBottom: 2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{card.card_name}</div>
-                    <div style={{ fontSize: '0.6rem', color: card.rarity === 'prismatic' ? '#c084fc' : card.rarity === 'gold-rare' ? '#fbbf24' : card.rarity === 'silver' ? '#94a3b8' : '#9ca3af', fontWeight: 800, marginBottom: 4 }}>{rarityLabel[card.rarity]}</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6rem', color: '#6070a0' }}>
-                      <span>❤️ {card.hp}</span>
-                      <span>⚡ {card.move1_dmg}</span>
-                      <span>💥 {card.move2_dmg}</span>
-                    </div>
-                  </div>
+                <div style={{ transform: 'scale(0.72)', transformOrigin: 'top center', marginBottom: '-100px' }}>
+                  <PokeCard card={{
+                    id: card.id, student_id: '', teacher_id: '',
+                    card_name: card.card_name, hp: card.hp, type: card.type, rarity: card.rarity,
+                    description: card.description,
+                    stat1_name: card.stat1_name, stat1_val: card.stat1_val,
+                    stat2_name: card.stat2_name, stat2_val: card.stat2_val,
+                    stat3_name: card.stat3_name, stat3_val: card.stat3_val,
+                    move1_name: card.move1_name, move1_dmg: card.move1_dmg,
+                    move2_name: card.move2_name, move2_dmg: card.move2_dmg,
+                    image_url: card.image_url, created_at: '',
+                  }} />
                 </div>
-                {!cardSwiped[idx] && <div style={{ textAlign: 'center', marginTop: 6, fontSize: '1.2rem', animation: 'shimmer 1.5s ease-in-out infinite' }}>↓</div>}
+                {!cardSwiped[idx] && <div style={{ textAlign: 'center', fontSize: '1.4rem', color: 'white', marginTop: 4 }}>↓</div>}
               </div>
             ))}
           </div>
 
           {/* Collection slots */}
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
             {slottedCards.map((card, idx) => (
-              <div key={idx} style={{ width: 130, aspectRatio: '3/4', borderRadius: 12, border: `2px dashed ${card ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.12)'}`, background: card ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.4s', overflow: 'hidden', position: 'relative' }}>
+              <div key={idx} style={{ flexShrink: 0 }}>
                 {card ? (
-                  <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    {card.image_url ? <img src={card.image_url} alt={card.card_name} style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover' }} /> : (
-                      <div style={{ width: '100%', aspectRatio: '4/3', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>🃏</div>
-                    )}
-                    <div style={{ padding: '6px 8px', flex: 1 }}>
-                      <div style={{ fontWeight: 900, fontSize: '0.65rem', color: 'white', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{card.card_name}</div>
-                      <div style={{ fontSize: '0.55rem', color: card.rarity === 'prismatic' ? '#c084fc' : card.rarity === 'gold-rare' ? '#fbbf24' : '#9ca3af', fontWeight: 800 }}>{rarityLabel[card.rarity]}</div>
-                    </div>
+                  <div style={{ transform: 'scale(0.72)', transformOrigin: 'top center', marginBottom: '-100px', filter: `drop-shadow(0 0 16px ${rarityGlow[card.rarity]})`, animation: 'packZoomIn 0.4s cubic-bezier(0.34,1.56,0.64,1)' }}>
+                    <PokeCard card={{
+                      id: card.id, student_id: '', teacher_id: '',
+                      card_name: card.card_name, hp: card.hp, type: card.type, rarity: card.rarity,
+                      description: card.description,
+                      stat1_name: card.stat1_name, stat1_val: card.stat1_val,
+                      stat2_name: card.stat2_name, stat2_val: card.stat2_val,
+                      stat3_name: card.stat3_name, stat3_val: card.stat3_val,
+                      move1_name: card.move1_name, move1_dmg: card.move1_dmg,
+                      move2_name: card.move2_name, move2_dmg: card.move2_dmg,
+                      image_url: card.image_url, created_at: '',
+                    }} />
                   </div>
                 ) : (
-                  <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem' }}>
-                    <div style={{ fontSize: '1.5rem', marginBottom: 4 }}>🃏</div>
+                  <div style={{ width: 180, height: 252, borderRadius: 16, border: '2px dashed rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.03)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.7rem' }}>
+                    <div style={{ fontSize: '2rem', marginBottom: 6 }}>🃏</div>
                     Slot {idx + 1}
                   </div>
                 )}
@@ -2533,7 +2536,7 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
           {/* Add to collection button */}
           {allSwiped && (
             <button onClick={handleAddToCollection} disabled={saving}
-              style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)', color: 'white', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', marginTop: 8, boxShadow: '0 8px 32px rgba(124,58,237,0.4)', animation: 'glowPulse 2s ease-in-out infinite' }}>
+              style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)', color: 'white', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', marginTop: 24, boxShadow: '0 8px 32px rgba(124,58,237,0.4)', animation: 'glowPulse 2s ease-in-out infinite' }}>
               {saving ? 'Saving…' : '✦ Add Cards to Collection ✦'}
             </button>
           )}
