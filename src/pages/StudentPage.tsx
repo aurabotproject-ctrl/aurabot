@@ -1788,6 +1788,7 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
           {/* ── SHOP & TRADE ── */}
           <ShopAndTrade
             studentId={studentId}
+            studentName={studentName}
             unlockedChoices={unlockedChoices}
             onUnlock={async (choice) => { await saveUnlockChoice(choice); }}
           />
@@ -1877,11 +1878,15 @@ const UNLOCK_ITEMS = [
   { id: 'buildabot', label: 'Build-a-Bot',      desc: 'Unlock the full bot customisation studio', emoji: '🔧', cost: 5 },
 ];
 
-function ShopAndTrade({ studentId, unlockedChoices, onUnlock }: {
+const TEST_ACCOUNTS = ['Bella Clark', 'Benji Clark'];
+
+function ShopAndTrade({ studentId, studentName, unlockedChoices, onUnlock }: {
   studentId: string;
+  studentName: string;
   unlockedChoices: string[];
   onUnlock: (choice: string) => Promise<void>;
 }) {
+  const isTestAccount = TEST_ACCOUNTS.includes(studentName);
   const [starPoints, setStarPoints] = React.useState<number | null>(null);
   const [packImages, setPackImages] = React.useState<Record<string, string>>({});
   const [buying, setBuying] = React.useState<string | null>(null);
@@ -1905,14 +1910,14 @@ function ShopAndTrade({ studentId, unlockedChoices, onUnlock }: {
   const showMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
 
   const handleBuyPack = async (packId: string) => {
-    if (starPoints === null || starPoints < 5) { showMsg('Not enough ⭐ star points! You need at least 5.'); return; }
+    if (!isTestAccount && (starPoints === null || starPoints < 5)) { showMsg('Not enough ⭐ star points! You need at least 5.'); return; }
     setBuying(packId);
     showMsg(`🎉 ${PACK_TYPES.find(p => p.id === packId)?.label} purchased! Cards coming soon…`);
     setBuying(null);
   };
 
   const handleUnlock = async (item: typeof UNLOCK_ITEMS[0]) => {
-    if (starPoints === null || starPoints < item.cost) { showMsg(`Not enough ⭐ star points! You need ${item.cost}.`); return; }
+    if (!isTestAccount && (starPoints === null || starPoints < item.cost)) { showMsg(`Not enough ⭐ star points! You need ${item.cost}.`); return; }
     if (unlockedChoices.includes(item.id)) { showMsg('Already unlocked!'); return; }
     setUnlocking(item.id);
     try {
@@ -2001,9 +2006,9 @@ function ShopAndTrade({ studentId, unlockedChoices, onUnlock }: {
               </div>
 
               {/* Buy button */}
-              <button disabled={buying === pack.id || starPoints === null || starPoints < 5}
+              <button disabled={buying === pack.id || (!isTestAccount && (starPoints === null || starPoints < 5))}
                 onClick={e => { e.stopPropagation(); handleBuyPack(pack.id); }}
-                style={{ width: '100%', marginTop: 8, padding: '6px 0', borderRadius: 10, border: 'none', background: starPoints !== null && starPoints >= 5 ? `linear-gradient(135deg,${pack.color},${pack.glow})` : 'rgba(180,180,200,0.3)', color: starPoints !== null && starPoints >= 5 ? 'white' : '#9090b0', fontWeight: 800, fontSize: '0.72rem', cursor: starPoints !== null && starPoints >= 5 ? 'pointer' : 'not-allowed', transition: 'all 0.2s' }}>
+                style={{ width: '100%', marginTop: 8, padding: '6px 0', borderRadius: 10, border: 'none', background: (isTestAccount || (starPoints !== null && starPoints >= 5)) ? `linear-gradient(135deg,${pack.color},${pack.glow})` : 'rgba(180,180,200,0.3)', color: (isTestAccount || (starPoints !== null && starPoints >= 5)) ? 'white' : '#9090b0', fontWeight: 800, fontSize: '0.72rem', cursor: (isTestAccount || (starPoints !== null && starPoints >= 5)) ? 'pointer' : 'not-allowed', transition: 'all 0.2s' }}>
                 {buying === pack.id ? '…' : '⭐ 5 pts — Buy'}
               </button>
             </div>
@@ -2029,7 +2034,7 @@ function ShopAndTrade({ studentId, unlockedChoices, onUnlock }: {
                   </div>
                 </div>
                 <button
-                  disabled={owned || unlocking === item.id || !canAfford}
+                  disabled={owned || unlocking === item.id || (!isTestAccount && !canAfford)}
                   onClick={() => handleUnlock(item)}
                   style={{ width: '100%', padding: '7px 0', borderRadius: 9, border: 'none', fontWeight: 800, fontSize: '0.76rem', cursor: owned || !canAfford ? 'not-allowed' : 'pointer', background: owned ? 'rgba(34,197,94,0.15)' : canAfford ? 'linear-gradient(135deg,#7c3aed,#5b21b6)' : 'rgba(180,180,200,0.3)', color: owned ? '#16a34a' : canAfford ? 'white' : '#9090b0', transition: 'all 0.2s' }}>
                   {owned ? '✓ Owned' : unlocking === item.id ? '…' : `⭐ ${item.cost} pts — Unlock`}
