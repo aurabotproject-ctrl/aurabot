@@ -1893,7 +1893,7 @@ function ShopAndTrade({ studentId, studentName, teacherId, unlockedChoices, onUn
   const isTestAccount = TEST_ACCOUNTS.includes(studentName);
   const [starPoints, setStarPoints] = React.useState<number | null>(null);
   const [packImages, setPackImages] = React.useState<Record<string, string>>({});
-  const [buying, setBuying] = React.useState<string | null>(null);
+  const [buying, _setBuying] = React.useState<string | null>(null);
   const [unlocking, setUnlocking] = React.useState<string | null>(null);
   const [msg, setMsg] = React.useState('');
   const [openingPack, setOpeningPack] = React.useState<typeof PACK_TYPES[0] | null>(null);
@@ -2170,7 +2170,7 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
   const swipeDragIdx = React.useRef(-1);
   const swipeStartY = React.useRef(0);
 
-  const canAfford = isTestAccount || starPoints >= (selectedTier?.stars || 0);
+  // canAfford check is inline per tier
 
   const handleSelectTier = (tier: typeof PACK_TIERS[0]) => {
     setSelectedTier(tier);
@@ -2483,7 +2483,7 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             {openedCards.map((card, idx) => (
               <div key={idx}
-                style={{ width: 130, flexShrink: 0, opacity: cardSwiped[idx] ? 0 : 1, transform: `translateY(${cardPositions[idx]}px)`, transition: swipeDragIdx.current === idx ? 'none' : 'transform 0.3s ease, opacity 0.3s', animation: `cardFlyUp 0.6s ${idx * 0.15}s cubic-bezier(0.34,1.56,0.64,1) both`, '--rot': `${(idx - 1) * 8}deg` as any, cursor: cardSwiped[idx] ? 'default' : 'grab', userSelect: 'none' }}
+                style={{ width: 130, flexShrink: 0, opacity: cardSwiped[idx] ? 0 : 1, transform: `translateY(${cardPositions[idx]}px)`, transition: swipeDragIdx.current === idx ? 'none' : 'transform 0.3s ease, opacity 0.3s', animation: `cardFlyUp 0.6s ${idx * 0.15}s cubic-bezier(0.34,1.56,0.64,1) both`, cursor: cardSwiped[idx] ? 'default' : 'grab', userSelect: 'none' }}
                 onMouseDown={e => onCardSwipeStart(idx, e.clientY)}
                 onTouchStart={e => onCardSwipeStart(idx, e.touches[0].clientY)}
               >
@@ -2533,7 +2533,7 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
           {/* Add to collection button */}
           {allSwiped && (
             <button onClick={handleAddToCollection} disabled={saving}
-              style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)', color: 'white', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', marginTop: 8, boxShadow: '0 8px 32px rgba(124,58,237,0.4)', animation: 'glowPulse 2s ease-in-out infinite', '--glow': 'rgba(124,58,237,0.5)' as any }}>
+              style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #7c3aed, #5b21b6)', color: 'white', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', marginTop: 8, boxShadow: '0 8px 32px rgba(124,58,237,0.4)', animation: 'glowPulse 2s ease-in-out infinite' }}>
               {saving ? 'Saving…' : '✦ Add Cards to Collection ✦'}
             </button>
           )}
