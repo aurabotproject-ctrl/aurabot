@@ -5,14 +5,18 @@ import StudentPage from './pages/StudentPage';
 import AdminPage from './pages/AdminPage';
 import ArenaPage from './pages/ArenaPage';
 import BuildABotPage from './pages/BuildABotPage';
+import MyCardsPage from './pages/MyCardsPage';
+import ShopPage from './pages/ShopPage';
 import { Auth } from './lib/auth';
 import { Router } from './lib/router';
 import type { Session } from './lib/auth';
 
+type Page = 'login' | 'teacher' | 'student' | 'admin' | 'arena' | 'buildabot' | 'mycards' | 'shop';
+
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState<'login' | 'teacher' | 'student' | 'admin' | 'arena' | 'buildabot'>('login');
+  const [page, setPage] = useState<Page>('login');
 
   useEffect(() => {
     init();
@@ -27,14 +31,12 @@ function App() {
       const s = await Auth.getSession();
       setSession(s);
       if (!s) {
-        if (path !== '/') {
-          Router.replace('/');
-        }
+        if (path !== '/') Router.replace('/');
         setPage('login');
       } else {
         const role = s.profile.role;
         if (path === '/' || path === '/login') {
-          const rmap: Record<string, typeof page> = { admin: 'admin', teacher: 'teacher', student: 'student' };
+          const rmap: Record<string, Page> = { admin: 'admin', teacher: 'teacher', student: 'student' };
           const target = rmap[role] || 'login';
           Router.navigate('/' + target);
           setPage(target);
@@ -48,11 +50,17 @@ function App() {
           if (role !== 'admin') { Router.navigate('/'); setPage('login'); }
           else setPage('admin');
         } else if (path.startsWith('/arena')) {
-          if (role !== 'student') { Router.navigate('/'); setPage('login'); }
+          if (role !== 'student' && role !== 'admin') { Router.navigate('/'); setPage('login'); }
           else setPage('arena');
         } else if (path.startsWith('/buildabot')) {
-          if (role !== 'student') { Router.navigate('/'); setPage('login'); }
+          if (role !== 'student' && role !== 'admin') { Router.navigate('/'); setPage('login'); }
           else setPage('buildabot');
+        } else if (path.startsWith('/mycards')) {
+          if (role !== 'student' && role !== 'admin') { Router.navigate('/'); setPage('login'); }
+          else setPage('mycards');
+        } else if (path.startsWith('/shop')) {
+          if (role !== 'student' && role !== 'admin') { Router.navigate('/'); setPage('login'); }
+          else setPage('shop');
         } else {
           setPage('login');
         }
@@ -69,6 +77,11 @@ function App() {
     window.location.reload();
   };
 
+  const goTo = (p: Page, route: string) => {
+    Router.navigate(route);
+    setPage(p);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#0f1629' }}>
@@ -79,12 +92,14 @@ function App() {
 
   return (
     <>
-      {page === 'login' && <LoginPage />}
-      {page === 'teacher' && <TeacherPage session={session!} onSignOut={handleSignOut} />}
-      {page === 'student' && <StudentPage session={session!} onSignOut={handleSignOut} />}
-      {page === 'admin' && <AdminPage session={session!} onSignOut={handleSignOut} />}
-      {page === 'arena' && <ArenaPage session={session!} />}
-      {page === 'buildabot' && <BuildABotPage onBack={() => { Router.navigate('/student'); setPage('student'); }} />}
+      {page === 'login'    && <LoginPage />}
+      {page === 'teacher'  && <TeacherPage session={session!} onSignOut={handleSignOut} />}
+      {page === 'student'  && <StudentPage session={session!} onSignOut={handleSignOut} />}
+      {page === 'admin'    && <AdminPage session={session!} onSignOut={handleSignOut} />}
+      {page === 'arena'    && <ArenaPage session={session!} />}
+      {page === 'buildabot' && <BuildABotPage onBack={() => goTo('student', '/student')} />}
+      {page === 'mycards'  && <MyCardsPage session={session!} onBack={() => goTo('student', '/student')} />}
+      {page === 'shop'     && <ShopPage session={session!} onBack={() => goTo('student', '/student')} onCardsAdded={() => goTo('mycards', '/mycards')} />}
     </>
   );
 }
