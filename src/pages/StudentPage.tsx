@@ -441,7 +441,8 @@ function SavedBotAvatar({ facePixels, faceColorPalettes, robotColor }: { facePix
                 return <div key={el.id} style={containerStyle}>{renderFaceContent(el)}</div>;
               }
               return renderBotEl(el, special);
-            })}\n          </div>
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -1873,37 +1874,33 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
 // ══════════════════════════════════════════════════════════════════════
 // SHOP & TRADE
+// ══════════════════════════════════════════════════════════════════════
 
-const TEST_ACCOUNTS = ['Bella Clark', 'Benji Clark'];
 const PACK_TYPES = [
-  { id: 'xanimals',  label: 'Xanimals Pack',  subtitle: 'Crossed Animals!',         color: '#7c3aed', glow: '#a855f7', emoji: '🧬' },
-  { id: 'animals',   label: 'Animals Pack',   subtitle: 'Real World Animals!',      color: '#16a34a', glow: '#22c55e', emoji: '🐾' },
-  { id: 'creatures', label: 'Creatures Pack', subtitle: 'Magical & Mythical!',      color: '#0369a1', glow: '#38bdf8', emoji: '👾' },
-  { id: 'humanoids', label: 'Humanoids Pack', subtitle: 'People & Warriors!',       color: '#b45309', glow: '#f59e0b', emoji: '🧑' },
+  { id: 'xanimals',  label: 'Xanimals Pack',  subtitle: 'Crossed Animals!',      color: '#7c3aed', glow: '#a855f7', emoji: '🧬' },
+  { id: 'animals',   label: 'Animals Pack',   subtitle: 'Real World Animals!',   color: '#16a34a', glow: '#22c55e', emoji: '🐾' },
+  { id: 'creatures', label: 'Creatures Pack', subtitle: 'Magical & Mythical!',   color: '#0369a1', glow: '#38bdf8', emoji: '👾' },
+  { id: 'humanoids', label: 'Humanoids Pack', subtitle: 'People & Warriors!',    color: '#b45309', glow: '#f59e0b', emoji: '🧑' },
   { id: 'robots',    label: 'Robots Pack',    subtitle: 'Mechanical & Futuristic!', color: '#374151', glow: '#9ca3af', emoji: '🤖' },
-  { id: 'luckydip',  label: 'Lucky Dip Pack', subtitle: 'Mix of All Themes!',      color: '#be123c', glow: '#f43f5e', emoji: '🎲' },
+  { id: 'luckydip',  label: 'Lucky Dip Pack', subtitle: 'Mix of All Themes!',   color: '#be123c', glow: '#f43f5e', emoji: '🎲', isSpecial: true },
 ];
+
 const UNLOCK_ITEMS = [
-  { id: 'color',     label: 'New Bot Colour',  desc: 'Unlock extra colour for your AuraBot', emoji: '🎨', cost: 5 },
-  { id: 'face',      label: 'Face Colour Pack', desc: 'Unlock a new face pixel colour palette', emoji: '✨', cost: 5 },
+  { id: 'color',    label: 'New Bot Colour',   desc: 'Unlock an extra colour for your AuraBot', emoji: '🎨', cost: 5 },
+  { id: 'face',     label: 'Face Colour Pack',  desc: 'Unlock a new face pixel colour palette',  emoji: '✨', cost: 5 },
   { id: 'buildabot', label: 'Build-a-Bot',      desc: 'Unlock the full bot customisation studio', emoji: '🔧', cost: 5 },
 ];
 
-// @ts-ignore -- kept for future use
-function ShopAndTrade({ studentId, studentName, teacherId, unlockedChoices, onUnlock }: {
+function ShopAndTrade({ studentId, unlockedChoices, onUnlock }: {
   studentId: string;
-  studentName: string;
-  teacherId: string;
   unlockedChoices: string[];
   onUnlock: (choice: string) => Promise<void>;
 }) {
-  const isTestAccount = TEST_ACCOUNTS.includes(studentName);
   const [starPoints, setStarPoints] = React.useState<number | null>(null);
   const [packImages, setPackImages] = React.useState<Record<string, string>>({});
-  const [buying, _setBuying] = React.useState<string | null>(null);
+  const [buying, setBuying] = React.useState<string | null>(null);
   const [unlocking, setUnlocking] = React.useState<string | null>(null);
   const [msg, setMsg] = React.useState('');
-  const [openingPack, setOpeningPack] = React.useState<typeof PACK_TYPES[0] | null>(null);
 
   React.useEffect(() => {
     if (!studentId) return;
@@ -1921,14 +1918,15 @@ function ShopAndTrade({ studentId, studentName, teacherId, unlockedChoices, onUn
 
   const showMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
 
-  const handleBuyPack = (packId: string) => {
-    const pack = PACK_TYPES.find(p => p.id === packId);
-    if (!pack) return;
-    setOpeningPack(pack);
+  const handleBuyPack = async (packId: string) => {
+    if (starPoints === null || starPoints < 5) { showMsg('Not enough ⭐ star points! You need at least 5.'); return; }
+    setBuying(packId);
+    showMsg(`🎉 ${PACK_TYPES.find(p => p.id === packId)?.label} purchased! Cards coming soon…`);
+    setBuying(null);
   };
 
   const handleUnlock = async (item: typeof UNLOCK_ITEMS[0]) => {
-    if (!isTestAccount && (starPoints === null || starPoints < item.cost)) { showMsg(`Not enough ⭐ star points! You need ${item.cost}.`); return; }
+    if (starPoints === null || starPoints < item.cost) { showMsg(`Not enough ⭐ star points! You need ${item.cost}.`); return; }
     if (unlockedChoices.includes(item.id)) { showMsg('Already unlocked!'); return; }
     setUnlocking(item.id);
     try {
@@ -1941,20 +1939,6 @@ function ShopAndTrade({ studentId, studentName, teacherId, unlockedChoices, onUn
   };
 
   return (
-    <>
-      {openingPack && (
-        <PackOpeningOverlay
-          pack={openingPack}
-          packImage={packImages[openingPack.id] || null}
-          starPoints={starPoints || 0}
-          isTestAccount={isTestAccount}
-          studentId={studentId}
-          teacherId={teacherId}
-          onClose={() => setOpeningPack(null)}
-          onStarsSpent={amt => setStarPoints(p => (p || 0) - amt)}
-          onComplete={(_cards) => { setOpeningPack(null); /* navigate to cards handled by parent */ }}
-        />
-      )}
     <div style={{ borderRadius: 22, background: 'rgba(255,255,255,0.72)', border: '1.5px solid rgba(200,190,240,0.5)', boxShadow: '0 6px 28px rgba(160,120,220,0.10)', padding: '22px 24px', backdropFilter: 'blur(8px)', marginTop: 8 }}>
       <style>{`
         @keyframes packFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
@@ -2031,9 +2015,9 @@ function ShopAndTrade({ studentId, studentName, teacherId, unlockedChoices, onUn
               </div>
 
               {/* Buy button */}
-              <button disabled={buying === pack.id || (!isTestAccount && (starPoints === null || starPoints < 5))}
+              <button disabled={buying === pack.id || starPoints === null || starPoints < 5}
                 onClick={e => { e.stopPropagation(); handleBuyPack(pack.id); }}
-                style={{ width: '100%', marginTop: 8, padding: '6px 0', borderRadius: 10, border: 'none', background: (isTestAccount || (starPoints !== null && starPoints >= 5)) ? `linear-gradient(135deg,${pack.color},${pack.glow})` : 'rgba(180,180,200,0.3)', color: (isTestAccount || (starPoints !== null && starPoints >= 5)) ? 'white' : '#9090b0', fontWeight: 800, fontSize: '0.72rem', cursor: (isTestAccount || (starPoints !== null && starPoints >= 5)) ? 'pointer' : 'not-allowed', transition: 'all 0.2s' }}>
+                style={{ width: '100%', marginTop: 8, padding: '6px 0', borderRadius: 10, border: 'none', background: starPoints !== null && starPoints >= 5 ? `linear-gradient(135deg,${pack.color},${pack.glow})` : 'rgba(180,180,200,0.3)', color: starPoints !== null && starPoints >= 5 ? 'white' : '#9090b0', fontWeight: 800, fontSize: '0.72rem', cursor: starPoints !== null && starPoints >= 5 ? 'pointer' : 'not-allowed', transition: 'all 0.2s' }}>
                 {buying === pack.id ? '…' : '⭐ 5 pts — Buy'}
               </button>
             </div>
@@ -2059,7 +2043,7 @@ function ShopAndTrade({ studentId, studentName, teacherId, unlockedChoices, onUn
                   </div>
                 </div>
                 <button
-                  disabled={owned || unlocking === item.id || (!isTestAccount && !canAfford)}
+                  disabled={owned || unlocking === item.id || !canAfford}
                   onClick={() => handleUnlock(item)}
                   style={{ width: '100%', padding: '7px 0', borderRadius: 9, border: 'none', fontWeight: 800, fontSize: '0.76rem', cursor: owned || !canAfford ? 'not-allowed' : 'pointer', background: owned ? 'rgba(34,197,94,0.15)' : canAfford ? 'linear-gradient(135deg,#7c3aed,#5b21b6)' : 'rgba(180,180,200,0.3)', color: owned ? '#16a34a' : canAfford ? 'white' : '#9090b0', transition: 'all 0.2s' }}>
                   {owned ? '✓ Owned' : unlocking === item.id ? '…' : `⭐ ${item.cost} pts — Unlock`}
@@ -2080,28 +2064,7 @@ function ShopAndTrade({ studentId, studentName, teacherId, unlockedChoices, onUn
         </div>
       </div>
     </div>
-    </>
   );
 }
 
 export default StudentPage;
-
-// ══════════════════════════════════════════════════════════════════════
-// PACK OPENING EXPERIENCE
-// ══════════════════════════════════════════════════════════════════════interface OpenedCard {
-  id: string;
-  card_name: string;
-  type: string;
-  rarity: 'common' | 'silver' | 'gold-rare' | 'prismatic';
-  description: string;
-  image_url: string;
-  hp: number;
-  stat1_name: string; stat1_val: number;
-  stat2_name: string; stat2_val: number;
-  stat3_name: string; stat3_val: number;
-  move1_name: string; move1_dmg: number;
-  move2_name: string; move2_dmg: number;
-  skill_points: number;
-}
-
-
