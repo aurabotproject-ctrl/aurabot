@@ -1710,6 +1710,28 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
                     </div>
                   );
                 })()}
+
+                {/* My Cards button */}
+                <div onClick={() => window.location.hash = '/mycards'}
+                  style={{ cursor: 'pointer', marginTop: 10 }}>
+                  <div style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderRadius: 14, padding: '11px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 6px 20px rgba(99,102,241,0.35)', transition: 'all 0.2s' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.03)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)'; }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 900, letterSpacing: '0.1em', color: '#fff', textTransform: 'uppercase' }}>My Cards</span>
+                    <span style={{ fontSize: '0.95rem' }}>🃏</span>
+                  </div>
+                </div>
+
+                {/* Shop button */}
+                <div onClick={() => window.location.hash = '/shop'}
+                  style={{ cursor: 'pointer', marginTop: 10 }}>
+                  <div style={{ background: 'linear-gradient(135deg,#f59e0b,#ef4444)', borderRadius: 14, padding: '11px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 6px 20px rgba(245,158,11,0.35)', transition: 'all 0.2s' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.03)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)'; }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 900, letterSpacing: '0.1em', color: '#fff', textTransform: 'uppercase' }}>Shop & Trade</span>
+                    <span style={{ fontSize: '0.95rem' }}>🛒</span>
+                  </div>
+                </div>
               </div>
             </div>
 
