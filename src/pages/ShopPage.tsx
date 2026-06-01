@@ -257,7 +257,7 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
 }
 
 // ── Pack Opening Overlay (self-contained) ─────────────────────────────
-type OpenPhase = 'tiers' | 'confirm' | 'zoom' | 'tear' | 'reveal' | 'done';
+type OpenPhase = 'tiers' | 'confirm' | 'zoom' | 'tear' | 'reveal';
 
 function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studentId, teacherId, onClose, onComplete, onStarsSpent }: {
   pack: typeof PACK_TYPES[0]; packImage: string | null;
@@ -271,18 +271,20 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
   const [openedCards, setOpenedCards] = useState<OpenedCard[]>([]);
   const [slottedCards, setSlottedCards] = useState<(OpenedCard | null)[]>([null, null, null]);
   const [saving, setSaving] = useState(false);
-  const [tearProgress, setTearProgress] = useState(0);
-  const [tearComplete, setTearComplete] = useState(false);
-  const [slideY, setSlideY] = useState(0);
-  const [sliding, setSliding] = useState(false);
+  // Tear state
+  const [torn, setTorn] = useState(false);
+  const [topY, setTopY] = useState(0);    // top piece flies up
+  const [botY, setBotY] = useState(0);    // bottom piece falls down
+  // Card swipe state
   const [cardPositions, setCardPositions] = useState([0, 0, 0]);
   const [cardSwiped, setCardSwiped] = useState([false, false, false]);
-  const tearStartX = React.useRef(0);
-  const tearStarted = React.useRef(false);
   const swipeDragIdx = React.useRef(-1);
   const swipeStartY = React.useRef(0);
 
-  const rarityGlow: Record<string, string> = { common: 'rgba(156,163,175,0.5)', silver: 'rgba(148,163,184,0.7)', 'gold-rare': 'rgba(245,158,11,0.8)', prismatic: 'rgba(168,85,247,0.9)' };
+  const rarityGlow: Record<string, string> = {
+    common: 'rgba(156,163,175,0.5)', silver: 'rgba(148,163,184,0.7)',
+    'gold-rare': 'rgba(245,158,11,0.8)', prismatic: 'rgba(168,85,247,0.9)',
+  };
 
   const handleConfirm = async () => {
     if (!selectedTier) return;
@@ -292,28 +294,69 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
     }
     const { data: dbCards } = await sb.from('card_database').select('*').limit(100);
     const pool = (dbCards || []).filter((c: any) => pack.id === 'luckydip' || c.type === pack.id);
-    const allCards = dbCards || [];
+    const src = (pool.length > 0 ? pool : (dbCards || [])) as any[];
     const rolled: OpenedCard[] = [];
     for (let i = 0; i < 3; i++) {
       const rarity = rollRarity(selectedTier.id);
       const stats = rollStats(rarity);
-      const src = (pool.length > 0 ? pool : allCards)[Math.floor(Math.random() * (pool.length > 0 ? pool.length : allCards.length))] as any;
-      rolled.push({ id: `opened-${Date.now()}-${i}`, card_name: src?.card_name || 'Mystery Card', type: src?.type || pack.id, rarity, description: src?.description || '', image_url: src?.image_url || '', hp: stats.hp, stat1_name: 'HP', stat1_val: stats.hp, stat2_name: src?.move1_name || 'Attack', stat2_val: stats.weakDmg, stat3_name: src?.move2_name || 'Power', stat3_val: stats.strongDmg, move1_name: src?.move1_name || 'Attack', move1_dmg: stats.weakDmg, move2_name: src?.move2_name || 'Power', move2_dmg: stats.strongDmg, skill_points: stats.skillPts });
+      const card = src.length > 0 ? src[Math.floor(Math.random() * src.length)] : null;
+      rolled.push({
+        id: `opened-${Date.now()}-${i}`,
+        card_name: card?.card_name || 'Mystery Card', type: card?.type || pack.id, rarity,
+        description: card?.description || '', image_url: card?.image_url || '', hp: stats.hp,
+        stat1_name: 'HP', stat1_val: stats.hp,
+        stat2_name: card?.move1_name || 'Attack', stat2_val: stats.weakDmg,
+        stat3_name: card?.move2_name || 'Power',  stat3_val: stats.strongDmg,
+        move1_name: card?.move1_name || 'Attack', move1_dmg: stats.weakDmg,
+        move2_name: card?.move2_name || 'Power',  move2_dmg: stats.strongDmg,
+        skill_points: stats.skillPts,
+      });
     }
     setOpenedCards(rolled);
     setPhase('zoom');
-    setTimeout(() => setPhase('tear'), 1200);
+    setTimeout(() => setPhase('tear'), 1000);
   };
 
-  const onTearStart = (x: number) => { if (tearComplete) return; tearStartX.current = x; tearStarted.current = true; };
-  const onTearMove = (x: number) => { if (!tearStarted.current || tearComplete) return; const p = Math.min(Math.max((x - tearStartX.current) / 280, 0), 1); setTearProgress(p); if (p >= 1) { setTearComplete(true); tearStarted.current = false; } };
-  const onTearEnd = () => { tearStarted.current = false; };
-  const onSlideStart = (y: number) => { if (!tearComplete || sliding) return; setSliding(true); swipeStartY.current = y; };
-  const onSlideMove = (y: number) => { if (!sliding) return; const dy = Math.max(0, y - swipeStartY.current); setSlideY(dy); if (dy > 220) { setSliding(false); setPhase('reveal'); } };
-  const onSlideEnd = () => { if (slideY < 220) setSlideY(0); setSliding(false); };
-  const onCardSwipeStart = (idx: number, y: number) => { if (cardSwiped[idx]) return; swipeDragIdx.current = idx; swipeStartY.current = y; };
-  const onCardSwipeMove = (y: number) => { const idx = swipeDragIdx.current; if (idx < 0 || cardSwiped[idx]) return; const dy = Math.max(0, y - swipeStartY.current); setCardPositions(prev => prev.map((p, i) => i === idx ? dy : p)); if (dy > 160) { setCardSwiped(prev => prev.map((s, i) => i === idx ? true : s)); setSlottedCards(prev => { const n = [...prev]; n[idx] = openedCards[idx]; return n; }); swipeDragIdx.current = -1; } };
-  const onCardSwipeEnd = () => { const idx = swipeDragIdx.current; if (idx >= 0 && !cardSwiped[idx]) setCardPositions(prev => prev.map((p, i) => i === idx ? 0 : p)); swipeDragIdx.current = -1; };
+  // Click the top zone → animate tear open
+  const handleTear = () => {
+    if (torn) return;
+    setTorn(true);
+    // Animate top flying up, bottom falling down
+    let frame = 0;
+    const animate = () => {
+      frame++;
+      setTopY(prev => prev - 18);
+      setBotY(prev => prev + 14);
+      if (frame < 25) requestAnimationFrame(animate);
+      else {
+        setTimeout(() => setPhase('reveal'), 200);
+      }
+    };
+    requestAnimationFrame(animate);
+  };
+
+  // Card swipe handlers
+  const onCardSwipeStart = (idx: number, y: number) => {
+    if (cardSwiped[idx]) return;
+    swipeDragIdx.current = idx;
+    swipeStartY.current = y;
+  };
+  const onCardSwipeMove = (y: number) => {
+    const idx = swipeDragIdx.current;
+    if (idx < 0 || cardSwiped[idx]) return;
+    const dy = Math.max(0, y - swipeStartY.current);
+    setCardPositions(prev => prev.map((p, i) => i === idx ? dy : p));
+    if (dy > 140) {
+      setCardSwiped(prev => prev.map((s, i) => i === idx ? true : s));
+      setSlottedCards(prev => { const n = [...prev]; n[idx] = openedCards[idx]; return n; });
+      swipeDragIdx.current = -1;
+    }
+  };
+  const onCardSwipeEnd = () => {
+    const idx = swipeDragIdx.current;
+    if (idx >= 0 && !cardSwiped[idx]) setCardPositions(prev => prev.map((p, i) => i === idx ? 0 : p));
+    swipeDragIdx.current = -1;
+  };
 
   const allSwiped = cardSwiped.every(Boolean);
 
@@ -321,25 +364,38 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
     setSaving(true);
     try {
       for (const card of openedCards) {
-        await sb.from('cards').insert({ student_id: studentId, teacher_id: teacherId, card_name: card.card_name, type: card.type, rarity: card.rarity, description: card.description, image_url: card.image_url, hp: card.hp, stat1_name: card.stat1_name, stat1_val: card.stat1_val, stat2_name: card.stat2_name, stat2_val: card.stat2_val, stat3_name: card.stat3_name, stat3_val: card.stat3_val, move1_name: card.move1_name, move1_dmg: card.move1_dmg, move2_name: card.move2_name, move2_dmg: card.move2_dmg, card_source: 'pack' });
+        await sb.from('cards').insert({
+          student_id: studentId, teacher_id: teacherId,
+          card_name: card.card_name, type: card.type, rarity: card.rarity,
+          description: card.description, image_url: card.image_url, hp: card.hp,
+          stat1_name: card.stat1_name, stat1_val: card.stat1_val,
+          stat2_name: card.stat2_name, stat2_val: card.stat2_val,
+          stat3_name: card.stat3_name, stat3_val: card.stat3_val,
+          move1_name: card.move1_name, move1_dmg: card.move1_dmg,
+          move2_name: card.move2_name, move2_dmg: card.move2_dmg,
+          card_source: 'pack',
+        });
       }
       onComplete(openedCards);
     } catch (err: any) { alert('Error: ' + err.message); }
     setSaving(false);
   };
 
+  const TEAR_LINE = 0.27; // 27% from top is the tear line
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(5,5,20,0.97)', zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
-      onMouseMove={e => { if (phase === 'tear') { onTearMove(e.clientX); onSlideMove(e.clientY); } if (phase === 'reveal') onCardSwipeMove(e.clientY); }}
-      onMouseUp={() => { onTearEnd(); onSlideEnd(); onCardSwipeEnd(); }}
-      onTouchMove={e => { const t = e.touches[0]; if (phase === 'tear') { onTearMove(t.clientX); onSlideMove(t.clientY); } if (phase === 'reveal') onCardSwipeMove(t.clientY); }}
-      onTouchEnd={() => { onTearEnd(); onSlideEnd(); onCardSwipeEnd(); }}
+      onMouseMove={e => { if (phase === 'reveal') onCardSwipeMove(e.clientY); }}
+      onMouseUp={() => onCardSwipeEnd()}
+      onTouchMove={e => { if (phase === 'reveal') onCardSwipeMove(e.touches[0].clientY); }}
+      onTouchEnd={() => onCardSwipeEnd()}
     >
       <style>{`
         @keyframes packZoomIn { from{transform:scale(0.6);opacity:0} to{transform:scale(1);opacity:1} }
-        @keyframes cardFlyUp { from{transform:translateY(120px);opacity:0} to{transform:translateY(0);opacity:1} }
-        @keyframes shimmer { 0%,100%{opacity:0.4} 50%{opacity:1} }
+        @keyframes cardFlyUp { from{transform:translateY(100px);opacity:0} to{transform:translateY(0);opacity:1} }
         @keyframes glowPulse { 0%,100%{box-shadow:0 8px 32px rgba(124,58,237,0.4)} 50%{box-shadow:0 8px 60px rgba(124,58,237,0.8)} }
+        @keyframes shimmer { 0%,100%{opacity:0.4} 50%{opacity:1} }
+        .tearzone-top:hover { background: rgba(255,255,255,0.08) !important; }
       `}</style>
 
       {phase !== 'reveal' && (
@@ -397,79 +453,130 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
         </div>
       )}
 
-      {/* ZOOM */}
+      {/* ZOOM IN */}
       {phase === 'zoom' && selectedTier && (
         <div style={{ animation: 'packZoomIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards' }}>
-          <div style={{ width: 220, aspectRatio: '3/4', borderRadius: 18, overflow: 'hidden', border: `3px solid ${selectedTier.color}`, boxShadow: `0 0 60px ${selectedTier.color}88` }}>
-            {packImage ? <img src={packImage} alt="pack" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: `linear-gradient(160deg,${pack.color}ee,${pack.color}88)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '4rem' }}>{pack.emoji}</div>}
+          <div style={{ width: 240, aspectRatio: '3/4', borderRadius: 18, overflow: 'hidden', border: `3px solid ${selectedTier.color}`, boxShadow: `0 0 60px ${selectedTier.color}88` }}>
+            {packImage
+              ? <img src={packImage} alt="pack" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <div style={{ width: '100%', height: '100%', background: `linear-gradient(160deg,${pack.color}ee,${pack.color}88)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '4rem' }}>{pack.emoji}</div>
+            }
           </div>
         </div>
       )}
 
-      {/* TEAR */}
+      {/* TEAR — click top zone to open */}
       {phase === 'tear' && selectedTier && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-          <div style={{ color: '#8090b0', fontSize: '0.8rem', fontWeight: 700, textAlign: 'center' }}>
-            {!tearComplete ? '👆 Drag across the top to tear open' : '👇 Slide the pack down'}
-          </div>
-          <div style={{ position: 'relative', width: 220, userSelect: 'none' }}>
-            {tearProgress > 0 && <div style={{ position: 'absolute', top: -36, left: 0, right: 0, height: 54, background: `linear-gradient(160deg,${pack.color}cc,${pack.color}88)`, borderRadius: '18px 18px 0 0', transform: `rotate(${tearProgress * -15}deg) translateX(${tearProgress * 20}px)`, opacity: 1 - tearProgress * 0.3, zIndex: 2, borderBottom: tearProgress > 0.1 ? '2px dashed rgba(255,255,255,0.4)' : 'none' }} />}
-            <div style={{ width: 220, aspectRatio: '3/4', borderRadius: tearComplete ? '0 0 18px 18px' : 18, overflow: 'hidden', border: `3px solid ${selectedTier.color}`, boxShadow: `0 0 40px ${selectedTier.color}66`, transform: `translateY(${slideY}px)`, transition: sliding ? 'none' : 'transform 0.3s', cursor: tearComplete ? 'grab' : 'crosshair' }}
-              onMouseDown={e => tearComplete ? onSlideStart(e.clientY) : onTearStart(e.clientX)}
-              onTouchStart={e => { const t = e.touches[0]; tearComplete ? onSlideStart(t.clientY) : onTearStart(t.clientX); }}>
-              {packImage ? <img src={packImage} alt="pack" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: `linear-gradient(160deg,${pack.color}ee,${pack.color}88)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '4rem' }}>{pack.emoji}</div>}
-            </div>
-            {!tearComplete && (
-              <div style={{ position: 'absolute', top: 28, left: 0, right: 0, height: 4, zIndex: 3, cursor: 'crosshair' }}
-                onMouseDown={e => onTearStart(e.clientX)} onTouchStart={e => onTearStart(e.touches[0].clientX)}>
-                <div style={{ height: '100%', background: `linear-gradient(90deg,${selectedTier.color},white)`, width: `${tearProgress * 100}%`, boxShadow: '0 0 8px white', borderRadius: 2 }} />
-                <div style={{ position: 'absolute', inset: 0, borderTop: '2px dashed rgba(255,255,255,0.3)' }} />
-              </div>
-            )}
-          </div>
-          {!tearComplete && (
-            <div style={{ display: 'flex', gap: 4 }}>
-              {Array.from({ length: 10 }).map((_, i) => <div key={i} style={{ width: 20, height: 4, borderRadius: 2, background: i < tearProgress * 10 ? selectedTier.color : 'rgba(255,255,255,0.1)' }} />)}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          {!torn && (
+            <div style={{ color: '#8090b0', fontSize: '0.8rem', fontWeight: 700, textAlign: 'center' }}>
+              👆 Tap the top of the pack to tear it open
             </div>
           )}
-        </div>
-      )}
 
-      {/* REVEAL */}
-      {phase === 'reveal' && (
-        <div style={{ width: '100%', maxWidth: 560, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ textAlign: 'center', color: '#8090b0', fontSize: '0.78rem', fontWeight: 700 }}>
-            {allSwiped ? '✦ All cards collected!' : '👇 Swipe each card down to your slots'}
-          </div>
-          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            {openedCards.map((card, idx) => (
-              <div key={idx} style={{ flexShrink: 0, opacity: cardSwiped[idx] ? 0 : 1, transform: `translateY(${cardPositions[idx]}px)`, transition: swipeDragIdx.current === idx ? 'none' : 'transform 0.3s, opacity 0.3s', animation: `cardFlyUp 0.6s ${idx * 0.15}s cubic-bezier(0.34,1.56,0.64,1) both`, cursor: cardSwiped[idx] ? 'default' : 'grab', userSelect: 'none', filter: `drop-shadow(0 0 16px ${rarityGlow[card.rarity]})` }}
-                onMouseDown={e => onCardSwipeStart(idx, e.clientY)} onTouchStart={e => onCardSwipeStart(idx, e.touches[0].clientY)}>
-                <div style={{ transform: 'scale(0.72)', transformOrigin: 'top center', marginBottom: '-100px' }}>
-                  <PokeCard card={{ id: card.id, student_id: '', teacher_id: '', card_name: card.card_name, hp: card.hp, type: card.type, rarity: card.rarity, description: card.description, stat1_name: card.stat1_name, stat1_val: card.stat1_val, stat2_name: card.stat2_name, stat2_val: card.stat2_val, stat3_name: card.stat3_name, stat3_val: card.stat3_val, move1_name: card.move1_name, move1_dmg: card.move1_dmg, move2_name: card.move2_name, move2_dmg: card.move2_dmg, image_url: card.image_url, created_at: '' }} />
-                </div>
-                {!cardSwiped[idx] && <div style={{ textAlign: 'center', fontSize: '1.4rem', color: 'white', marginTop: 4, animation: 'shimmer 1.5s infinite' }}>↓</div>}
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 8, flexWrap: 'wrap' }}>
-            {slottedCards.map((card, idx) => (
-              <div key={idx} style={{ flexShrink: 0 }}>
-                {card ? (
-                  <div style={{ transform: 'scale(0.72)', transformOrigin: 'top center', marginBottom: '-100px', filter: `drop-shadow(0 0 16px ${rarityGlow[card.rarity]})`, animation: 'packZoomIn 0.4s cubic-bezier(0.34,1.56,0.64,1)' }}>
-                    <PokeCard card={{ id: card.id, student_id: '', teacher_id: '', card_name: card.card_name, hp: card.hp, type: card.type, rarity: card.rarity, description: card.description, stat1_name: card.stat1_name, stat1_val: card.stat1_val, stat2_name: card.stat2_name, stat2_val: card.stat2_val, stat3_name: card.stat3_name, stat3_val: card.stat3_val, move1_name: card.move1_name, move1_dmg: card.move1_dmg, move2_name: card.move2_name, move2_dmg: card.move2_dmg, image_url: card.image_url, created_at: '' }} />
-                  </div>
-                ) : (
-                  <div style={{ width: 180, height: 252, borderRadius: 16, border: '2px dashed rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: 6 }}>🃏</div>Slot {idx + 1}
+          {/* Pack split into top and bottom halves */}
+          <div style={{ position: 'relative', width: 240, height: 336 }}>
+
+            {/* TOP half — flies up when torn */}
+            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${TEAR_LINE * 100}%`, overflow: 'hidden', transform: `translateY(${topY}px)`, transition: torn ? 'none' : 'transform 0.1s', zIndex: torn ? 2 : 3, cursor: torn ? 'default' : 'pointer', borderRadius: '18px 18px 0 0' }}
+              onClick={handleTear}
+              className="tearzone-top"
+            >
+              <div style={{ width: '100%', height: `${100 / TEAR_LINE}%`, borderRadius: 18, overflow: 'hidden', border: `3px solid ${selectedTier.color}`, boxShadow: `0 0 40px ${selectedTier.color}66` }}>
+                {packImage
+                  ? <img src={packImage} alt="pack top" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }} />
+                  : <div style={{ width: '100%', height: '100%', background: `linear-gradient(160deg,${pack.color}ee,${pack.color}88)`, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 16 }}>
+                      <span style={{ fontSize: '1.5rem', opacity: 0.6 }}>{pack.emoji}</span>
+                    </div>
+                }
+                {/* Hover hint overlay on top half */}
+                {!torn && (
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', transition: 'background 0.2s' }}>
+                    <span style={{ fontSize: '1.2rem', animation: 'shimmer 1.5s infinite' }}>✂️</span>
                   </div>
                 )}
               </div>
-            ))}
+              {/* Dotted tear line at bottom of top piece */}
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, borderBottom: '3px dashed rgba(255,255,255,0.7)', zIndex: 4 }} />
+            </div>
+
+            {/* BOTTOM half — falls down when torn */}
+            <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: `${(1 - TEAR_LINE) * 100}%`, overflow: 'hidden', transform: `translateY(${botY}px)`, transition: torn ? 'none' : 'transform 0.1s', borderRadius: '0 0 18px 18px' }}>
+              <div style={{ width: '100%', height: `${100 / (1 - TEAR_LINE)}%`, position: 'absolute', bottom: 0, left: 0, borderRadius: 18, overflow: 'hidden', border: `3px solid ${selectedTier.color}`, boxShadow: `0 0 40px ${selectedTier.color}66` }}>
+                {packImage
+                  ? <img src={packImage} alt="pack bottom" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'bottom' }} />
+                  : <div style={{ width: '100%', height: '100%', background: `linear-gradient(160deg,${pack.color}88,${pack.color}55)`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 16 }}>
+                      <span style={{ fontSize: '2rem' }}>{pack.emoji}</span>
+                    </div>
+                }
+              </div>
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* REVEAL — cards stacked, swipe each down to slot */}
+      {phase === 'reveal' && (
+        <div style={{ width: '100%', maxWidth: 600, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}
+          onMouseMove={e => onCardSwipeMove(e.clientY)}
+          onTouchMove={e => onCardSwipeMove(e.touches[0].clientY)}
+        >
+          <div style={{ color: '#8090b0', fontSize: '0.78rem', fontWeight: 700, textAlign: 'center' }}>
+            {allSwiped ? '✦ All cards collected!' : '👇 Swipe each card down to its slot'}
+          </div>
+
+          {/* Stacked cards + slots side by side */}
+          <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', justifyContent: 'center', flexWrap: 'wrap', width: '100%' }}>
+
+            {/* Left: stacked draggable cards */}
+            <div style={{ position: 'relative', width: 180, height: 252, flexShrink: 0 }}>
+              {openedCards.map((card, idx) => {
+                const unswiped = !cardSwiped[idx];
+                const isTop = !cardSwiped[idx] && cardSwiped.slice(0, idx).every(Boolean);
+                return (
+                  <div key={idx}
+                    style={{ position: 'absolute', top: unswiped ? idx * 6 : -300, left: idx * 3, width: '100%', zIndex: openedCards.length - idx, transform: `translateY(${isTop ? cardPositions[idx] : 0}px) rotate(${(idx - 1) * 2}deg)`, transition: (isTop && swipeDragIdx.current === idx) ? 'none' : 'top 0.4s, transform 0.3s, opacity 0.3s', opacity: unswiped ? 1 : 0, cursor: isTop ? 'grab' : 'default', userSelect: 'none', filter: `drop-shadow(0 0 ${isTop ? 20 : 6}px ${rarityGlow[card.rarity]})`, animation: `cardFlyUp 0.5s ${idx * 0.1}s both` }}
+                    onMouseDown={e => isTop && onCardSwipeStart(idx, e.clientY)}
+                    onTouchStart={e => isTop && onCardSwipeStart(idx, e.touches[0].clientY)}
+                  >
+                    <div style={{ transform: 'scale(0.72)', transformOrigin: 'top left', width: 250 }}>
+                      <PokeCard card={{ id: card.id, student_id: '', teacher_id: '', card_name: card.card_name, hp: card.hp, type: card.type, rarity: card.rarity, description: card.description, stat1_name: card.stat1_name, stat1_val: card.stat1_val, stat2_name: card.stat2_name, stat2_val: card.stat2_val, stat3_name: card.stat3_name, stat3_val: card.stat3_val, move1_name: card.move1_name, move1_dmg: card.move1_dmg, move2_name: card.move2_name, move2_dmg: card.move2_dmg, image_url: card.image_url, created_at: '' }} />
+                    </div>
+                    {isTop && !cardSwiped[idx] && <div style={{ position: 'absolute', bottom: -24, left: 0, right: 0, textAlign: 'center', fontSize: '1.2rem', animation: 'shimmer 1s infinite', color: 'white' }}>↓</div>}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Right: 3 slots */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flexShrink: 0 }}>
+              {slottedCards.map((card, idx) => (
+                <div key={idx} style={{ width: 130, height: 74, borderRadius: 10, border: `2px dashed ${card ? rarityGlow[card.rarity] : 'rgba(255,255,255,0.12)'}`, background: card ? 'rgba(167,139,250,0.08)' : 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.3s', overflow: 'hidden', position: 'relative' }}>
+                  {card ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 10px', width: '100%' }}>
+                      {card.image_url
+                        ? <img src={card.image_url} alt={card.card_name} style={{ width: 40, height: 30, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} />
+                        : <div style={{ width: 40, height: 30, background: 'rgba(255,255,255,0.05)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>🃏</div>
+                      }
+                      <div style={{ overflow: 'hidden' }}>
+                        <div style={{ fontWeight: 800, fontSize: '0.65rem', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.card_name}</div>
+                        <div style={{ fontSize: '0.55rem', color: card.rarity === 'prismatic' ? '#c084fc' : card.rarity === 'gold-rare' ? '#fbbf24' : card.rarity === 'silver' ? '#94a3b8' : '#9ca3af', fontWeight: 700 }}>{card.rarity === 'gold-rare' ? 'Gold' : card.rarity.charAt(0).toUpperCase() + card.rarity.slice(1)}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.62rem', textAlign: 'center' }}>
+                      <div style={{ fontSize: '1rem' }}>🃏</div>
+                      Slot {idx + 1}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
           {allSwiped && (
             <button onClick={handleAddToCollection} disabled={saving}
-              style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#5b21b6)', color: 'white', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', marginTop: 16, animation: 'glowPulse 2s infinite' }}>
+              style={{ width: '100%', maxWidth: 400, padding: '14px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#5b21b6)', color: 'white', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', marginTop: 8, animation: 'glowPulse 2s infinite' }}>
               {saving ? 'Saving…' : '✦ Add Cards to Collection ✦'}
             </button>
           )}
