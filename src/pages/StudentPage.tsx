@@ -1056,7 +1056,6 @@ function CardItem({ card, onClick, index, fanAngle, radius, containerCx, contain
 /* ─────────────────────────────────────────────
    Card Carousel
 ───────────────────────────────────────────── */
-function CardCarousel({ cards, onCardClick }: { cards: Card[]; onCardClick: (c: Card) => void }) {
   const [page, setPage] = useState(0);
   const cardsPerPage = 12;
   const totalPages = Math.ceil(cards.length / cardsPerPage);
@@ -1396,7 +1395,6 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
   const [detailCard, setDetailCard] = useState<Card | null>(null);
   const [studentName, setStudentName] = useState('Student');
   const [studentId, setStudentId] = useState('');
-  const [teacherIdState, setTeacherIdState] = useState('');
   const [weeklyProject, setWeeklyProject] = useState<WeeklyProject | null>(null);
   type HomeComm = { id: string; teacher_id: string; event_date: string; comment: string; created_at: string };
   const [homeComms, setHomeComms] = useState<HomeComm[]>([]);
@@ -1893,7 +1891,6 @@ const UNLOCK_ITEMS = [
 
 const TEST_ACCOUNTS = ['Bella Clark', 'Benji Clark'];
 
-function ShopAndTrade({ studentId, studentName, teacherId, unlockedChoices, onUnlock }: {
   studentId: string;
   studentName: string;
   teacherId: string;
@@ -2334,7 +2331,6 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
     common: 'rgba(156,163,175,0.4)', silver: 'rgba(148,163,184,0.6)',
     'gold-rare': 'rgba(245,158,11,0.7)', prismatic: 'rgba(168,85,247,0.8)',
   };
-  const rarityLabel: Record<string, string> = { common: 'Common', silver: 'Silver', 'gold-rare': 'Gold', prismatic: '🌈 Rainbow' };
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(5,5,20,0.97)', zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
