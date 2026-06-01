@@ -1806,18 +1806,6 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
             </div>
           )}
 
-          {/* ── CARD CAROUSEL ── */}
-          <CardCarousel cards={cards} onCardClick={setDetailCard} />
-
-          {/* ── SHOP & TRADE ── */}
-          <ShopAndTrade
-            studentId={studentId}
-            studentName={studentName}
-            teacherId={teacherIdState}
-            unlockedChoices={unlockedChoices}
-            onUnlock={async (choice) => { await saveUnlockChoice(choice); }}
-          />
-
           {/* ── HOME COMMUNICATION ── */}
           {(pinboard || homeComms.length > 0) && (
             <div style={{ marginTop: 28, borderRadius: 22, background: 'rgba(255,255,255,0.72)', border: '1.5px solid rgba(200,190,240,0.5)', boxShadow: '0 6px 28px rgba(160,120,220,0.10)', padding: '22px 24px', backdropFilter: 'blur(8px)' }}>
@@ -2346,6 +2334,7 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
     common: 'rgba(156,163,175,0.4)', silver: 'rgba(148,163,184,0.6)',
     'gold-rare': 'rgba(245,158,11,0.7)', prismatic: 'rgba(168,85,247,0.8)',
   };
+  const rarityLabel: Record<string, string> = { common: 'Common', silver: 'Silver', 'gold-rare': 'Gold', prismatic: '🌈 Rainbow' };
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(5,5,20,0.97)', zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}

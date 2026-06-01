@@ -14,10 +14,13 @@ export default function MyCardsPage({ session, onBack }: { session: NonNullable<
   const loadCards = useCallback(async () => {
     setLoading(true);
     try {
-      const profile = session.profile;
-      let sid = profile.student_id;
+      // Get student row ID from auth user ID
+      let sid = session.profile.student_id;
       if (!sid) {
-        const { data } = await sb.from('students').select('id').eq('auth_user_id', session.user.id).maybeSingle();
+        const { data } = await sb.from('students')
+          .select('id')
+          .eq('auth_user_id', session.user.id)
+          .maybeSingle();
         if (data) sid = data.id;
       }
       if (sid) {
@@ -29,6 +32,12 @@ export default function MyCardsPage({ session, onBack }: { session: NonNullable<
   }, [session]);
 
   useEffect(() => { loadCards(); }, [loadCards]);
+
+  useEffect(() => {
+    const onFocus = () => loadCards();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [loadCards]);
 
   const RARITIES = ['all', 'common', 'silver', 'gold-rare', 'prismatic'];
   const RARITY_LABELS: Record<string, string> = { all: 'All', common: 'Common', silver: 'Silver', 'gold-rare': 'Gold', prismatic: '🌈 Rainbow' };
