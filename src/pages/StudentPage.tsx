@@ -1056,6 +1056,7 @@ function CardItem({ card, onClick, index, fanAngle, radius, containerCx, contain
 /* ─────────────────────────────────────────────
    Card Carousel
 ───────────────────────────────────────────── */
+function _CardCarousel({ cards, onCardClick }: { cards: Card[]; onCardClick: (c: Card) => void }) {
   const [page, setPage] = useState(0);
   const cardsPerPage = 12;
   const totalPages = Math.ceil(cards.length / cardsPerPage);
@@ -1891,6 +1892,7 @@ const UNLOCK_ITEMS = [
 
 const TEST_ACCOUNTS = ['Bella Clark', 'Benji Clark'];
 
+function _ShopAndTrade({ studentId, studentName, teacherId, unlockedChoices, onUnlock }: {
   studentId: string;
   studentName: string;
   teacherId: string;
