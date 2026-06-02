@@ -1802,16 +1802,6 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
             </div>
           )}
 
-          {/* ── CARD CAROUSEL ── */}
-          <CardCarousel cards={cards} onCardClick={setDetailCard} />
-
-          {/* ── SHOP & TRADE ── */}
-          <ShopAndTrade
-            studentId={studentId}
-            unlockedChoices={unlockedChoices}
-            onUnlock={async (choice) => { await saveUnlockChoice(choice); }}
-          />
-
           {/* ── HOME COMMUNICATION ── */}
           {(pinboard || homeComms.length > 0) && (
             <div style={{ marginTop: 28, borderRadius: 22, background: 'rgba(255,255,255,0.72)', border: '1.5px solid rgba(200,190,240,0.5)', boxShadow: '0 6px 28px rgba(160,120,220,0.10)', padding: '22px 24px', backdropFilter: 'blur(8px)' }}>
