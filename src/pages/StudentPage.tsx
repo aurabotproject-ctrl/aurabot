@@ -441,8 +441,7 @@ function SavedBotAvatar({ facePixels, faceColorPalettes, robotColor }: { facePix
                 return <div key={el.id} style={containerStyle}>{renderFaceContent(el)}</div>;
               }
               return renderBotEl(el, special);
-            })}
-          </div>
+            })}\n          </div>
         </div>
       </div>
     </div>
