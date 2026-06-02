@@ -1056,7 +1056,7 @@ function CardItem({ card, onClick, index, fanAngle, radius, containerCx, contain
 /* ─────────────────────────────────────────────
    Card Carousel
 ───────────────────────────────────────────── */
-function CardCarousel({ cards, onCardClick }: { cards: Card[]; onCardClick: (c: Card) => void }) {
+: { cards: Card[]; onCardClick: (c: Card) => void }) {
   const [page, setPage] = useState(0);
   const cardsPerPage = 12;
   const totalPages = Math.ceil(cards.length / cardsPerPage);
@@ -1870,24 +1870,7 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
 // ══════════════════════════════════════════════════════════════════════
 // SHOP & TRADE
-// ══════════════════════════════════════════════════════════════════════
-
-const PACK_TYPES = [
-  { id: 'xanimals',  label: 'Xanimals Pack',  subtitle: 'Crossed Animals!',      color: '#7c3aed', glow: '#a855f7', emoji: '🧬' },
-  { id: 'animals',   label: 'Animals Pack',   subtitle: 'Real World Animals!',   color: '#16a34a', glow: '#22c55e', emoji: '🐾' },
-  { id: 'creatures', label: 'Creatures Pack', subtitle: 'Magical & Mythical!',   color: '#0369a1', glow: '#38bdf8', emoji: '👾' },
-  { id: 'humanoids', label: 'Humanoids Pack', subtitle: 'People & Warriors!',    color: '#b45309', glow: '#f59e0b', emoji: '🧑' },
-  { id: 'robots',    label: 'Robots Pack',    subtitle: 'Mechanical & Futuristic!', color: '#374151', glow: '#9ca3af', emoji: '🤖' },
-  { id: 'luckydip',  label: 'Lucky Dip Pack', subtitle: 'Mix of All Themes!',   color: '#be123c', glow: '#f43f5e', emoji: '🎲', isSpecial: true },
-];
-
-const UNLOCK_ITEMS = [
-  { id: 'color',    label: 'New Bot Colour',   desc: 'Unlock an extra colour for your AuraBot', emoji: '🎨', cost: 5 },
-  { id: 'face',     label: 'Face Colour Pack',  desc: 'Unlock a new face pixel colour palette',  emoji: '✨', cost: 5 },
-  { id: 'buildabot', label: 'Build-a-Bot',      desc: 'Unlock the full bot customisation studio', emoji: '🔧', cost: 5 },
-];
-
-function ShopAndTrade({ studentId, unlockedChoices, onUnlock }: {
+// ══════════════════════════════════════════════════════════════════════: {
   studentId: string;
   unlockedChoices: string[];
   onUnlock: (choice: string) => Promise<void>;
