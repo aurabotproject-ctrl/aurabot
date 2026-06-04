@@ -249,7 +249,7 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
           teacherId={teacherId}
           onClose={() => setOpeningPack(null)}
           onStarsSpent={amt => setStarPoints(p => (p || 0) - amt)}
-          onComplete={() => { setOpeningPack(null); onCardsAdded?.(); onBack(); }}
+          onComplete={() => { setOpeningPack(null); onCardsAdded?.(); }}
         />
       )}
     </div>
@@ -292,14 +292,17 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
       await sb.from('student_star_points').update({ points: starPoints - selectedTier.stars }).eq('student_id', studentId);
       onStarsSpent(selectedTier.stars);
     }
-    const { data: dbCards } = await sb.from('card_database').select('*').limit(100);
+    const { data: dbCards } = await sb.from('card_database').select('*').limit(200);
     const pool = (dbCards || []).filter((c: any) => pack.id === 'luckydip' || c.type === pack.id);
-    const src = (pool.length > 0 ? pool : (dbCards || [])) as any[];
+    const src = (pool.length >= 3 ? pool : (dbCards || [])) as any[];
+    // Shuffle and pick 3 unique cards (no duplicates)
+    const shuffled = [...src].sort(() => Math.random() - 0.5);
+    const picked = shuffled.slice(0, 3);
     const rolled: OpenedCard[] = [];
     for (let i = 0; i < 3; i++) {
       const rarity = rollRarity(selectedTier.id);
       const stats = rollStats(rarity);
-      const card = src.length > 0 ? src[Math.floor(Math.random() * src.length)] : null;
+      const card = picked[i] || null;
       rolled.push({
         id: `opened-${Date.now()}-${i}`,
         card_name: card?.card_name || 'Mystery Card', type: card?.type || pack.id, rarity,
@@ -363,21 +366,33 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
   const handleAddToCollection = async () => {
     setSaving(true);
     try {
+      console.log('Saving cards:', { studentId, teacherId, cardCount: openedCards.length });
       for (const card of openedCards) {
-        await sb.from('cards').insert({
-          student_id: studentId, teacher_id: teacherId,
-          card_name: card.card_name, type: card.type, rarity: card.rarity,
-          description: card.description, image_url: card.image_url, hp: card.hp,
+        console.log('Inserting card:', card.card_name, 'student_id:', studentId);
+        const { data, error } = await sb.from('cards').insert({
+          student_id: studentId,
+          teacher_id: teacherId || null,
+          card_name: card.card_name,
+          type: card.type,
+          rarity: card.rarity,
+          description: card.description,
+          image_url: card.image_url,
+          hp: card.hp,
           stat1_name: card.stat1_name, stat1_val: card.stat1_val,
           stat2_name: card.stat2_name, stat2_val: card.stat2_val,
           stat3_name: card.stat3_name, stat3_val: card.stat3_val,
           move1_name: card.move1_name, move1_dmg: card.move1_dmg,
           move2_name: card.move2_name, move2_dmg: card.move2_dmg,
           card_source: 'pack',
-        });
+        }).select();
+        console.log('Result:', { data, error });
+        if (error) throw error;
       }
       onComplete(openedCards);
-    } catch (err: any) { alert('Error: ' + err.message); }
+    } catch (err: any) {
+      console.error('Save error:', err);
+      alert('Error saving cards: ' + (err.message || err.code || JSON.stringify(err)));
+    }
     setSaving(false);
   };
 
