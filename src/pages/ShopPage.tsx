@@ -34,9 +34,11 @@ const STAT_RANGES: Record<string, { hpMin: number; hpMax: number; weakMin: numbe
 const TEST_ACCOUNTS = ['Bella Clark', 'Benji Clark'];
 
 const UNLOCK_ITEMS = [
-  { id: 'color',     label: 'New Bot Colour',  desc: 'Unlock extra colour for your AuraBot', emoji: '🎨', cost: 5 },
-  { id: 'face',      label: 'Face Colour Pack', desc: 'Unlock a new face pixel colour palette', emoji: '✨', cost: 5 },
-  { id: 'buildabot', label: 'Build-a-Bot',      desc: 'Unlock the full bot customisation studio', emoji: '🔧', cost: 5 },
+  { id: 'color',     label: 'Unlock Grape & Ocean',    desc: 'Adds 2 new bot colours: Grape purple & Ocean teal', emoji: '🎨', cost: 5 },
+  { id: 'color2',    label: 'Unlock Gold & Silver',    desc: 'Adds shiny Gold & Silver bot colours ✨',            emoji: '⭐', cost: 10 },
+  { id: 'color3',    label: 'Unlock Rainbow & Black Chrome', desc: 'Adds the rare Rainbow & Black Chrome bots 🌈🖤', emoji: '💎', cost: 20 },
+  { id: 'face',      label: 'Face Colour Pack',         desc: 'Unlock a new face pixel colour palette',            emoji: '✨', cost: 5 },
+  { id: 'buildabot', label: 'Build-a-Bot',              desc: 'Unlock the full bot customisation studio',          emoji: '🔧', cost: 5 },
 ];
 
 function rollRarity(tier: string): 'common' | 'silver' | 'gold-rare' | 'prismatic' {
@@ -90,18 +92,40 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
     (async () => {
       const profile = session.profile;
       setStudentName(profile.name || '');
+      
+      // Get student row - try profile.student_id first, then lookup by auth_user_id
       let sid = profile.student_id;
+      let tid = '';
       if (!sid) {
-        const { data } = await sb.from('students').select('id, teacher_id').eq('auth_user_id', session.user.id).maybeSingle();
-        if (data) { sid = data.id; setTeacherId(data.teacher_id || ''); }
+        const { data } = await sb.from('students')
+          .select('id, teacher_id')
+          .eq('auth_user_id', session.user.id)
+          .maybeSingle();
+        if (data) { sid = data.id; tid = data.teacher_id || ''; }
+      } else {
+        const { data } = await sb.from('students')
+          .select('teacher_id')
+          .eq('id', sid)
+          .maybeSingle();
+        if (data) tid = data.teacher_id || '';
       }
+
+      console.log('ShopPage loaded studentId:', sid, 'teacherId:', tid);
+
       if (sid) {
         setStudentId(sid);
-        const { data: starData } = await sb.from('student_star_points').select('points').eq('student_id', sid).maybeSingle();
+        setTeacherId(tid);
+
+        const { data: starData } = await sb.from('student_star_points')
+          .select('points').eq('student_id', sid).maybeSingle();
         setStarPoints(starData?.points ?? 0);
-        const { data: unlockData } = await sb.from('student_unlocks').select('choices').eq('student_id', sid).maybeSingle();
-        setUnlockedChoices(unlockData?.choices || []);
+
+        // student_unlocks uses unlock_key rows, not a choices array
+        const { data: unlockData } = await sb.from('student_unlocks')
+          .select('unlock_key').eq('student_id', sid);
+        setUnlockedChoices((unlockData || []).map((r: any) => r.unlock_key));
       }
+
       const { data: imgs } = await sb.from('pack_images').select('pack_id, image_url');
       const map: Record<string, string> = {};
       (imgs || []).forEach((r: any) => { map[r.pack_id] = r.image_url; });
@@ -118,9 +142,9 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
     try {
       await sb.from('student_star_points').update({ points: (starPoints || 0) - item.cost }).eq('student_id', studentId);
       setStarPoints(p => (p || 0) - item.cost);
-      const newChoices = [...unlockedChoices, item.id];
-      await sb.from('student_unlocks').upsert({ student_id: studentId, choices: newChoices }, { onConflict: 'student_id' });
-      setUnlockedChoices(newChoices);
+      // Insert unlock_key row
+      await sb.from('student_unlocks').upsert({ student_id: studentId, unlock_key: item.id });
+      setUnlockedChoices(prev => [...prev, item.id]);
       showMsg(`✓ ${item.label} unlocked!`);
     } catch { showMsg('Error — try again'); }
     setUnlocking(null);
@@ -271,6 +295,7 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
   const [openedCards, setOpenedCards] = useState<OpenedCard[]>([]);
   const [slottedCards, setSlottedCards] = useState<(OpenedCard | null)[]>([null, null, null]);
   const [saving, setSaving] = useState(false);
+  const [loadingCards, setLoadingCards] = useState(false);
   // Tear state
   const [torn, setTorn] = useState(false);
   const [topY, setTopY] = useState(0);    // top piece flies up
@@ -288,14 +313,27 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
 
   const handleConfirm = async () => {
     if (!selectedTier) return;
+    setLoadingCards(true);
     if (!isTestAccount) {
       await sb.from('student_star_points').update({ points: starPoints - selectedTier.stars }).eq('student_id', studentId);
       onStarsSpent(selectedTier.stars);
     }
-    const { data: dbCards } = await sb.from('card_database').select('*').limit(200);
-    const pool = (dbCards || []).filter((c: any) => pack.id === 'luckydip' || c.type === pack.id);
-    const src = (pool.length >= 3 ? pool : (dbCards || [])) as any[];
-    // Shuffle and pick 3 unique cards (no duplicates)
+    const fetchWithTimeout = Promise.race([
+      sb.from('card_database')
+        .select('id, card_name, type, description, image_url, move1_name, move2_name')
+        .limit(50),
+      new Promise<{data: null}>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
+    ]);
+    
+    let dbCards: any[] = [];
+    try {
+      const result = await fetchWithTimeout as any;
+      dbCards = result.data || [];
+    } catch {
+      dbCards = [];
+    }
+    const pool = dbCards.filter((c: any) => pack.id === 'luckydip' || c.type === pack.id);
+    const src = (pool.length >= 3 ? pool : dbCards) as any[];
     const shuffled = [...src].sort(() => Math.random() - 0.5);
     const picked = shuffled.slice(0, 3);
     const rolled: OpenedCard[] = [];
@@ -316,6 +354,7 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
       });
     }
     setOpenedCards(rolled);
+    setLoadingCards(false);
     setPhase('zoom');
     setTimeout(() => setPhase('tear'), 1000);
   };
@@ -410,6 +449,7 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
         @keyframes cardFlyUp { from{transform:translateY(100px);opacity:0} to{transform:translateY(0);opacity:1} }
         @keyframes glowPulse { 0%,100%{box-shadow:0 8px 32px rgba(124,58,237,0.4)} 50%{box-shadow:0 8px 60px rgba(124,58,237,0.8)} }
         @keyframes shimmer { 0%,100%{opacity:0.4} 50%{opacity:1} }
+        @keyframes spin { to{transform:rotate(360deg)} }
         .tearzone-top:hover { background: rgba(255,255,255,0.08) !important; }
       `}</style>
 
@@ -462,8 +502,15 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
             {isTestAccount && <span style={{ color: '#4ade80', fontSize: '0.72rem' }}>✦ Test account — free!</span>}
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-            <button onClick={() => setPhase('tiers')} style={{ padding: '10px 22px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)', background: 'transparent', color: '#8090b0', cursor: 'pointer', fontWeight: 700 }}>Back</button>
-            <button onClick={handleConfirm} style={{ padding: '10px 26px', borderRadius: 12, border: 'none', background: `linear-gradient(135deg,${selectedTier.color},${selectedTier.color}bb)`, color: 'white', cursor: 'pointer', fontWeight: 900, fontSize: '0.88rem' }}>Open Pack! 🎉</button>
+            <button onClick={() => setPhase('tiers')} disabled={loadingCards} style={{ padding: '10px 22px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)', background: 'transparent', color: '#8090b0', cursor: 'pointer', fontWeight: 700 }}>Back</button>
+            <button onClick={handleConfirm} disabled={loadingCards} style={{ padding: '10px 26px', borderRadius: 12, border: 'none', background: loadingCards ? 'rgba(255,255,255,0.1)' : `linear-gradient(135deg,${selectedTier.color},${selectedTier.color}bb)`, color: 'white', cursor: loadingCards ? 'not-allowed' : 'pointer', fontWeight: 900, fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+              {loadingCards ? (
+                <>
+                  <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  Preparing cards…
+                </>
+              ) : 'Open Pack! 🎉'}
+            </button>
           </div>
         </div>
       )}

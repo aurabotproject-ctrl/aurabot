@@ -74,7 +74,11 @@ function knobToRobotColor(k: number, themes: ColorTheme[]): ColorTheme {
 
 /* How many extra colors unlocked from an array of unlock choices */
 function countUnlockedColors(choices: string[]): number {
-  return choices.filter(c => c === 'color').length * 2;
+  let count = 0;
+  if (choices.includes('color'))  count += 2; // Grape & Ocean
+  if (choices.includes('color2')) count += 2; // Gold & Silver
+  if (choices.includes('color3')) count += 2; // Rainbow & Black Chrome
+  return count;
 }
 function countUnlockedFaceColors(choices: string[]): number {
   return choices.filter(c => c === 'face').length;
@@ -1218,29 +1222,11 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
     await sb.from('student_unlocks').upsert({ student_id: studentId, choices: newChoices }, { onConflict: 'student_id' });
   };
 
-  // Detect level-ups and queue pending unlocks.
-  // On first load, compare current level vs choices already made — this
-  // catches students who were already at level 2+ before the unlock system existed.
+  // Level-up unlocks are now purchased via the Shop with star points.
+  // The card-count based trigger is disabled.
   useEffect(() => {
-    if (!unlocksLoaded || cards.length === 0) return;
-    const currentLevel = Math.max(1, Math.floor(cards.length / 5) + 1);
-
-    if (prevLevel === null) {
-      // First time running after unlocks loaded — check if they have unclaimed unlocks
-      // Each level above 1 earns one unlock, so they should have (currentLevel - 1) choices.
-      // Any deficit means unclaimed unlocks.
-      const earnedUnlocks = currentLevel - 1;
-      const claimedUnlocks = unlockedChoices.length;
-      const owed = Math.max(0, earnedUnlocks - claimedUnlocks);
-      if (owed > 0) setPendingUnlocks(owed);
-      setPrevLevel(currentLevel);
-      return;
-    }
-
-    if (currentLevel > prevLevel) {
-      setPendingUnlocks(p => p + (currentLevel - prevLevel));
-      setPrevLevel(currentLevel);
-    }
+    if (!unlocksLoaded) return;
+    // No automatic unlock popups — students buy unlocks in the Shop
   }, [cards.length, unlocksLoaded]);
 
   const loadCards = useCallback(async () => {
