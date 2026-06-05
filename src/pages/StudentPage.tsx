@@ -213,7 +213,8 @@ function renderBotEl(el: BotEl & { _bodyBg?: string }, special?: BotElSpecial): 
     height: isGroup ? (el.baseH ?? el.h) : el.h,
     transform: `translate(-50%,-50%) rotate(${el.rotation}deg) scale(${isGroup ? (el.scale ?? 1) : 1}) scaleX(${el.flipX ? -1 : 1}) scaleY(${el.flipY ? -1 : 1})`,
     borderRadius: isCircle ? '50%' : (typeof el.rx === 'number' ? el.rx : 0),
-    backgroundColor: (isGroup || isSticker) ? 'transparent' : el.color,
+    backgroundColor: (isGroup || isSticker) ? 'transparent' : (el._bodyBg ? undefined : el.color),
+    background: (isGroup || isSticker) ? undefined : (el._bodyBg || undefined),
     boxShadow: isScreen
       ? 'inset 0 0 14px rgba(0,0,0,0.85)'
       : (!isGroup && !isSticker)
@@ -331,7 +332,7 @@ function SavedBotAvatar({ facePixels, faceColorPalettes, robotColor }: { facePix
   }));
 
   // For special themes with gradient, rects that use the theme colour should show the gradient
-  const themedElementsWithGradient = isRainbow || isBlackChrome
+  const themedElementsWithGradient = (isRainbow || isBlackChrome || isGold || isSilver)
     ? themedElements.map(el => ({
         ...el,
         _bodyBg: el.color === robotColor.mid ? bodyBg : undefined,
