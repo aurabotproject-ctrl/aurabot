@@ -323,25 +323,29 @@ function SavedBotAvatar({ facePixels, faceColorPalettes, robotColor }: { facePix
   const isBlackChrome = !!(robotColor as any).blackChrome;
 
   // Remap any element still using the default build colour to the current theme colour.
-  const remapColor = (c: string): string => c === BOT_DEFAULT_COLOR ? robotColor.mid : c;
+  // Screens (face/chest) keep their saved dark colour regardless of theme.
+  const remapColor = (c: string, type?: string): string => {
+    if (type === 'face' || type === 'chest') return c; // never remap screens
+    if (c === BOT_DEFAULT_COLOR) return robotColor.mid;
+    return c;
+  };
 
   const themedElements = botElements.map(el => ({
     ...el,
-    color: remapColor(el.color),
-    children: el.children?.map(c => ({ ...c, color: remapColor(c.color) })),
+    color: remapColor(el.color, el.type),
+    children: el.children?.map(c => ({ ...c, color: remapColor(c.color, c.type) })),
   }));
 
-  // For special themes with gradient, rects that use the theme colour should show the gradient
-  const themedElementsWithGradient = (isRainbow || isBlackChrome || isGold || isSilver)
-    ? themedElements.map(el => ({
-        ...el,
-        _bodyBg: el.color === robotColor.mid ? bodyBg : undefined,
-        children: el.children?.map(c => ({
-          ...c,
-          _bodyBg: c.color === robotColor.mid ? bodyBg : undefined,
-        })),
-      }))
-    : themedElements;
+  // Apply bodyBg gradient to ALL body elements (not just special themes) so they
+  // get the same gradient depth as the default RobotAvatar. Screens are excluded.
+  const themedElementsWithGradient = themedElements.map(el => ({
+    ...el,
+    _bodyBg: (el.type !== 'face' && el.type !== 'chest' && el.color === robotColor.mid) ? bodyBg : undefined,
+    children: el.children?.map(c => ({
+      ...c,
+      _bodyBg: (c.type !== 'face' && c.type !== 'chest' && c.color === robotColor.mid) ? bodyBg : undefined,
+    })),
+  }));
 
   // Compute the actual bounding box of this specific bot
   const bounds = getBotBounds(themedElementsWithGradient);
