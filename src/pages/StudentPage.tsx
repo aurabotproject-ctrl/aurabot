@@ -1202,24 +1202,24 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
   const faceColorPalettes = FACE_COLOR_PALETTES.slice(0, unlockedFaceColorCount);
   const robotColor = knobToRobotColor(knob, colorThemes);
 
-  // Load unlocks from Supabase
+  // Load unlocks from Supabase — matches Shop's multi-row unlock_key format
   useEffect(() => {
     const loadUnlocks = async () => {
       if (!studentId) return;
-      const { data } = await sb.from('student_unlocks').select('choices').eq('student_id', studentId).maybeSingle();
-      const choices: string[] = data?.choices || [];
+      const { data } = await sb.from('student_unlocks').select('unlock_key').eq('student_id', studentId);
+      const choices: string[] = (data || []).map((r: any) => r.unlock_key).filter(Boolean);
       setUnlockedChoices(choices);
       setUnlocksLoaded(true);
     };
     if (studentId) loadUnlocks();
   }, [studentId]);
 
-  // Save a new unlock choice to Supabase
+  // Save a new unlock choice — insert a new unlock_key row (matches Shop format)
   const saveUnlockChoice = async (choice: string) => {
     if (!studentId) return;
     const newChoices = [...unlockedChoices, choice];
     setUnlockedChoices(newChoices);
-    await sb.from('student_unlocks').upsert({ student_id: studentId, choices: newChoices }, { onConflict: 'student_id' });
+    await sb.from('student_unlocks').upsert({ student_id: studentId, unlock_key: choice }, { onConflict: 'student_id,unlock_key' });
   };
 
   // Level-up unlocks are now purchased via the Shop with star points.
