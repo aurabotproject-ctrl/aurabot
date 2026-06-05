@@ -1180,7 +1180,6 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
   // Unlock system state
   const [unlockedChoices, setUnlockedChoices] = useState<string[]>([]);
   const [pendingUnlocks, setPendingUnlocks] = useState(0);
-  const [prevLevel, setPrevLevel] = useState<number | null>(null);
   const [unlocksLoaded, setUnlocksLoaded] = useState(false);
 
   // Color index — stored in Supabase via student metadata
