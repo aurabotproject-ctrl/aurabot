@@ -213,8 +213,8 @@ function renderBotEl(el: BotEl & { _bodyBg?: string }, special?: BotElSpecial): 
     height: isGroup ? (el.baseH ?? el.h) : el.h,
     transform: `translate(-50%,-50%) rotate(${el.rotation}deg) scale(${isGroup ? (el.scale ?? 1) : 1}) scaleX(${el.flipX ? -1 : 1}) scaleY(${el.flipY ? -1 : 1})`,
     borderRadius: isCircle ? '50%' : (typeof el.rx === 'number' ? el.rx : 0),
-    backgroundColor: (isGroup || isSticker) ? 'transparent' : (el._bodyBg ? undefined : el.color),
-    background: (isGroup || isSticker) ? undefined : (el._bodyBg || undefined),
+    backgroundColor: (isGroup || isSticker || isScreen) ? (isScreen ? el.color : 'transparent') : (el._bodyBg ? undefined : el.color),
+    background: (!isGroup && !isSticker && !isScreen) ? (el._bodyBg || undefined) : undefined,
     boxShadow: isScreen
       ? 'inset 0 0 14px rgba(0,0,0,0.85)'
       : (!isGroup && !isSticker)
@@ -1186,7 +1186,7 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
   // Color index — stored in Supabase via student metadata
   const storageKey = `classcard_robot_knob_${session.user.id}`;
   const [knob, setKnobRaw] = useState<number>(() => {
-    try { const v = localStorage.getItem(storageKey); return v !== null ? Math.min(3, Math.max(0, parseInt(v, 10) || 0)) : 0; }
+    try { const v = localStorage.getItem(storageKey); return v !== null ? Math.max(0, parseInt(v, 10) || 0) : 0; }
     catch { return 0; }
   });
 
@@ -1202,16 +1202,25 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
   const faceColorPalettes = FACE_COLOR_PALETTES.slice(0, unlockedFaceColorCount);
   const robotColor = knobToRobotColor(knob, colorThemes);
 
-  // Load unlocks from Supabase — matches Shop's multi-row unlock_key format
+  // Load unlocks + robot settings together so the knob index is set after we know
+  // how many colour themes are available (avoids the "wrong colour on load" flash).
   useEffect(() => {
-    const loadUnlocks = async () => {
+    const loadUnlocksAndRobot = async () => {
       if (!studentId) return;
-      const { data } = await sb.from('student_unlocks').select('unlock_key').eq('student_id', studentId);
-      const choices: string[] = (data || []).map((r: any) => r.unlock_key).filter(Boolean);
+      const [unlockRes, robotSettings] = await Promise.all([
+        sb.from('student_unlocks').select('unlock_key').eq('student_id', studentId),
+        loadStudentRobotSettings(studentId).catch(() => null),
+      ]);
+      const choices: string[] = ((unlockRes.data || []) as any[]).map((r: any) => r.unlock_key).filter(Boolean);
       setUnlockedChoices(choices);
       setUnlocksLoaded(true);
+      // Now set the knob — we know the real theme count so no stale-clamp issue
+      if (robotSettings) {
+        setKnobRaw(robotSettings.colorIndex);
+        if (robotSettings.facePixels) setFacePixelsRaw(robotSettings.facePixels);
+      }
     };
-    if (studentId) loadUnlocks();
+    if (studentId) loadUnlocksAndRobot();
   }, [studentId]);
 
   // Save a new unlock choice — insert a new unlock_key row (matches Shop format)
@@ -1285,26 +1294,6 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
   }, [session]);
 
   useEffect(() => { loadCards(); }, [loadCards]);
-
-  // Load robot settings from database on mount
-  useEffect(() => {
-    async function loadRobotSettings() {
-      if (!studentId) return;
-      try {
-        const settings = await loadStudentRobotSettings(studentId);
-        if (settings) {
-          // Only update if we have saved settings in database
-          setKnobRaw(settings.colorIndex);
-          if (settings.facePixels) {
-            setFacePixelsRaw(settings.facePixels);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load robot settings:', error);
-      }
-    }
-    loadRobotSettings();
-  }, [studentId]);
 
   // Save robot settings to database whenever they change
   useEffect(() => {
