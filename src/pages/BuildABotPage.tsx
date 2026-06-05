@@ -192,10 +192,18 @@ function BotElement({ element, isSelected, isPendingMerge, onPointerDown }: BotE
 
 interface BuildABotPageProps {
   onBack: () => void;
+  userId: string;
 }
 
-export default function BuildABotPage({ onBack }: BuildABotPageProps) {
-  const [elements, setElements] = useState<BotEl[]>(INITIAL_ELEMENTS);
+export default function BuildABotPage({ onBack, userId }: BuildABotPageProps) {
+  const savedBotKey = `savedBot_${userId}`;
+  const [elements, setElements] = useState<BotEl[]>(() => {
+    try {
+      const raw = localStorage.getItem(savedBotKey);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return INITIAL_ELEMENTS;
+  });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [action, setAction] = useState<any>(null);
   const [pendingMergeId, setPendingMergeId] = useState<string | null>(null);
@@ -433,7 +441,7 @@ export default function BuildABotPage({ onBack }: BuildABotPageProps) {
           {/* Save button */}
           <button
             onClick={() => {
-              localStorage.setItem('savedBot', JSON.stringify(elements));
+              localStorage.setItem(savedBotKey, JSON.stringify(elements));
               setSaveFlash(true);
               setTimeout(() => setSaveFlash(false), 1800);
             }}
