@@ -97,7 +97,7 @@ function App() {
       {page === 'student'  && <StudentPage session={session!} onSignOut={handleSignOut} />}
       {page === 'admin'    && <AdminPage session={session!} onSignOut={handleSignOut} />}
       {page === 'arena'    && <ArenaPage session={session!} />}
-      {page === 'buildabot' && <BuildABotPage onBack={() => goTo('student', '/student')} />}
+      {page === 'buildabot' && <BuildABotPage onBack={() => goTo('student', '/student')} userId={session?.user.id ?? ''} />}
       {page === 'mycards'  && <MyCardsPage session={session!} onBack={() => goTo('student', '/student')} />}
       {page === 'shop'     && <ShopPage session={session!} onBack={() => goTo('student', '/student')} onCardsAdded={() => goTo('mycards', '/mycards')} />}
     </>
