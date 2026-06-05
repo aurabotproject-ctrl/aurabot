@@ -179,26 +179,27 @@ export type Card = {
 export async function saveStudentRobotSettings(
   studentId: string,
   colorIndex: number,
-  facePixels: string[] | null
+  facePixels: string[] | null,
+  botElements?: any[] | null
 ): Promise<void> {
-  const { error } = await sb
-    .from('students')
-    .update({
-      robot_color_index: colorIndex,
-      face_pixels: facePixels ? JSON.stringify(facePixels) : null,
-    })
-    .eq('id', studentId);
-  
+  const update: Record<string, any> = {
+    robot_color_index: colorIndex,
+    face_pixels: facePixels ? JSON.stringify(facePixels) : null,
+  };
+  if (botElements !== undefined) {
+    update.bot_elements = botElements ? JSON.stringify(botElements) : null;
+  }
+  const { error } = await sb.from('students').update(update).eq('id', studentId);
   if (error) throw error;
 }
 
 /** Load student's robot settings from database */
 export async function loadStudentRobotSettings(
   studentId: string
-): Promise<{ colorIndex: number; facePixels: string[] | null } | null> {
+): Promise<{ colorIndex: number; facePixels: string[] | null; botElements: any[] | null } | null> {
   const { data, error } = await sb
     .from('students')
-    .select('robot_color_index, face_pixels')
+    .select('robot_color_index, face_pixels, bot_elements')
     .eq('id', studentId)
     .maybeSingle();
   
@@ -208,6 +209,7 @@ export async function loadStudentRobotSettings(
   return {
     colorIndex: data.robot_color_index ?? 0,
     facePixels: data.face_pixels ? JSON.parse(data.face_pixels) : null,
+    botElements: data.bot_elements ? JSON.parse(data.bot_elements) : null,
   };
 }
 
