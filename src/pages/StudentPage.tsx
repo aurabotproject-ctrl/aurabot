@@ -8,11 +8,59 @@ import type { Card } from '../lib/supabase';
 import {
   BASE_COLOR_THEMES, EXTRA_COLOR_THEMES, FACE_COLOR_PALETTES,
   buildColorThemes, knobToRobotColor, countUnlockedColors, countUnlockedFaceColors,
-  BotEl, BotElType, BotElSpecial, STICKER_MAP, CONTAINER_W, CONTAINER_H,
-  BOT_DEFAULT_COLOR, DARK_SCREEN, getBotBounds, remapBotElements, renderBotEl,
   StudentBotAvatar,
 } from '../components/BotAvatar';
 import type { ColorTheme } from '../components/BotAvatar';
+
+/* ─────────────────────────────────────────────
+   Waveform canvas component
+───────────────────────────────────────────── */
+function Waveform({ colorIndex, colorThemes }: { colorIndex: number; colorThemes: ColorTheme[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animRef = useRef<number>(0);
+  const colorRef = useRef(colorIndex);
+  colorRef.current = colorIndex;
+  const themesRef = useRef(colorThemes);
+  themesRef.current = colorThemes;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+    function draw(ts: number) {
+      const W = canvas!.width;
+      const H = canvas!.height;
+      ctx.clearRect(0, 0, W, H);
+      const theme = themesRef.current[colorRef.current % themesRef.current.length];
+      ctx.strokeStyle = theme.wave + '18';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < W; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+      for (let y = 0; y < H; y += 15) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+      const idx = colorRef.current;
+      const speed = 0.0015 + (idx / 4) * 0.003;
+      const amp = 18 + (idx / 4) * 20;
+      const freq = 1 + (idx / 4) * 3;
+      ctx.shadowColor = theme.wave;
+      ctx.shadowBlur = 14;
+      ctx.strokeStyle = theme.waveShadow;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      for (let px = 0; px < W; px++) {
+        const t = (px / W) * Math.PI * 2 * freq + ts * speed;
+        const spike = Math.exp(-((px / W - 0.4) ** 2) * 20) * amp * 1.8;
+        const y = H / 2 + Math.sin(t) * amp * 0.4 + spike * Math.sin(t * 3);
+        px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      animRef.current = requestAnimationFrame(draw);
+    }
+    animRef.current = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(animRef.current);
+  }, []);
+
+  return <canvas ref={canvasRef} width={400} height={120} style={{ width: '100%', height: '100%', display: 'block' }} />;
+}
 
 type WeeklyProject = {
   id: string;
