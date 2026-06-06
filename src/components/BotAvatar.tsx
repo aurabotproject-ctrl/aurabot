@@ -24,8 +24,8 @@ export const EXTRA_COLOR_THEMES: ColorTheme[] = [
   { light: '#e0f7fa', mid: '#80deea', dark: '#00bcd4', glow: 'rgba(0,188,212,0.35)',   label: 'Ocean',     wave: '#00bcd4', waveShadow: 'rgba(0,188,212,0.8)',    special: false },
   { light: '#fff3e0', mid: '#ffcc80', dark: '#ff9800', glow: 'rgba(255,152,0,0.35)',   label: 'Tangerine', wave: '#ff9800', waveShadow: 'rgba(255,152,0,0.8)',    special: false },
   { light: '#fce4ec', mid: '#ef9a9a', dark: '#e53935', glow: 'rgba(229,57,53,0.35)',   label: 'Crimson',   wave: '#e53935', waveShadow: 'rgba(229,57,53,0.8)',    special: false },
-  { light: '#fffde7', mid: '#ffe082', dark: '#ffc107', glow: 'rgba(255,193,7,0.6)',    label: '✨ Gold',    wave: '#ffd700', waveShadow: 'rgba(255,215,0,0.95)',   special: true,  gradient: 'linear-gradient(135deg,#fffbe6,#ffe066,#ffd700,#bfa000,#ffd700,#ffe066)' },
-  { light: '#f5f5f5', mid: '#e0e0e0', dark: '#9e9e9e', glow: 'rgba(200,200,200,0.6)', label: '✨ Silver',  wave: '#c0c0c0', waveShadow: 'rgba(192,192,192,0.95)', special: true,  gradient: 'linear-gradient(135deg,#ffffff,#d0d0d0,#a0a0a0,#e8e8e8,#a0a0a0,#d0d0d0)' },
+  { light: '#fffde7', mid: '#ffe082', dark: '#ffc107', glow: 'rgba(255,193,7,0.7)',    label: '✨ Gold',    wave: '#ffd700', waveShadow: 'rgba(255,215,0,0.95)',   special: true,  gradient: 'linear-gradient(145deg,#fff8dc 0%,#ffe566 15%,#ffd700 28%,#b8860b 42%,#ffd700 55%,#ffe566 65%,#fff4a0 75%,#c8960a 85%,#ffe566 100%)' },
+  { light: '#f5f5f5', mid: '#e0e0e0', dark: '#9e9e9e', glow: 'rgba(200,200,220,0.7)', label: '✨ Silver',  wave: '#c0c0c0', waveShadow: 'rgba(220,220,255,0.95)', special: true,  gradient: 'linear-gradient(145deg,#ffffff 0%,#d8e0f0 12%,#a0aabb 28%,#e8eaf5 42%,#8090a8 55%,#d0d8ee 65%,#f0f2ff 75%,#90a0b8 85%,#dce0f0 100%)' },
   { light: '#ff9de2', mid: '#a78bfa', dark: '#38bdf8', glow: 'rgba(167,139,250,0.6)', label: '🌈 Chrome', wave: '#a855f7', waveShadow: 'rgba(168,85,247,0.95)', special: true, gradient: 'linear-gradient(135deg,#ff0080,#ff8c00,#ffe000,#00ff88,#00c8ff,#a855f7,#ff0080,#ff8c00,#ffe000)', rainbow: true },
   { light: '#0a0a0f', mid: '#111118', dark: '#1a1a2e', glow: 'rgba(140,80,255,0.55)', label: '🖤 Black Chrome', wave: '#7c3aed', waveShadow: 'rgba(124,58,237,0.95)', special: true, gradient: 'linear-gradient(135deg,#0a0a0f,#1a1028,#0d0d1a,#1a1028,#0a0a0f)', blackChrome: true },
 ];
@@ -157,9 +157,31 @@ export function renderBotEl(el: BotEl & { _bodyBg?: string }, special?: BotElSpe
 
   const SheenStrip = () => {
     if (!isSpecial || isScreen || isSticker || isGroup || !special?.sheenColor) return null;
+    const isMetallic = special.isGold || special.isSilver;
     return (
       <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', borderRadius: 'inherit', pointerEvents: 'none', zIndex: 3 }}>
-        <div className={special.sheenClass} style={{ position: 'absolute', top: '-50%', left: '-75%', width: '60%', height: '200%', background: special.sheenColor, transform: 'skewX(-15deg)' }} />
+        {/* Wide soft reflection */}
+        <div className={special.sheenClass} style={{
+          position: 'absolute', top: '-50%', left: '-120%',
+          width: isMetallic ? '80%' : '60%', height: '200%',
+          background: isMetallic
+            ? (special.isGold
+                ? 'linear-gradient(105deg,transparent,rgba(255,255,220,0.18) 30%,rgba(255,255,255,0.55) 50%,rgba(255,240,160,0.18) 70%,transparent)'
+                : 'linear-gradient(105deg,transparent,rgba(220,230,255,0.18) 30%,rgba(255,255,255,0.6) 50%,rgba(200,220,255,0.18) 70%,transparent)')
+            : special.sheenColor,
+          transform: 'skewX(-18deg)',
+        }} />
+        {/* Sharp bright highlight — offset timing */}
+        {isMetallic && (
+          <div className={`${special.sheenClass}-sharp`} style={{
+            position: 'absolute', top: '-50%', left: '-120%',
+            width: '20%', height: '200%',
+            background: special.isGold
+              ? 'linear-gradient(105deg,transparent,rgba(255,255,200,0.7) 45%,rgba(255,255,255,0.9) 50%,rgba(255,255,200,0.7) 55%,transparent)'
+              : 'linear-gradient(105deg,transparent,rgba(200,220,255,0.6) 45%,rgba(255,255,255,0.95) 50%,rgba(200,220,255,0.6) 55%,transparent)',
+            transform: 'skewX(-18deg)',
+          }} />
+        )}
       </div>
     );
   };
@@ -397,22 +419,38 @@ export function TeacherBotThumbnail({ colorIndex, botElements, facePixels, starP
     <div style={{ position: 'relative', width: size, flexShrink: 0 }}>
       <style>{`
         @keyframes savedBotBounce { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } }
-        @keyframes sheenSweep     { 0% { left:-75%; } 100% { left:130%; } }
-        @keyframes sheenSweepSlow { 0% { left:-75%; } 100% { left:130%; } }
-        @keyframes sheenBCSweep   { 0% { left:-75%; } 100% { left:130%; } }
-        @keyframes goldPulse    { 0%,100%{filter:brightness(1) saturate(1);}   50%{filter:brightness(1.15) saturate(1.3);} }
-        @keyframes silverPulse  { 0%,100%{filter:brightness(1) saturate(0.9);} 50%{filter:brightness(1.2) saturate(1.1);} }
+        @keyframes sheenSweep     { 0% { left:-120%; } 100% { left:150%; } }
+        @keyframes sheenSweepSlow { 0% { left:-120%; } 100% { left:150%; } }
+        @keyframes sheenBCSweep   { 0% { left:-120%; } 100% { left:150%; } }
+        @keyframes sheenGoldSharp  { 0%   { left:-120%; } 100% { left:150%; } }
+        @keyframes sheenSilverSharp{ 0%   { left:-120%; } 100% { left:150%; } }
+        @keyframes goldPulse   {
+          0%   { filter: brightness(1)    saturate(1.1)  contrast(1); }
+          25%  { filter: brightness(1.18) saturate(1.5)  contrast(1.05); }
+          50%  { filter: brightness(1.28) saturate(1.7)  contrast(1.08); }
+          75%  { filter: brightness(1.1)  saturate(1.3)  contrast(1.02); }
+          100% { filter: brightness(1)    saturate(1.1)  contrast(1); }
+        }
+        @keyframes silverPulse {
+          0%   { filter: brightness(1)    saturate(0.85) contrast(1)    hue-rotate(0deg); }
+          30%  { filter: brightness(1.2)  saturate(1.1)  contrast(1.05) hue-rotate(10deg); }
+          60%  { filter: brightness(1.35) saturate(1.2)  contrast(1.1)  hue-rotate(5deg); }
+          80%  { filter: brightness(1.15) saturate(0.95) contrast(1.02) hue-rotate(2deg); }
+          100% { filter: brightness(1)    saturate(0.85) contrast(1)    hue-rotate(0deg); }
+        }
         @keyframes bcPulse      { 0%,100%{filter:brightness(1) saturate(1.6);} 50%{filter:brightness(1.1) saturate(2.2);} }
         @keyframes rainbowPulse { 0%,100%{filter:brightness(1.05) saturate(1.2);} 50%{filter:brightness(1.2) saturate(1.5);} }
-        .saved-bot-body     { animation: savedBotBounce 3s ease-in-out infinite; }
-        .sheen-gold         { animation: sheenSweep 2.4s ease-in-out infinite; }
-        .sheen-silver       { animation: sheenSweepSlow 3s ease-in-out infinite; }
-        .sheen-chrome       { animation: sheenSweep 1.6s ease-in-out infinite; }
-        .sheen-black-chrome { animation: sheenBCSweep 2s ease-in-out infinite; }
-        .bot-gold           { animation: savedBotBounce 3s ease-in-out infinite, goldPulse 2.4s ease-in-out infinite; }
-        .bot-silver         { animation: savedBotBounce 3s ease-in-out infinite, silverPulse 3s ease-in-out infinite; }
-        .bot-rainbow        { animation: savedBotBounce 3s ease-in-out infinite, rainbowPulse 3s ease-in-out infinite; }
-        .bot-black-chrome   { animation: savedBotBounce 3s ease-in-out infinite, bcPulse 5s ease-in-out infinite; }
+        .saved-bot-body        { animation: savedBotBounce 3s ease-in-out infinite; }
+        .sheen-gold            { animation: sheenSweep 2.2s ease-in-out infinite; }
+        .sheen-gold-sharp      { animation: sheenGoldSharp 2.2s ease-in-out infinite; animation-delay: 0.15s; }
+        .sheen-silver          { animation: sheenSweepSlow 2.8s ease-in-out infinite; }
+        .sheen-silver-sharp    { animation: sheenSilverSharp 2.8s ease-in-out infinite; animation-delay: 0.2s; }
+        .sheen-chrome          { animation: sheenSweep 1.6s ease-in-out infinite; }
+        .sheen-black-chrome    { animation: sheenBCSweep 2s ease-in-out infinite; }
+        .bot-gold              { animation: savedBotBounce 3s ease-in-out infinite, goldPulse 2.2s ease-in-out infinite; }
+        .bot-silver            { animation: savedBotBounce 3s ease-in-out infinite, silverPulse 2.8s ease-in-out infinite; }
+        .bot-rainbow           { animation: savedBotBounce 3s ease-in-out infinite, rainbowPulse 3s ease-in-out infinite; }
+        .bot-black-chrome      { animation: savedBotBounce 3s ease-in-out infinite, bcPulse 5s ease-in-out infinite; }
       `}</style>
       <BotCanvas
         botElements={elements}
