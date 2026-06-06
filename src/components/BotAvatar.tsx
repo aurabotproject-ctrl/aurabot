@@ -164,7 +164,7 @@ export function renderBotEl(el: BotEl & { _bodyBg?: string }, special?: BotElSpe
     );
   };
 
-  const renderScreenContent = (type: string, w: number, h: number) => {
+  const renderScreenContent = (type: string, w: number, h: number, pts?: number) => {
     if (type === 'face') {
       return (
         <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:'15%' }}>
@@ -174,13 +174,15 @@ export function renderBotEl(el: BotEl & { _bodyBg?: string }, special?: BotElSpe
       );
     }
     if (type === 'chest') {
-      const fs = Math.round(w * 0.14);
+      const fs = Math.round(w * 0.13);
+      const starCount = pts ?? 0;
       return (
-        <div style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap: Math.round(h * 0.06) }}>
-          <span style={{ fontSize: fs, fontWeight:700, color:'#8be9fd', letterSpacing:'0.05em' }}>LVL 5</span>
-          <div style={{ width:'75%', height: Math.max(3, Math.round(h * 0.04)), background:'#1f2937', borderRadius:9999, overflow:'hidden' }}>
-            <div style={{ width:'66%', height:'100%', background:'linear-gradient(90deg,#60a5fa,#a855f7)', borderRadius:9999 }} />
-          </div>
+        <div style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap: Math.round(h * 0.05) }}>
+          <span style={{ fontSize: Math.round(w * 0.09), lineHeight: 1 }}>⭐</span>
+          <span style={{ fontSize: fs, fontWeight: 800, color: starCount > 0 ? '#fbbf24' : '#8be9fd', letterSpacing: '0.05em', lineHeight: 1 }}>
+            {starCount > 0 ? starCount : '—'}
+          </span>
+          <span style={{ fontSize: Math.round(w * 0.07), fontWeight: 600, color: '#4a5568', letterSpacing: '0.08em', lineHeight: 1, textTransform: 'uppercase' }}>stars</span>
         </div>
       );
     }
@@ -227,14 +229,13 @@ interface BotCanvasProps {
   robotColor: ColorTheme;
   facePixels?: string[] | null;
   faceColorPalettes?: typeof FACE_COLOR_PALETTES;
-  /** Display size; defaults to CONTAINER_W × CONTAINER_H */
+  starPoints?: number;
   width?: number;
   height?: number;
-  /** Extra CSS class on the bouncing wrapper */
   animClass?: string;
 }
 
-export function BotCanvas({ botElements, robotColor, facePixels, faceColorPalettes, width = CONTAINER_W, height = CONTAINER_H, animClass = 'saved-bot-body' }: BotCanvasProps) {
+export function BotCanvas({ botElements, robotColor, facePixels, faceColorPalettes, starPoints, width = CONTAINER_W, height = CONTAINER_H, animClass = 'saved-bot-body' }: BotCanvasProps) {
   const isGold        = robotColor.label === '✨ Gold';
   const isSilver      = robotColor.label === '✨ Silver';
   const isRainbow     = !!(robotColor as any).rainbow;
@@ -306,6 +307,28 @@ export function BotCanvas({ botElements, robotColor, facePixels, faceColorPalett
                 </div>
               );
             }
+            if (el.type === 'chest') {
+              const pts = starPoints ?? 0;
+              return (
+                <div key={el.id} style={{
+                  position: 'absolute', left: el.cx, top: el.cy,
+                  width: el.w, height: el.h,
+                  transform: `translate(-50%,-50%) rotate(${el.rotation}deg)`,
+                  borderRadius: typeof el.rx === 'number' ? el.rx : 0,
+                  backgroundColor: el.color,
+                  boxShadow: 'inset 0 0 14px rgba(0,0,0,0.85)',
+                  overflow: 'hidden', zIndex: 2,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: Math.round(el.h * 0.05),
+                }}>
+                  <span style={{ fontSize: Math.round(el.w * 0.09), lineHeight: 1 }}>⭐</span>
+                  <span style={{ fontSize: Math.round(el.w * 0.13), fontWeight: 800, color: pts > 0 ? '#fbbf24' : '#8be9fd', letterSpacing: '0.05em', lineHeight: 1 }}>
+                    {pts > 0 ? pts : '—'}
+                  </span>
+                  <span style={{ fontSize: Math.round(el.w * 0.07), fontWeight: 600, color: '#4a5568', letterSpacing: '0.08em', lineHeight: 1, textTransform: 'uppercase' }}>stars</span>
+                </div>
+              );
+            }
             return renderBotEl(el, special);
           })}
         </div>
@@ -320,13 +343,13 @@ interface StudentBotAvatarProps {
   robotColor: ColorTheme;
   facePixels?: string[] | null;
   faceColorPalettes?: typeof FACE_COLOR_PALETTES;
-  /** Per-user localStorage key, e.g. `savedBot_<userId>` */
+  starPoints?: number;
   storageKey: string;
   width?: number;
   height?: number;
 }
 
-export function StudentBotAvatar({ robotColor, facePixels, faceColorPalettes, storageKey, width = CONTAINER_W, height = CONTAINER_H }: StudentBotAvatarProps) {
+export function StudentBotAvatar({ robotColor, facePixels, faceColorPalettes, starPoints, storageKey, width = CONTAINER_W, height = CONTAINER_H }: StudentBotAvatarProps) {
   const [botElements, setBotElements] = React.useState<BotEl[] | null>(() => {
     try { const r = localStorage.getItem(storageKey); return r ? JSON.parse(r) : null; } catch { return null; }
   });
@@ -345,7 +368,7 @@ export function StudentBotAvatar({ robotColor, facePixels, faceColorPalettes, st
   }, [storageKey]);
 
   if (!botElements) return null;
-  return <BotCanvas botElements={botElements} robotColor={robotColor} facePixels={facePixels} faceColorPalettes={faceColorPalettes} width={width} height={height} />;
+  return <BotCanvas botElements={botElements} robotColor={robotColor} facePixels={facePixels} faceColorPalettes={faceColorPalettes} starPoints={starPoints} width={width} height={height} />;
 }
 
 /* ─── TeacherBotThumbnail — renders a student's bot from DB data ─────────── */
@@ -354,6 +377,7 @@ interface TeacherBotThumbnailProps {
   colorIndex: number;
   botElements: BotEl[] | null;
   facePixels: string[] | null;
+  starPoints?: number;
   size?: number;
 }
 
@@ -371,7 +395,7 @@ const DEFAULT_BOT_ELEMENTS: BotEl[] = [
   { id: 'antb',  type: 'circle', cx: 280, cy: 30,  w: 30,  h: 30,  rotation: 0, rx: '50%', color: BOT_DEFAULT_COLOR },
 ];
 
-export function TeacherBotThumbnail({ colorIndex, botElements, facePixels, size = 100 }: TeacherBotThumbnailProps) {
+export function TeacherBotThumbnail({ colorIndex, botElements, facePixels, starPoints, size = 100 }: TeacherBotThumbnailProps) {
   const theme = ALL_COLOR_THEMES[Math.min(colorIndex, ALL_COLOR_THEMES.length - 1)];
   const elements = botElements ?? DEFAULT_BOT_ELEMENTS;
 
@@ -401,6 +425,7 @@ export function TeacherBotThumbnail({ colorIndex, botElements, facePixels, size 
         robotColor={theme}
         facePixels={facePixels}
         faceColorPalettes={FACE_COLOR_PALETTES}
+        starPoints={starPoints}
         width={size}
         height={size * (CONTAINER_H / CONTAINER_W)}
       />
