@@ -302,7 +302,6 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
   const [botY, setBotY] = useState(0);    // bottom piece falls down
   // Card swipe state
   const [cardSwiped, setCardSwiped] = useState([false, false, false]);
-  const [cardDismissing, setCardDismissing] = useState([false, false, false]);
 
   const rarityGlow: Record<string, string> = {
     common: 'rgba(156,163,175,0.5)', silver: 'rgba(148,163,184,0.7)',
@@ -317,12 +316,12 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
       onStarsSpent(selectedTier.stars);
     }
     const fetchWithTimeout = Promise.race([
-      sb.from('card_database')
-        .select('id, card_name, type, description, image_url, move1_name, move2_name')
-        .limit(50),
+      pack.id === 'luckydip'
+        ? sb.from('card_database').select('id, card_name, type, description, image_url, move1_name, move2_name').limit(100)
+        : sb.from('card_database').select('id, card_name, type, description, image_url, move1_name, move2_name').eq('type', pack.id).limit(100),
       new Promise<{data: null}>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
     ]);
-    
+
     let dbCards: any[] = [];
     try {
       const result = await fetchWithTimeout as any;
@@ -330,8 +329,8 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
     } catch {
       dbCards = [];
     }
-    const pool = dbCards.filter((c: any) => pack.id === 'luckydip' || c.type === pack.id);
-    const src = (pool.length >= 3 ? pool : dbCards) as any[];
+    const pool = dbCards.length >= 3 ? dbCards : dbCards;
+    const src = pool as any[];
     const shuffled = [...src].sort(() => Math.random() - 0.5);
     const picked = shuffled.slice(0, 3);
     const rolled: OpenedCard[] = [];
@@ -375,21 +374,12 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
     requestAnimationFrame(animate);
   };
 
-  // Card click handler — animate card down then slot it
+  // Card click handler — instantly slot the card
   const onCardClick = (idx: number) => {
     const isTop = !cardSwiped[idx] && cardSwiped.slice(0, idx).every(Boolean);
-    if (!isTop || cardDismissing[idx]) return;
-    // Start dismiss animation
-    setCardDismissing(prev => prev.map((d, i) => i === idx ? true : d));
-    // Slot the card into the right panel partway through the animation
-    setTimeout(() => {
-      setSlottedCards(prev => { const n = [...prev]; n[idx] = openedCards[idx]; return n; });
-    }, 500);
-    // After animation fully completes, mark as swiped
-    setTimeout(() => {
-      setCardSwiped(prev => prev.map((s, i) => i === idx ? true : s));
-      setCardDismissing(prev => prev.map((d, i) => i === idx ? false : d));
-    }, 1100);
+    if (!isTop) return;
+    setCardSwiped(prev => prev.map((s, i) => i === idx ? true : s));
+    setSlottedCards(prev => { const n = [...prev]; n[idx] = openedCards[idx]; return n; });
   };
 
   const allSwiped = cardSwiped.every(Boolean);
@@ -585,13 +575,12 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
                 return (
                   <div key={idx}
                     style={{ position: 'absolute', top: idx * 6, left: idx * 3, width: '100%', zIndex: openedCards.length - idx,
-                      transform: cardDismissing[idx] ? 'translateY(110vh)' : 'translateY(0px)',
-                      transition: cardDismissing[idx] ? 'transform 1.1s cubic-bezier(0.3,0,0.8,0.6)' : 'transform 0.3s',
+                      transform: `translateY(${cardSwiped[idx] ? 600 : 0}px) rotate(${cardSwiped[idx] ? 0 : (idx - 1) * 2}deg)`,
+                      transition: 'transform 0.4s ease-in, opacity 0.3s',
                       opacity: cardSwiped[idx] ? 0 : 1,
                       cursor: isTop ? 'pointer' : 'default',
                       filter: `drop-shadow(0 0 ${isTop ? 20 : 6}px ${rarityGlow[card.rarity]})`,
-                      animation: (cardSwiped[idx] || cardDismissing[idx]) ? 'none' : `cardFlyUp 0.5s ${idx * 0.1}s both`,
-                      rotate: cardDismissing[idx] ? '0deg' : `${(idx - 1) * 2}deg`,
+                      animation: cardSwiped[idx] ? 'none' : `cardFlyUp 0.5s ${idx * 0.1}s both`,
                     }}
                     onClick={() => onCardClick(idx)}
                   >
