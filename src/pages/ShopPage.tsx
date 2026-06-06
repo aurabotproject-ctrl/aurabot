@@ -595,7 +595,6 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
             {/* Left: stacked draggable cards */}
             <div style={{ position: 'relative', width: 180, height: 252, flexShrink: 0 }}>
               {openedCards.map((card, idx) => {
-                const unswiped = !cardSwiped[idx];
                 const isTop = !cardSwiped[idx] && cardSwiped.slice(0, idx).every(Boolean);
                 return (
                   <div key={idx}
