@@ -1045,190 +1045,13 @@ function ModalForm({ fields, onSubmit, submitLabel, error, onCancel }: {
 // STARS TAB — Teacher awards stars to students (like ClassDojo)
 // ══════════════════════════════════════════════════════════════════════
 
-const ALL_BOT_COLORS = [
-  // Base 4
-  { light: '#e3f2fd', mid: '#90caf9', dark: '#42a5f5', label: 'Sky',       special: false },
-  { light: '#fce4ec', mid: '#f8bbd0', dark: '#f48fb1', label: 'Bubblegum', special: false },
-  { light: '#f1f8e9', mid: '#c5e1a5', dark: '#8bc34a', label: 'Minty',     special: false },
-  { light: '#fffde7', mid: '#fff176', dark: '#fdd835', label: 'Lemon',     special: false },
-  // Tier 1
-  { light: '#f3e5f5', mid: '#ce93d8', dark: '#ab47bc', label: 'Grape',     special: false },
-  { light: '#e0f7fa', mid: '#80deea', dark: '#00bcd4', label: 'Ocean',     special: false },
-  // Tier 2
-  { light: '#fff3e0', mid: '#ffcc80', dark: '#ff9800', label: 'Tangerine', special: false },
-  { light: '#fce4ec', mid: '#ef9a9a', dark: '#e53935', label: 'Crimson',   special: false },
-  // Tier 3 — special
-  { light: '#fffde7', mid: '#ffe082', dark: '#ffc107', label: '✨ Gold',   special: true,  gradient: 'linear-gradient(135deg,#fffbe6,#ffe066,#ffd700,#bfa000,#ffd700,#ffe066)',      glow: 'rgba(255,193,7,0.6)',    pulse: 'goldPulse' },
-  { light: '#f5f5f5', mid: '#e0e0e0', dark: '#9e9e9e', label: '✨ Silver', special: true,  gradient: 'linear-gradient(135deg,#ffffff,#d0d0d0,#a0a0a0,#e8e8e8,#a0a0a0,#d0d0d0)',    glow: 'rgba(200,200,200,0.6)', pulse: 'silverPulse' },
-  // Tier 4 — special
-  { light: '#ff9de2', mid: '#a78bfa', dark: '#38bdf8', label: '🌈 Chrome', special: true,  gradient: 'linear-gradient(135deg,#ff0080,#ff8c00,#ffe000,#00ff88,#00c8ff,#a855f7,#ff0080,#ff8c00,#ffe000)', glow: 'rgba(167,139,250,0.6)', pulse: 'rainbowPulse', rainbow: true },
-  { light: '#0a0a0f', mid: '#111118', dark: '#1a1a2e', label: '🖤 Black Chrome', special: true, gradient: 'linear-gradient(135deg,#0a0a0f,#1a1028,#0d0d1a,#1a1028,#0a0a0f)',       glow: 'rgba(140,80,255,0.55)', pulse: 'bcPulse',      blackChrome: true },
-];
+// Bot thumbnails use the shared BotAvatar component
+import { TeacherBotThumbnail } from '../components/BotAvatar';
 
-const FACE_PALETTES_MINI = [
-  { on: '#42a5f5', glow: 'rgba(66,165,245,0.9)'  },
-  { on: '#fdd835', glow: 'rgba(253,216,53,0.9)'  },
-  { on: '#66bb6a', glow: 'rgba(102,187,106,0.9)' },
-  { on: '#f06292', glow: 'rgba(240,98,146,0.9)'  },
-];
+// Alias for backwards compatibility within this file
+const MiniBotAvatar = ({ colorIndex, size = 90, facePixels, botElements }: { colorIndex: number; size?: number; facePixels?: string[] | null; botElements?: any[] | null }) =>
+  <TeacherBotThumbnail colorIndex={colorIndex} botElements={botElements ?? null} facePixels={facePixels ?? null} size={size} />;
 
-// Mini-bot renderer for teacher Stars tab — supports all special themes + face pixels
-function MiniBotAvatar({ colorIndex, size = 90, facePixels }: { colorIndex: number; size?: number; facePixels?: string[] | null }) {
-  const theme = ALL_BOT_COLORS[colorIndex % ALL_BOT_COLORS.length] as typeof ALL_BOT_COLORS[0] & { gradient?: string; glow?: string; pulse?: string; rainbow?: boolean; blackChrome?: boolean };
-  const s = size;
-  const isSpecial = theme.special;
-  const bodyFill   = isSpecial ? `url(#miniGrad_${colorIndex})` : theme.mid;
-  const sheenAnim  = theme.rainbow ? 'sheenSweep 1.6s ease-in-out infinite' : theme.blackChrome ? 'sheenBCSweep 2s ease-in-out infinite' : isSpecial ? 'sheenSweep 2.4s ease-in-out infinite' : 'none';
-  const sheenColor = theme.rainbow
-    ? 'rgba(255,255,255,0.55)'
-    : theme.blackChrome
-      ? 'rgba(180,140,255,0.45)'
-      : 'rgba(255,255,255,0.55)';
-  const botAnim = theme.pulse
-    ? `botBounce 2.8s ease-in-out infinite, ${theme.pulse} ${theme.rainbow ? '3s' : theme.blackChrome ? '5s' : '2.4s'} ease-in-out infinite`
-    : 'botBounce 2.8s ease-in-out infinite';
-  const dropShadow = isSpecial ? `drop-shadow(0 4px 10px ${theme.glow ?? theme.dark + '88'})` : `drop-shadow(0 4px 8px ${theme.dark}55)`;
-
-  // Render face pixels as a 20×20 grid inside an SVG foreignObject
-  const renderFace = () => {
-    if (!facePixels || facePixels.length === 0) {
-      // Default glowing eyes
-      return (
-        <>
-          <circle cx="38" cy="36" r="5" fill="#8be9fd" opacity="0.9">
-            <animate attributeName="opacity" values="0.7;1;0.7" dur="2.5s" repeatCount="indefinite" />
-          </circle>
-          <circle cx="62" cy="36" r="5" fill="#8be9fd" opacity="0.9">
-            <animate attributeName="opacity" values="0.7;1;0.7" dur="2.5s" begin="0.4s" repeatCount="indefinite" />
-          </circle>
-          <circle cx="39.5" cy="34.5" r="1.5" fill="white" opacity="0.8" />
-          <circle cx="63.5" cy="34.5" r="1.5" fill="white" opacity="0.8" />
-        </>
-      );
-    }
-    // Render the 20×20 pixel grid inside the face area (x:24-76, y:22-50 → 52×28)
-    const cols = 20;
-    const rows = Math.ceil(facePixels.length / cols);
-    const cellW = 52 / cols;
-    const cellH = 28 / rows;
-    return (
-      <>
-        {facePixels.map((c, i) => {
-          const col = i % cols;
-          const row = Math.floor(i / cols);
-          const paletteIdx = c.startsWith('on') ? (parseInt(c.replace('on', '') || '0') || 0) : -1;
-          if (paletteIdx < 0) return null;
-          const pal = FACE_PALETTES_MINI[paletteIdx % FACE_PALETTES_MINI.length];
-          return (
-            <rect
-              key={i}
-              x={24 + col * cellW}
-              y={22 + row * cellH}
-              width={cellW}
-              height={cellH}
-              fill={pal.on}
-              opacity="0.95"
-            />
-          );
-        })}
-      </>
-    );
-  };
-
-  return (
-    <svg width={s} height={s * 1.1} viewBox="0 0 100 110" style={{ overflow: 'visible', filter: dropShadow }}>
-      <defs>
-        {isSpecial && theme.gradient && (
-          <linearGradient id={`miniGrad_${colorIndex}`} x1="0%" y1="0%" x2="100%" y2="100%">
-            {/* Parse the gradient stops from the theme gradient string — just use 3 representative colours */}
-            {theme.rainbow
-              ? <>
-                  <stop offset="0%"   stopColor="#ff0080" />
-                  <stop offset="25%"  stopColor="#ffe000" />
-                  <stop offset="50%"  stopColor="#00ff88" />
-                  <stop offset="75%"  stopColor="#00c8ff" />
-                  <stop offset="100%" stopColor="#a855f7" />
-                </>
-              : theme.blackChrome
-              ? <>
-                  <stop offset="0%"   stopColor="#0a0a0f" />
-                  <stop offset="50%"  stopColor="#1a1028" />
-                  <stop offset="100%" stopColor="#0d0d1a" />
-                </>
-              : theme.label === '✨ Gold'
-              ? <>
-                  <stop offset="0%"   stopColor="#fffbe6" />
-                  <stop offset="40%"  stopColor="#ffd700" />
-                  <stop offset="100%" stopColor="#bfa000" />
-                </>
-              : /* Silver */ <>
-                  <stop offset="0%"   stopColor="#ffffff" />
-                  <stop offset="50%"  stopColor="#a0a0a0" />
-                  <stop offset="100%" stopColor="#d0d0d0" />
-                </>
-            }
-          </linearGradient>
-        )}
-        {isSpecial && (
-          <clipPath id={`miniClip_${colorIndex}`}>
-            <rect x="0" y="0" width="100" height="110" />
-          </clipPath>
-        )}
-      </defs>
-
-      <style>{`
-        @keyframes botBounce    { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-5px); } }
-        @keyframes goldPulse    { 0%,100% { filter:brightness(1) saturate(1); }   50% { filter:brightness(1.15) saturate(1.3); } }
-        @keyframes silverPulse  { 0%,100% { filter:brightness(1) saturate(0.9); } 50% { filter:brightness(1.2) saturate(1.1); } }
-        @keyframes bcPulse      { 0%,100% { filter:brightness(1) saturate(1.6); } 50% { filter:brightness(1.1) saturate(2.2); } }
-        @keyframes rainbowPulse { 0%,100% { filter:brightness(1.05) saturate(1.2); } 50% { filter:brightness(1.2) saturate(1.5); } }
-        @keyframes sheenSweep   { 0% { transform:translateX(-120px) skewX(-15deg); } 100% { transform:translateX(220px) skewX(-15deg); } }
-        @keyframes sheenBCSweep { 0% { transform:translateX(-120px) skewX(-15deg); } 100% { transform:translateX(220px) skewX(-15deg); } }
-        .mini-bot-g { animation: ${botAnim}; }
-      `}</style>
-
-      <g className="mini-bot-g" style={{ transformOrigin: '50px 55px' }}>
-        {/* Antenna */}
-        <rect x="48" y="2" width="4" height="12" rx="2" fill={bodyFill} />
-        <circle cx="50" cy="2" r="4" fill={isSpecial ? bodyFill : theme.dark} />
-        {/* Ears */}
-        <rect x="10" y="22" width="10" height="22" rx="5" fill={bodyFill} />
-        <rect x="80" y="22" width="10" height="22" rx="5" fill={bodyFill} />
-        {/* Head */}
-        <rect x="18" y="16" width="64" height="46" rx="14" fill={bodyFill} />
-        {/* Face screen */}
-        <rect x="24" y="22" width="52" height="28" rx="8" fill="#111827" />
-        {/* Face content */}
-        {renderFace()}
-        {/* Neck */}
-        <rect x="43" y="62" width="14" height="8" rx="4" fill={bodyFill} />
-        {/* Arms */}
-        <rect x="6" y="72" width="16" height="36" rx="8" fill={bodyFill} />
-        <rect x="78" y="72" width="16" height="36" rx="8" fill={bodyFill} />
-        {/* Body */}
-        <rect x="20" y="70" width="60" height="28" rx="14" fill={bodyFill} />
-        {/* Chest screen */}
-        <rect x="28" y="74" width="44" height="18" rx="6" fill="#111827" />
-        <rect x="30" y="77" width="28" height="3" rx="2" fill={isSpecial ? bodyFill : theme.dark} opacity="0.8" />
-        <rect x="30" y="82" width="18" height="2" rx="1" fill={isSpecial ? bodyFill : theme.dark} opacity="0.5" />
-        {/* Legs */}
-        <rect x="30" y="98" width="14" height="10" rx="5" fill={bodyFill} />
-        <rect x="56" y="98" width="14" height="10" rx="5" fill={bodyFill} />
-
-        {/* Sheen sweep overlay for special themes */}
-        {isSpecial && (
-          <g clipPath={`url(#miniClip_${colorIndex})`} style={{ pointerEvents: 'none' }}>
-            <rect
-              x="-30" y="-10" width="30" height="130"
-              fill={sheenColor}
-              style={{ animation: sheenAnim }}
-            />
-          </g>
-        )}
-      </g>
-    </svg>
-  );
-}
 
 function StarsTab({ students, session }: { students: Student[]; session: NonNullable<import('../lib/auth').Session> }) {
   const [starPoints, setStarPoints] = React.useState<Record<string, number>>({});
@@ -1237,6 +1060,7 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
   const [flash, setFlash] = React.useState<Record<string, string>>({});
   const [colorMap, setColorMap] = React.useState<Record<string, number>>({});
   const [facePixelMap, setFacePixelMap] = React.useState<Record<string, string[] | null>>({});
+  const [botElementMap, setBotElementMap] = React.useState<Record<string, any[] | null>>({});
 
   React.useEffect(() => {
     loadStars();
@@ -1262,15 +1086,18 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
     try {
       const ids = students.map(s => s.id);
       if (ids.length === 0) return;
-      const { data } = await sb.from('students').select('id, robot_color_index, face_pixels').in('id', ids);
+      const { data } = await sb.from('students').select('id, robot_color_index, face_pixels, bot_elements').in('id', ids);
       const colorM: Record<string, number> = {};
       const faceM: Record<string, string[] | null> = {};
+      const botM: Record<string, any[] | null> = {};
       (data || []).forEach((r: any) => {
         colorM[r.id] = r.robot_color_index || 0;
         faceM[r.id] = r.face_pixels ? JSON.parse(r.face_pixels) : null;
+        botM[r.id]  = r.bot_elements ? JSON.parse(r.bot_elements) : null;
       });
       setColorMap(colorM);
       setFacePixelMap(faceM);
+      setBotElementMap(botM);
     } catch {}
   };
 
@@ -1346,7 +1173,7 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
 
                 {/* Bot avatar */}
                 <div>
-                  <MiniBotAvatar colorIndex={colorIdx} size={80} facePixels={facePixelMap[student.id]} />
+                  <MiniBotAvatar colorIndex={colorIdx} size={80} facePixels={facePixelMap[student.id]} botElements={botElementMap[student.id]} />
                 </div>
 
                 {/* Name */}
