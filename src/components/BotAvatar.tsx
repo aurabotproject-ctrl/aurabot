@@ -424,20 +424,8 @@ export function TeacherBotThumbnail({ colorIndex, botElements, facePixels, starP
         @keyframes sheenBCSweep   { 0% { left:-120%; } 100% { left:150%; } }
         @keyframes sheenGoldSharp  { 0%   { left:-120%; } 100% { left:150%; } }
         @keyframes sheenSilverSharp{ 0%   { left:-120%; } 100% { left:150%; } }
-        @keyframes goldPulse   {
-          0%   { filter: brightness(1)    saturate(1.1)  contrast(1); }
-          25%  { filter: brightness(1.18) saturate(1.5)  contrast(1.05); }
-          50%  { filter: brightness(1.28) saturate(1.7)  contrast(1.08); }
-          75%  { filter: brightness(1.1)  saturate(1.3)  contrast(1.02); }
-          100% { filter: brightness(1)    saturate(1.1)  contrast(1); }
-        }
-        @keyframes silverPulse {
-          0%   { filter: brightness(1)    saturate(0.85) contrast(1)    hue-rotate(0deg); }
-          30%  { filter: brightness(1.2)  saturate(1.1)  contrast(1.05) hue-rotate(10deg); }
-          60%  { filter: brightness(1.35) saturate(1.2)  contrast(1.1)  hue-rotate(5deg); }
-          80%  { filter: brightness(1.15) saturate(0.95) contrast(1.02) hue-rotate(2deg); }
-          100% { filter: brightness(1)    saturate(0.85) contrast(1)    hue-rotate(0deg); }
-        }
+        @keyframes goldPulse    { 0%,100%{filter:brightness(1) saturate(1.1);}   50%{filter:brightness(1.12) saturate(1.3);} }
+        @keyframes silverPulse  { 0%,100%{filter:brightness(1) saturate(0.9);}   50%{filter:brightness(1.12) saturate(1.1);} }
         @keyframes bcPulse      { 0%,100%{filter:brightness(1) saturate(1.6);} 50%{filter:brightness(1.1) saturate(2.2);} }
         @keyframes rainbowPulse { 0%,100%{filter:brightness(1.05) saturate(1.2);} 50%{filter:brightness(1.2) saturate(1.5);} }
         .saved-bot-body        { animation: savedBotBounce 3s ease-in-out infinite; }
