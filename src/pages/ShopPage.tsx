@@ -597,7 +597,7 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
                 const isTop = !cardSwiped[idx] && cardSwiped.slice(0, idx).every(Boolean);
                 return (
                   <div key={idx}
-                    style={{ position: 'absolute', top: unswiped ? idx * 6 : -300, left: idx * 3, width: '100%', zIndex: openedCards.length - idx, transform: `translateY(${isTop ? cardPositions[idx] : 0}px) rotate(${(idx - 1) * 2}deg)`, transition: (isTop && swipeDragIdx.current === idx) ? 'none' : 'top 0.4s, transform 0.3s, opacity 0.3s', opacity: unswiped ? 1 : 0, cursor: isTop ? 'grab' : 'default', userSelect: 'none', filter: `drop-shadow(0 0 ${isTop ? 20 : 6}px ${rarityGlow[card.rarity]})`, animation: `cardFlyUp 0.5s ${idx * 0.1}s both` }}
+                    style={{ position: 'absolute', top: unswiped ? idx * 6 : 700, left: idx * 3, width: '100%', zIndex: openedCards.length - idx, transform: `translateY(${isTop ? cardPositions[idx] : 0}px) rotate(${(idx - 1) * 2}deg)`, transition: (isTop && swipeDragIdx.current === idx) ? 'none' : 'top 0.5s cubic-bezier(0.4,0,1,1), transform 0.3s, opacity 0.4s', opacity: unswiped ? 1 : 0, cursor: isTop ? 'grab' : 'default', userSelect: 'none', filter: `drop-shadow(0 0 ${isTop ? 20 : 6}px ${rarityGlow[card.rarity]})`, animation: `cardFlyUp 0.5s ${idx * 0.1}s both` }}
                     onMouseDown={e => isTop && onCardSwipeStart(idx, e.clientY)}
                     onTouchStart={e => isTop && onCardSwipeStart(idx, e.touches[0].clientY)}
                   >
