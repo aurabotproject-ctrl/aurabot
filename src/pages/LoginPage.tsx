@@ -5,7 +5,6 @@ type Role = 'Admin' | 'Teacher' | 'Student';
 
 function LoginPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const cursorRef = useRef<HTMLDivElement>(null);
   const animRef = useRef<number>(0);
 
   const [overlayActive, setOverlayActive] = useState(false);
@@ -31,21 +30,6 @@ function LoginPage() {
 
   useEffect(() => { stateRef.current.currentRole = currentRole; }, [currentRole]);
   useEffect(() => { stateRef.current.studentPin = studentPin; }, [studentPin]);
-
-  // Inject cursor:none — target html & body directly to beat specificity issues
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.id = 'cc-hide-cursor';
-    style.textContent = `html, body, * { cursor: none !important; }`;
-    document.head.appendChild(style);
-    document.documentElement.style.setProperty('cursor', 'none', 'important');
-    document.body.style.setProperty('cursor', 'none', 'important');
-    return () => {
-      document.getElementById('cc-hide-cursor')?.remove();
-      document.documentElement.style.removeProperty('cursor');
-      document.body.style.removeProperty('cursor');
-    };
-  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -207,11 +191,6 @@ function LoginPage() {
     animRef.current = requestAnimationFrame(render);
 
     const handleMouseMove = (e: MouseEvent) => {
-      const cur = cursorRef.current;
-      if (cur) {
-        cur.style.transform = `translate(${e.clientX - 4}px, ${e.clientY - 4}px)`;
-        cur.style.opacity = "1";
-      }
       if (s.isZoomed) return;
       s.targetMouseX = (e.clientX - window.innerWidth / 2) / (window.innerWidth / 2);
       s.targetMouseY = (e.clientY - window.innerHeight / 2) / (window.innerHeight / 2);
@@ -311,65 +290,11 @@ function LoginPage() {
   return (
     <>
       <style>{`
-        @keyframes cc-pulse {
-          0%   { transform: scale(1);    filter: drop-shadow(0 0 6px rgba(168,230,255,0.7)); }
-          50%  { transform: scale(1.12); filter: drop-shadow(0 0 14px rgba(168,230,255,1)); }
-          100% { transform: scale(1);    filter: drop-shadow(0 0 6px rgba(168,230,255,0.7)); }
-        }
-        @keyframes cc-fill-pulse {
-          0%   { fill: #a8e6ff; }
-          100% { fill: #3a86ff; }
-        }
-        .cc-cursor-svg { animation: cc-pulse 1.8s ease-in-out infinite; }
-        .cc-cursor-fill { animation: cc-fill-pulse 1.5s ease-in-out infinite alternate; }
         .cc-key-btn:hover  { background: rgba(168,230,255,0.12) !important; }
         .cc-key-btn:active { background: #a8e6ff !important; color: #0d1117 !important; }
         .cc-input:focus { border-color: #a8e6ff !important; }
         .cc-login-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
       `}</style>
-
-      {/* ── Cute puffy custom cursor ── */}
-      {/* 1.5× the original 72px = 108px. Arrow shape with very rounded joins for a puffy feel. */}
-      <div
-        ref={cursorRef}
-        style={{
-          position: 'fixed',
-          width: 108,
-          height: 108,
-          pointerEvents: 'none',
-          zIndex: 99999,
-          left: 0,
-          top: 0,
-          opacity: 0,            /* hidden until first mouse move */
-          transform: 'translate(-200px, -200px)',
-          willChange: 'transform, opacity',
-        }}
-      >
-        <svg
-          className="cc-cursor-svg"
-          width="108"
-          height="108"
-          viewBox="0 0 36 36"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          {/* Soft white backing blob for puffiness */}
-          <ellipse cx="13" cy="16" rx="10" ry="11" fill="rgba(255,255,255,0.18)" />
-          {/* Main arrow — chunky rounded path */}
-          <path
-            className="cc-cursor-fill"
-            d="M5 3 L5 26 L10.5 20.5 L14.5 29 L17.5 27.5 L13.5 19 L21 19 Z"
-            strokeLinejoin="round"
-            strokeLinecap="round"
-            stroke="rgba(10,20,40,0.55)"
-            strokeWidth="1.8"
-          />
-          {/* Inner highlight shine */}
-          <path
-            d="M7 6 L7 18 L10 15 L12.5 21 L13.8 20.4 L11.3 14.2 L16 14.2 Z"
-            fill="rgba(255,255,255,0.28)"
-          />
-        </svg>
-      </div>
 
       {/* Background */}
       <div style={{
