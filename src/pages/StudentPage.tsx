@@ -31,8 +31,8 @@ const RARITY_ICONS: Record<string, string> = {
   common: '☆', silver: '✦', 'gold-rare': '★', prismatic: '✦✦',
 };
 
-   Robot avatar
-───────────────────────────────────────────── */
+/* Robot avatar */
+
 
 function RobotAvatar({ level, xp, xpMax, color, facePixels, faceColorPalettes }: { level: number; xp: number; xpMax: number; color: ColorTheme; facePixels: string[] | null; faceColorPalettes?: typeof FACE_COLOR_PALETTES }) {
   const { light, mid, dark, glow, label } = color;
