@@ -811,6 +811,7 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
   const [scoreboard, setScoreboard] = useState<{ student_id: string; name: string; wins: number }[]>([]);
   const [botRenderKey, setBotRenderKey] = useState(0);
   const [lockSaved, setLockSaved] = useState(false);
+  const [myStarPoints, setMyStarPoints] = useState(0);
   const faceKey = `classcard_face_${session.user.id}`;
   const [facePixels, setFacePixelsRaw] = useState<string[] | null>(() => {
     try { const v = localStorage.getItem(faceKey); return v ? JSON.parse(v) : null; }
@@ -867,13 +868,15 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
   useEffect(() => {
     const loadUnlocksAndRobot = async () => {
       if (!studentId) return;
-      const [unlockRes, robotSettings] = await Promise.all([
+      const [unlockRes, robotSettings, starRes] = await Promise.all([
         sb.from('student_unlocks').select('unlock_key').eq('student_id', studentId),
         loadStudentRobotSettings(studentId).catch(() => null),
+        sb.from('student_star_points').select('points').eq('student_id', studentId).maybeSingle(),
       ]);
       const choices: string[] = ((unlockRes.data || []) as any[]).map((r: any) => r.unlock_key).filter(Boolean);
       setUnlockedChoices(choices);
       setUnlocksLoaded(true);
+      if (starRes.data) setMyStarPoints(starRes.data.points ?? 0);
       // Now set the knob — we know the real theme count so no stale-clamp issue
       if (robotSettings) {
         setKnobRaw(robotSettings.colorIndex);
@@ -1057,7 +1060,7 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
                 </p>
                 <div style={{ marginTop: 16 }}>
                   {localStorage.getItem(savedBotKey)
-                    ? <StudentBotAvatar key={botRenderKey} facePixels={facePixels} faceColorPalettes={faceColorPalettes} robotColor={robotColor} storageKey={savedBotKey} />
+                    ? <StudentBotAvatar key={botRenderKey} facePixels={facePixels} faceColorPalettes={faceColorPalettes} robotColor={robotColor} storageKey={savedBotKey} starPoints={myStarPoints} />
                     : <RobotAvatar level={level} xp={xp} xpMax={500} color={robotColor} facePixels={facePixels} faceColorPalettes={faceColorPalettes} />
                   }
                 </div>

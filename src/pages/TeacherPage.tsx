@@ -1049,8 +1049,8 @@ function ModalForm({ fields, onSubmit, submitLabel, error, onCancel }: {
 import { TeacherBotThumbnail } from '../components/BotAvatar';
 
 // Alias for backwards compatibility within this file
-const MiniBotAvatar = ({ colorIndex, size = 90, facePixels, botElements }: { colorIndex: number; size?: number; facePixels?: string[] | null; botElements?: any[] | null }) =>
-  <TeacherBotThumbnail colorIndex={colorIndex} botElements={botElements ?? null} facePixels={facePixels ?? null} size={size} />;
+const MiniBotAvatar = ({ colorIndex, size = 90, facePixels, botElements, starPoints }: { colorIndex: number; size?: number; facePixels?: string[] | null; botElements?: any[] | null; starPoints?: number }) =>
+  <TeacherBotThumbnail colorIndex={colorIndex} botElements={botElements ?? null} facePixels={facePixels ?? null} starPoints={starPoints} size={size} />;
 
 
 function StarsTab({ students, session }: { students: Student[]; session: NonNullable<import('../lib/auth').Session> }) {
@@ -1174,7 +1174,7 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
                 </div>
 
                 {/* Bot */}
-                <MiniBotAvatar colorIndex={colorIdx} size={90} facePixels={facePixelMap[student.id]} botElements={botElementMap[student.id]} />
+                <MiniBotAvatar colorIndex={colorIdx} size={90} facePixels={facePixelMap[student.id]} botElements={botElementMap[student.id]} starPoints={pts} />
 
                 {/* Name */}
                 <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#3040a0', textAlign: 'center', lineHeight: 1.2 }}>{student.name}</div>
