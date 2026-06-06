@@ -301,10 +301,7 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
   const [topY, setTopY] = useState(0);    // top piece flies up
   const [botY, setBotY] = useState(0);    // bottom piece falls down
   // Card swipe state
-  const [cardPositions, setCardPositions] = useState([0, 0, 0]);
   const [cardSwiped, setCardSwiped] = useState([false, false, false]);
-  const swipeDragIdx = React.useRef(-1);
-  const swipeStartY = React.useRef(0);
 
   const rarityGlow: Record<string, string> = {
     common: 'rgba(156,163,175,0.5)', silver: 'rgba(148,163,184,0.7)',
@@ -378,26 +375,11 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
   };
 
   // Card swipe handlers
-  const onCardSwipeStart = (idx: number, y: number) => {
-    if (cardSwiped[idx]) return;
-    swipeDragIdx.current = idx;
-    swipeStartY.current = y;
-  };
-  const onCardSwipeMove = (y: number) => {
-    const idx = swipeDragIdx.current;
-    if (idx < 0 || cardSwiped[idx]) return;
-    const dy = Math.max(0, y - swipeStartY.current);
-    setCardPositions(prev => prev.map((p, i) => i === idx ? dy : p));
-    if (dy > 140) {
-      setCardSwiped(prev => prev.map((s, i) => i === idx ? true : s));
-      setSlottedCards(prev => { const n = [...prev]; n[idx] = openedCards[idx]; return n; });
-      swipeDragIdx.current = -1;
-    }
-  };
-  const onCardSwipeEnd = () => {
-    const idx = swipeDragIdx.current;
-    if (idx >= 0 && !cardSwiped[idx]) setCardPositions(prev => prev.map((p, i) => i === idx ? 0 : p));
-    swipeDragIdx.current = -1;
+  const onCardClick = (idx: number) => {
+    const isTop = !cardSwiped[idx] && cardSwiped.slice(0, idx).every(Boolean);
+    if (!isTop) return;
+    setCardSwiped(prev => prev.map((s, i) => i === idx ? true : s));
+    setSlottedCards(prev => { const n = [...prev]; n[idx] = openedCards[idx]; return n; });
   };
 
   const allSwiped = cardSwiped.every(Boolean);
@@ -439,10 +421,6 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(5,5,20,0.97)', zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
-      onMouseMove={e => { if (phase === 'reveal') onCardSwipeMove(e.clientY); }}
-      onMouseUp={() => onCardSwipeEnd()}
-      onTouchMove={e => { if (phase === 'reveal') onCardSwipeMove(e.touches[0].clientY); }}
-      onTouchEnd={() => onCardSwipeEnd()}
     >
       <style>{`
         @keyframes packZoomIn { from{transform:scale(0.6);opacity:0} to{transform:scale(1);opacity:1} }
@@ -580,13 +558,11 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
       {/* REVEAL — cards stacked, swipe each down to slot */}
       {phase === 'reveal' && (
         <div style={{ width: '100%', maxWidth: 600, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}
-          onMouseMove={e => onCardSwipeMove(e.clientY)}
-          onTouchMove={e => onCardSwipeMove(e.touches[0].clientY)}
         >
           {/* Add Cards button — sits at top, activates when all swiped */}
           <button onClick={allSwiped ? handleAddToCollection : undefined} disabled={saving}
             style={{ width: '100%', maxWidth: 400, padding: '14px', borderRadius: 14, border: 'none', background: allSwiped ? 'linear-gradient(135deg,#7c3aed,#5b21b6)' : 'rgba(80,60,120,0.3)', color: allSwiped ? 'white' : 'rgba(255,255,255,0.25)', fontWeight: 900, fontSize: '1rem', cursor: allSwiped ? 'pointer' : 'default', animation: allSwiped ? 'glowPulse 2s infinite' : 'none', transition: 'all 0.4s', borderWidth: 1, borderStyle: 'solid', borderColor: allSwiped ? 'transparent' : 'rgba(255,255,255,0.08)' }}>
-            {saving ? 'Saving…' : allSwiped ? '✦ Add Cards to Collection ✦' : '👇 Swipe all cards down first'}
+            {saving ? 'Saving…' : allSwiped ? '✦ Add Cards to Collection ✦' : '👆 Tap each card to collect it'}
           </button>
 
           {/* Stacked cards + slots side by side */}
@@ -598,14 +574,13 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
                 const isTop = !cardSwiped[idx] && cardSwiped.slice(0, idx).every(Boolean);
                 return (
                   <div key={idx}
-                    style={{ position: 'absolute', top: idx * 6, left: idx * 3, width: '100%', zIndex: openedCards.length - idx, transform: `translateY(${cardSwiped[idx] ? 600 : isTop ? cardPositions[idx] : 0}px) rotate(${cardSwiped[idx] ? 0 : (idx - 1) * 2}deg)`, transition: (isTop && swipeDragIdx.current === idx) ? 'none' : 'transform 0.45s cubic-bezier(0.4,0,1,1), opacity 0.4s', opacity: cardSwiped[idx] ? 0 : 1, cursor: isTop ? 'grab' : 'default', userSelect: 'none', filter: `drop-shadow(0 0 ${isTop ? 20 : 6}px ${rarityGlow[card.rarity]})`, animation: `cardFlyUp 0.5s ${idx * 0.1}s both` }}
-                    onMouseDown={e => isTop && onCardSwipeStart(idx, e.clientY)}
-                    onTouchStart={e => isTop && onCardSwipeStart(idx, e.touches[0].clientY)}
+                    style={{ position: 'absolute', top: idx * 6, left: idx * 3, width: '100%', zIndex: openedCards.length - idx, transform: `translateY(${cardSwiped[idx] ? 600 : 0}px) rotate(${cardSwiped[idx] ? 0 : (idx - 1) * 2}deg)`, transition: 'transform 0.45s cubic-bezier(0.4,0,1,1), opacity 0.4s', opacity: cardSwiped[idx] ? 0 : 1, cursor: isTop ? 'pointer' : 'default', filter: `drop-shadow(0 0 ${isTop ? 20 : 6}px ${rarityGlow[card.rarity]})`, animation: `cardFlyUp 0.5s ${idx * 0.1}s both` }}
+                    onClick={() => onCardClick(idx)}
                   >
                     <div style={{ transform: 'scale(0.72)', transformOrigin: 'top left', width: 250 }}>
                       <PokeCard card={{ id: card.id, student_id: '', teacher_id: '', card_name: card.card_name, hp: card.hp, type: card.type, rarity: card.rarity, description: card.description, stat1_name: card.stat1_name, stat1_val: card.stat1_val, stat2_name: card.stat2_name, stat2_val: card.stat2_val, stat3_name: card.stat3_name, stat3_val: card.stat3_val, move1_name: card.move1_name, move1_dmg: card.move1_dmg, move2_name: card.move2_name, move2_dmg: card.move2_dmg, image_url: card.image_url, created_at: '' }} />
                     </div>
-                    {isTop && !cardSwiped[idx] && <div style={{ position: 'absolute', bottom: -24, left: 0, right: 0, textAlign: 'center', fontSize: '1.2rem', animation: 'shimmer 1s infinite', color: 'white' }}>↓</div>}
+                    {isTop && <div style={{ position: 'absolute', bottom: -26, left: 0, right: 0, textAlign: 'center', fontSize: '0.65rem', fontWeight: 700, animation: 'shimmer 1s infinite', color: 'rgba(255,255,255,0.7)', letterSpacing: '0.05em' }}>👆 TAP</div>}
                   </div>
                 );
               })}
