@@ -101,16 +101,23 @@ function RobotAvatar({ level, xp, xpMax, color, facePixels, faceColorPalettes }:
   const Sheen = ({ rounded = 8 }: { rounded?: number }) => {
     if (!isSpecial) return null;
     const sheenClass = isRainbow ? 'sheen-chrome' : isBlackChrome ? 'sheen-black-chrome' : isGold ? 'sheen-gold' : 'sheen-silver';
-    const sheenColor = isRainbow
+    const isMetallic = isGold || isSilver;
+    const wideSheenBg = isRainbow
       ? 'linear-gradient(105deg,transparent 30%,rgba(255,255,255,0.6) 50%,transparent 70%)'
       : isBlackChrome
         ? 'linear-gradient(105deg,transparent 25%,rgba(180,140,255,0.5) 45%,rgba(255,255,255,0.35) 50%,rgba(140,100,255,0.4) 55%,transparent 75%)'
         : isGold
-          ? 'linear-gradient(105deg,transparent 30%,rgba(255,250,200,0.7) 50%,transparent 70%)'
-          : 'linear-gradient(105deg,transparent 30%,rgba(255,255,255,0.65) 50%,transparent 70%)';
+          ? 'linear-gradient(105deg,transparent,rgba(255,255,220,0.18) 30%,rgba(255,255,255,0.55) 50%,rgba(255,240,160,0.18) 70%,transparent)'
+          : 'linear-gradient(105deg,transparent,rgba(220,230,255,0.18) 30%,rgba(255,255,255,0.6) 50%,rgba(200,220,255,0.18) 70%,transparent)';
+    const sharpBg = isGold
+      ? 'linear-gradient(105deg,transparent,rgba(255,255,200,0.7) 45%,rgba(255,255,255,0.9) 50%,rgba(255,255,200,0.7) 55%,transparent)'
+      : 'linear-gradient(105deg,transparent,rgba(200,220,255,0.6) 45%,rgba(255,255,255,0.95) 50%,rgba(200,220,255,0.6) 55%,transparent)';
     return (
       <div style={{ position: 'absolute', inset: 0, borderRadius: rounded, overflow: 'hidden', pointerEvents: 'none', zIndex: 3 }}>
-        <div className={sheenClass} style={{ position: 'absolute', top: '-50%', left: '-75%', width: '60%', height: '200%', background: sheenColor, transform: 'skewX(-15deg)' }} />
+        <div className={sheenClass} style={{ position: 'absolute', top: '-50%', left: '-120%', width: isMetallic ? '80%' : '60%', height: '200%', background: wideSheenBg, transform: 'skewX(-18deg)' }} />
+        {isMetallic && (
+          <div className={`${sheenClass}-sharp`} style={{ position: 'absolute', top: '-50%', left: '-120%', width: '20%', height: '200%', background: sharpBg, transform: 'skewX(-18deg)' }} />
+        )}
       </div>
     );
   };
@@ -126,23 +133,37 @@ function RobotAvatar({ level, xp, xpMax, color, facePixels, faceColorPalettes }:
           0%,90%,100% { transform: scaleY(1); }
           95%          { transform: scaleY(0.08); }
         }
-        @keyframes sheenSweep     { 0% { left:-75%; } 100% { left:130%; } }
-        @keyframes sheenSweepSlow { 0% { left:-75%; } 100% { left:130%; } }
-        @keyframes sheenBCSweep   { 0% { left:-75%; } 100% { left:130%; } }
-        @keyframes goldPulse      { 0%,100% { filter:brightness(1) saturate(1); } 50% { filter:brightness(1.15) saturate(1.3); } }
-        @keyframes silverPulse    { 0%,100% { filter:brightness(1) saturate(0.9); } 50% { filter:brightness(1.2) saturate(1.1); } }
+        @keyframes sheenSweep     { 0% { left:-120%; } 100% { left:150%; } }
+        @keyframes sheenSweepSlow { 0% { left:-120%; } 100% { left:150%; } }
+        @keyframes sheenBCSweep   { 0% { left:-120%; } 100% { left:150%; } }
+        @keyframes goldPulse {
+          0%   { filter: brightness(1)    saturate(1.1)  contrast(1); }
+          25%  { filter: brightness(1.18) saturate(1.5)  contrast(1.05); }
+          50%  { filter: brightness(1.28) saturate(1.7)  contrast(1.08); }
+          75%  { filter: brightness(1.1)  saturate(1.3)  contrast(1.02); }
+          100% { filter: brightness(1)    saturate(1.1)  contrast(1); }
+        }
+        @keyframes silverPulse {
+          0%   { filter: brightness(1)    saturate(0.85) contrast(1)    hue-rotate(0deg); }
+          30%  { filter: brightness(1.2)  saturate(1.1)  contrast(1.05) hue-rotate(10deg); }
+          60%  { filter: brightness(1.35) saturate(1.2)  contrast(1.1)  hue-rotate(5deg); }
+          80%  { filter: brightness(1.15) saturate(0.95) contrast(1.02) hue-rotate(2deg); }
+          100% { filter: brightness(1)    saturate(0.85) contrast(1)    hue-rotate(0deg); }
+        }
         @keyframes bcPulse        { 0%,100% { filter:brightness(1) saturate(1.6); } 50% { filter:brightness(1.1) saturate(2.2); } }
         @keyframes rainbowPulse   { 0%,100% { filter:brightness(1.05) saturate(1.2); } 50% { filter:brightness(1.2) saturate(1.5); } }
-        .robot-body         { animation: robotBounce 3s ease-in-out infinite; }
-        .robot-eye          { animation: eyeBlink 4s ease-in-out infinite; }
-        .sheen-gold         { animation: sheenSweep 2.4s ease-in-out infinite; }
-        .sheen-silver       { animation: sheenSweepSlow 3s ease-in-out infinite; }
-        .sheen-chrome       { animation: sheenSweep 1.6s ease-in-out infinite; }
-        .sheen-black-chrome { animation: sheenBCSweep 2s ease-in-out infinite; }
-        .bot-gold           { animation: robotBounce 3s ease-in-out infinite, goldPulse 2.4s ease-in-out infinite; }
-        .bot-silver         { animation: robotBounce 3s ease-in-out infinite, silverPulse 3s ease-in-out infinite; }
-        .bot-rainbow        { animation: robotBounce 3s ease-in-out infinite, rainbowPulse 3s ease-in-out infinite; }
-        .bot-black-chrome   { animation: robotBounce 3s ease-in-out infinite, bcPulse 5s ease-in-out infinite; }
+        .robot-body            { animation: robotBounce 3s ease-in-out infinite; }
+        .robot-eye             { animation: eyeBlink 4s ease-in-out infinite; }
+        .sheen-gold            { animation: sheenSweep 2.2s ease-in-out infinite; }
+        .sheen-gold-sharp      { animation: sheenSweep 2.2s ease-in-out infinite; animation-delay: 0.15s; }
+        .sheen-silver          { animation: sheenSweepSlow 2.8s ease-in-out infinite; }
+        .sheen-silver-sharp    { animation: sheenSweepSlow 2.8s ease-in-out infinite; animation-delay: 0.2s; }
+        .sheen-chrome          { animation: sheenSweep 1.6s ease-in-out infinite; }
+        .sheen-black-chrome    { animation: sheenBCSweep 2s ease-in-out infinite; }
+        .bot-gold              { animation: robotBounce 3s ease-in-out infinite, goldPulse 2.2s ease-in-out infinite; }
+        .bot-silver            { animation: robotBounce 3s ease-in-out infinite, silverPulse 2.8s ease-in-out infinite; }
+        .bot-rainbow           { animation: robotBounce 3s ease-in-out infinite, rainbowPulse 3s ease-in-out infinite; }
+        .bot-black-chrome      { animation: robotBounce 3s ease-in-out infinite, bcPulse 5s ease-in-out infinite; }
       `}</style>
 
       <div className={`robot-body${bodyAnimClass}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
