@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { sb } from '../lib/supabase';
 import type { Session } from '../lib/auth';
 
