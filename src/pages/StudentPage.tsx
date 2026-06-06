@@ -293,21 +293,21 @@ function renderBotEl(el: BotEl & { _bodyBg?: string }, special?: BotElSpecial): 
   );
 }
 
-function SavedBotAvatar({ facePixels, faceColorPalettes, robotColor, storageKey }: { facePixels: string[] | null; faceColorPalettes: typeof FACE_COLOR_PALETTES; robotColor: ColorTheme; storageKey: string }) {
+function SavedBotAvatar({ facePixels, faceColorPalettes, robotColor }: { facePixels: string[] | null; faceColorPalettes: typeof FACE_COLOR_PALETTES; robotColor: ColorTheme }) {
   const [botElements, setBotElements] = useState<BotEl[] | null>(null);
 
   useEffect(() => {
-    const raw = localStorage.getItem(storageKey);
+    const raw = localStorage.getItem('savedBot');
     if (raw) { try { setBotElements(JSON.parse(raw)); } catch { setBotElements(null); } }
     const onStorage = (e: StorageEvent) => {
-      if (e.key === storageKey) {
+      if (e.key === 'savedBot') {
         if (e.newValue) { try { setBotElements(JSON.parse(e.newValue)); } catch { setBotElements(null); } }
         else setBotElements(null);
       }
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
-  }, [storageKey]);
+  }, []);
 
   if (!botElements) return null;
 
@@ -697,7 +697,7 @@ function PixelEditor({ faceColorPalettes, onSend, onReset }: {
 /* ─────────────────────────────────────────────
    Signal Panel (center hero)
 ───────────────────────────────────────────── */
-function SignalPanel({ knob, onKnobChange, colorThemes, onLockColor, lockSaved }: { knob: number; onKnobChange: (v: number) => void; colorThemes: ColorTheme[]; onLockColor: () => void; lockSaved: boolean }) {
+function SignalPanel({ knob, onKnobChange, colorThemes }: { knob: number; onKnobChange: (v: number) => void; colorThemes: ColorTheme[] }) {
   const theme = colorThemes[knob % colorThemes.length];
   // 4 positions evenly spaced around the dial: -135°, -45°, 45°, 135°
   const knobAngle = -135 + (knob % colorThemes.length) * (270 / Math.max(1, colorThemes.length - 1));
@@ -735,26 +735,6 @@ function SignalPanel({ knob, onKnobChange, colorThemes, onLockColor, lockSaved }
             <div style={{ position: 'absolute', bottom: -18, left: '50%', transform: 'translateX(-50%)', fontSize: '0.5rem', color: '#b0b8d0', whiteSpace: 'nowrap' }}>{colorThemes.length} colors</div>
           </div>
           <div style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.12em', color: theme.dark, textTransform: 'uppercase', transition: 'color 0.3s' }}>{theme.label}</div>
-          <button
-            onClick={onLockColor}
-            title="Save this colour to your bot"
-            style={{
-              marginTop: 4,
-              padding: '4px 12px',
-              borderRadius: 20,
-              border: lockSaved ? `1.5px solid ${theme.wave}` : '1.5px solid rgba(160,140,220,0.3)',
-              background: lockSaved ? `${theme.wave}22` : 'rgba(255,255,255,0.6)',
-              color: lockSaved ? theme.dark : '#8090b0',
-              fontSize: '0.6rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              letterSpacing: '0.08em',
-              transition: 'all 0.3s',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {lockSaved ? '✓ Saved' : '🔒 Lock colour'}
-          </button>
         </div>
       </div>
     </div>
@@ -1191,8 +1171,7 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
   const [showProject, setShowProject] = useState(false);
   const [medals, setMedals] = useState({ gold: 0, silver: 0, bronze: 0 });
   const [scoreboard, setScoreboard] = useState<{ student_id: string; name: string; wins: number }[]>([]);
-  const [botRenderKey, setBotRenderKey] = useState(0);
-  const [lockSaved, setLockSaved] = useState(false);
+  const [savedBotKey, setSavedBotKey] = useState(0);
   const faceKey = `classcard_face_${session.user.id}`;
   const [facePixels, setFacePixelsRaw] = useState<string[] | null>(() => {
     try { const v = localStorage.getItem(faceKey); return v ? JSON.parse(v) : null; }
@@ -1213,7 +1192,6 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
   // Color index — stored in Supabase via student metadata
   const storageKey = `classcard_robot_knob_${session.user.id}`;
-  const savedBotKey = `savedBot_${session.user.id}`;
   const [knob, setKnobRaw] = useState<number>(() => {
     try { const v = localStorage.getItem(storageKey); return v !== null ? Math.max(0, parseInt(v, 10) || 0) : 0; }
     catch { return 0; }
@@ -1221,21 +1199,8 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
   const setKnob = (v: number) => {
     setKnobRaw(v);
-    setLockSaved(false); // colour changed, needs re-locking
     try { localStorage.setItem(storageKey, String(v)); } catch { /* ignore */ }
   };
-
-  const handleLockColor = useCallback(async () => {
-    if (!studentId) return;
-    try {
-      const botRaw = localStorage.getItem(savedBotKey);
-      const botElements = botRaw ? JSON.parse(botRaw) : null;
-      await saveStudentRobotSettings(studentId, knob, facePixels, botElements);
-      setLockSaved(true);
-    } catch (e) {
-      console.error('Failed to lock colour:', e);
-    }
-  }, [studentId, knob, facePixels, savedBotKey]);
 
   // Derived unlock counts
   const unlockedColorCount = 4 + countUnlockedColors(unlockedChoices);
@@ -1260,10 +1225,6 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
       if (robotSettings) {
         setKnobRaw(robotSettings.colorIndex);
         if (robotSettings.facePixels) setFacePixelsRaw(robotSettings.facePixels);
-        // Seed per-user localStorage with bot elements from DB (only if not already set locally)
-        if (robotSettings.botElements && !localStorage.getItem(savedBotKey)) {
-          localStorage.setItem(savedBotKey, JSON.stringify(robotSettings.botElements));
-        }
       }
     };
     if (studentId) loadUnlocksAndRobot();
@@ -1346,9 +1307,7 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
     async function saveRobotSettings() {
       if (!studentId) return;
       try {
-        const botRaw = localStorage.getItem(savedBotKey);
-        const botElements = botRaw ? JSON.parse(botRaw) : null;
-        await saveStudentRobotSettings(studentId, knob, facePixels, botElements);
+        await saveStudentRobotSettings(studentId, knob, facePixels);
       } catch (error) {
         console.error('Failed to save robot settings:', error);
       }
@@ -1356,20 +1315,21 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
     // Debounce saves - only save after user stops changing for 1 second
     const timeoutId = setTimeout(saveRobotSettings, 1000);
     return () => clearTimeout(timeoutId);
-  }, [studentId, knob, facePixels, savedBotKey]);
+  }, [studentId, knob, facePixels]);
 
+  // Handle sign out - save robot settings before logging out
   const handleSignOut = useCallback(async () => {
     if (studentId) {
       try {
-        const botRaw = localStorage.getItem(savedBotKey);
-        const botElements = botRaw ? JSON.parse(botRaw) : null;
-        await saveStudentRobotSettings(studentId, knob, facePixels, botElements);
+        // Save robot settings one final time before logout
+        await saveStudentRobotSettings(studentId, knob, facePixels);
       } catch (error) {
         console.error('Failed to save robot settings on logout:', error);
       }
     }
+    // Call the original onSignOut
     onSignOut();
-  }, [studentId, knob, facePixels, savedBotKey, onSignOut]);
+  }, [studentId, knob, facePixels, onSignOut]);
 
   // Robot level is now based on card count
   const level = Math.max(1, Math.floor(cards.length / 5) + 1);
@@ -1438,15 +1398,15 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
                   You've collected {cards.length} card{cards.length !== 1 ? 's' : ''}
                 </p>
                 <div style={{ marginTop: 16 }}>
-                  {localStorage.getItem(savedBotKey)
-                    ? <SavedBotAvatar key={botRenderKey} facePixels={facePixels} faceColorPalettes={faceColorPalettes} robotColor={robotColor} storageKey={savedBotKey} />
+                  {localStorage.getItem('savedBot')
+                    ? <SavedBotAvatar key={savedBotKey} facePixels={facePixels} faceColorPalettes={faceColorPalettes} robotColor={robotColor} />
                     : <RobotAvatar level={level} xp={xp} xpMax={500} color={robotColor} facePixels={facePixels} faceColorPalettes={faceColorPalettes} />
                   }
                 </div>
                 {/* Reset to default bot — only shown when a saved bot exists */}
-                {localStorage.getItem(savedBotKey) && (
+                {localStorage.getItem('savedBot') && (
                   <button
-                    onClick={() => { localStorage.removeItem(savedBotKey); setBotRenderKey(k => k + 1); }}
+                    onClick={() => { localStorage.removeItem('savedBot'); setSavedBotKey(k => k + 1); }}
                     style={{ width: '100%', marginTop: 8, padding: '7px 10px', background: 'rgba(239,68,68,0.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, cursor: 'pointer', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em' }}
                   >
                     ↺ Reset to Default Bot
@@ -1510,7 +1470,7 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
             {/* Signal panel + Pixel editor stacked */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <SignalPanel knob={knob} onKnobChange={setKnob} colorThemes={colorThemes} onLockColor={handleLockColor} lockSaved={lockSaved} />
+              <SignalPanel knob={knob} onKnobChange={setKnob} colorThemes={colorThemes} />
               <PixelEditor
                 faceColorPalettes={faceColorPalettes}
                 onSend={setFacePixels}
