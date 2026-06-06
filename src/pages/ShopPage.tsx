@@ -583,9 +583,11 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
           onMouseMove={e => onCardSwipeMove(e.clientY)}
           onTouchMove={e => onCardSwipeMove(e.touches[0].clientY)}
         >
-          <div style={{ color: '#8090b0', fontSize: '0.78rem', fontWeight: 700, textAlign: 'center' }}>
-            {allSwiped ? '✦ All cards collected!' : '👇 Swipe each card down to its slot'}
-          </div>
+          {/* Add Cards button — sits at top, activates when all swiped */}
+          <button onClick={allSwiped ? handleAddToCollection : undefined} disabled={saving}
+            style={{ width: '100%', maxWidth: 400, padding: '14px', borderRadius: 14, border: 'none', background: allSwiped ? 'linear-gradient(135deg,#7c3aed,#5b21b6)' : 'rgba(80,60,120,0.3)', color: allSwiped ? 'white' : 'rgba(255,255,255,0.25)', fontWeight: 900, fontSize: '1rem', cursor: allSwiped ? 'pointer' : 'default', animation: allSwiped ? 'glowPulse 2s infinite' : 'none', transition: 'all 0.4s', borderWidth: 1, borderStyle: 'solid', borderColor: allSwiped ? 'transparent' : 'rgba(255,255,255,0.08)' }}>
+            {saving ? 'Saving…' : allSwiped ? '✦ Add Cards to Collection ✦' : '👇 Swipe all cards down first'}
+          </button>
 
           {/* Stacked cards + slots side by side */}
           <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', justifyContent: 'center', flexWrap: 'wrap', width: '100%' }}>
@@ -597,7 +599,7 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
                 const isTop = !cardSwiped[idx] && cardSwiped.slice(0, idx).every(Boolean);
                 return (
                   <div key={idx}
-                    style={{ position: 'absolute', top: unswiped ? idx * 6 : 700, left: idx * 3, width: '100%', zIndex: openedCards.length - idx, transform: `translateY(${isTop ? cardPositions[idx] : 0}px) rotate(${(idx - 1) * 2}deg)`, transition: (isTop && swipeDragIdx.current === idx) ? 'none' : 'top 0.5s cubic-bezier(0.4,0,1,1), transform 0.3s, opacity 0.4s', opacity: unswiped ? 1 : 0, cursor: isTop ? 'grab' : 'default', userSelect: 'none', filter: `drop-shadow(0 0 ${isTop ? 20 : 6}px ${rarityGlow[card.rarity]})`, animation: `cardFlyUp 0.5s ${idx * 0.1}s both` }}
+                    style={{ position: 'absolute', top: idx * 6, left: idx * 3, width: '100%', zIndex: openedCards.length - idx, transform: `translateY(${cardSwiped[idx] ? 600 : isTop ? cardPositions[idx] : 0}px) rotate(${cardSwiped[idx] ? 0 : (idx - 1) * 2}deg)`, transition: (isTop && swipeDragIdx.current === idx) ? 'none' : 'transform 0.45s cubic-bezier(0.4,0,1,1), opacity 0.4s', opacity: cardSwiped[idx] ? 0 : 1, cursor: isTop ? 'grab' : 'default', userSelect: 'none', filter: `drop-shadow(0 0 ${isTop ? 20 : 6}px ${rarityGlow[card.rarity]})`, animation: `cardFlyUp 0.5s ${idx * 0.1}s both` }}
                     onMouseDown={e => isTop && onCardSwipeStart(idx, e.clientY)}
                     onTouchStart={e => isTop && onCardSwipeStart(idx, e.touches[0].clientY)}
                   >
@@ -635,13 +637,6 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
               ))}
             </div>
           </div>
-
-          {allSwiped && (
-            <button onClick={handleAddToCollection} disabled={saving}
-              style={{ width: '100%', maxWidth: 400, padding: '14px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#5b21b6)', color: 'white', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', marginTop: 8, animation: 'glowPulse 2s infinite' }}>
-              {saving ? 'Saving…' : '✦ Add Cards to Collection ✦'}
-            </button>
-          )}
         </div>
       )}
     </div>
