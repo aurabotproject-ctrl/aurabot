@@ -386,7 +386,7 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
       setCardSwiped(prev => prev.map((s, i) => i === idx ? true : s));
       setSlottedCards(prev => { const n = [...prev]; n[idx] = openedCards[idx]; return n; });
       setCardDismissing(prev => prev.map((d, i) => i === idx ? false : d));
-    }, 420);
+    }, 580);
   };
 
   const allSwiped = cardSwiped.every(Boolean);
@@ -427,7 +427,7 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
   const TEAR_LINE = 0.27; // 27% from top is the tear line
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(5,5,20,0.97)', zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(5,5,20,0.97)', zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'clip' }}
     >
       <style>{`
         @keyframes packZoomIn { from{transform:scale(0.6);opacity:0} to{transform:scale(1);opacity:1} }
@@ -581,7 +581,7 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
                 const isTop = !cardSwiped[idx] && cardSwiped.slice(0, idx).every(Boolean);
                 return (
                   <div key={idx}
-                    style={{ position: 'absolute', top: idx * 6, left: idx * 3, width: '100%', zIndex: openedCards.length - idx, transform: `translateY(${(cardSwiped[idx] || cardDismissing[idx]) ? 700 : 0}px) rotate(${(cardSwiped[idx] || cardDismissing[idx]) ? 0 : (idx - 1) * 2}deg)`, transition: (cardSwiped[idx] || cardDismissing[idx]) ? 'transform 0.42s cubic-bezier(0.4,0,1,1), opacity 0.42s' : 'none', opacity: (cardSwiped[idx] || cardDismissing[idx]) ? 0 : 1, cursor: isTop ? 'pointer' : 'default', filter: `drop-shadow(0 0 ${isTop ? 20 : 6}px ${rarityGlow[card.rarity]})`, animation: (cardSwiped[idx] || cardDismissing[idx]) ? 'none' : `cardFlyUp 0.5s ${idx * 0.1}s both` }}
+                    style={{ position: 'absolute', top: idx * 6, left: idx * 3, width: '100%', zIndex: openedCards.length - idx, transform: `translateY(${(cardSwiped[idx] || cardDismissing[idx]) ? 900 : 0}px) rotate(${(cardSwiped[idx] || cardDismissing[idx]) ? 0 : (idx - 1) * 2}deg)`, transition: (cardSwiped[idx] || cardDismissing[idx]) ? 'transform 0.55s cubic-bezier(0.2,0,0.6,1), opacity 0.5s 0.25s' : 'none', opacity: (cardSwiped[idx] || cardDismissing[idx]) ? 0 : 1, cursor: isTop ? 'pointer' : 'default', filter: `drop-shadow(0 0 ${isTop ? 20 : 6}px ${rarityGlow[card.rarity]})`, animation: (cardSwiped[idx] || cardDismissing[idx]) ? 'none' : `cardFlyUp 0.5s ${idx * 0.1}s both` }}
                     onClick={() => onCardClick(idx)}
                   >
                     <div style={{ transform: 'scale(0.72)', transformOrigin: 'top left', width: 250 }}>
