@@ -174,15 +174,12 @@ export function renderBotEl(el: BotEl & { _bodyBg?: string }, special?: BotElSpe
       );
     }
     if (type === 'chest') {
-      const fs = Math.round(w * 0.13);
-      const starCount = pts ?? 0;
+      const fs = Math.round(w * 0.28);
       return (
-        <div style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap: Math.round(h * 0.05) }}>
-          <span style={{ fontSize: Math.round(w * 0.09), lineHeight: 1 }}>⭐</span>
-          <span style={{ fontSize: fs, fontWeight: 800, color: starCount > 0 ? '#fbbf24' : '#8be9fd', letterSpacing: '0.05em', lineHeight: 1 }}>
-            {starCount > 0 ? starCount : '—'}
+        <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <span style={{ fontSize: fs, fontWeight: 900, color: '#8be9fd', textShadow: '0 0 14px #8be9fd, 0 0 6px rgba(139,233,253,0.6)', letterSpacing: '0.04em', lineHeight: 1 }}>
+            {pts ?? 0}
           </span>
-          <span style={{ fontSize: Math.round(w * 0.07), fontWeight: 600, color: '#4a5568', letterSpacing: '0.08em', lineHeight: 1, textTransform: 'uppercase' }}>stars</span>
         </div>
       );
     }
@@ -318,14 +315,11 @@ export function BotCanvas({ botElements, robotColor, facePixels, faceColorPalett
                   backgroundColor: el.color,
                   boxShadow: 'inset 0 0 14px rgba(0,0,0,0.85)',
                   overflow: 'hidden', zIndex: 2,
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  gap: Math.round(el.h * 0.05),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <span style={{ fontSize: Math.round(el.w * 0.09), lineHeight: 1 }}>⭐</span>
-                  <span style={{ fontSize: Math.round(el.w * 0.13), fontWeight: 800, color: pts > 0 ? '#fbbf24' : '#8be9fd', letterSpacing: '0.05em', lineHeight: 1 }}>
-                    {pts > 0 ? pts : '—'}
+                  <span style={{ fontSize: Math.round(el.w * 0.28), fontWeight: 900, color: '#8be9fd', textShadow: '0 0 14px #8be9fd, 0 0 6px rgba(139,233,253,0.6)', letterSpacing: '0.04em', lineHeight: 1 }}>
+                    {pts}
                   </span>
-                  <span style={{ fontSize: Math.round(el.w * 0.07), fontWeight: 600, color: '#4a5568', letterSpacing: '0.08em', lineHeight: 1, textTransform: 'uppercase' }}>stars</span>
                 </div>
               );
             }
