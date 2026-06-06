@@ -2,7 +2,7 @@
  * BotAvatar.tsx — shared robot rendering components
  * Used by both StudentPage (live bot) and TeacherPage (stars grid thumbnails).
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 
 /* ─── Colour themes ──────────────────────────────────────────────────────── */
 
@@ -260,7 +260,7 @@ export function BotCanvas({ botElements, robotColor, facePixels, faceColorPalett
   const botAnimClass = isRainbow ? ' bot-rainbow' : isBlackChrome ? ' bot-black-chrome' : isGold ? ' bot-gold' : isSilver ? ' bot-silver' : '';
   const special: BotElSpecial | undefined = isSpecialBot ? { isRainbow, isBlackChrome, isGold, isSilver, sheenClass, sheenColor } : undefined;
 
-  const renderFaceContent = (el: any) => {
+  const renderFaceContent = (_el: any) => {
     const pixels: string[] | null = facePixels ?? null;
     if (pixels) {
       return (
@@ -374,7 +374,6 @@ const DEFAULT_BOT_ELEMENTS: BotEl[] = [
 export function TeacherBotThumbnail({ colorIndex, botElements, facePixels, size = 100 }: TeacherBotThumbnailProps) {
   const theme = ALL_COLOR_THEMES[Math.min(colorIndex, ALL_COLOR_THEMES.length - 1)];
   const elements = botElements ?? DEFAULT_BOT_ELEMENTS;
-  const scaleFactor = size / CONTAINER_W;
 
   return (
     <div style={{ position: 'relative', width: size, flexShrink: 0 }}>
