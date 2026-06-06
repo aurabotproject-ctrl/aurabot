@@ -164,7 +164,7 @@ export function renderBotEl(el: BotEl & { _bodyBg?: string }, special?: BotElSpe
     );
   };
 
-  const renderScreenContent = (type: string, w: number, h: number, pts?: number) => {
+  const renderScreenContent = (type: string, w: number, _h: number, pts?: number) => {
     if (type === 'face') {
       return (
         <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:'15%' }}>
