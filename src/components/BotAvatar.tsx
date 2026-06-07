@@ -196,10 +196,26 @@ export function renderBotEl(el: BotEl & { _bodyBg?: string }, special?: BotElSpe
       );
     }
     if (type === 'chest') {
-      const fs = Math.round(w * 0.28);
+      const fs = Math.round(w * 0.22);
+      const heartSize = Math.round(w * 0.52);
       return (
-        <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <span style={{ fontSize: fs, fontWeight: 900, color: '#8be9fd', textShadow: '0 0 14px #8be9fd, 0 0 6px rgba(139,233,253,0.6)', letterSpacing: '0.04em', lineHeight: 1 }}>
+        <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
+          {/* Pink glowing heart SVG */}
+          <svg width={heartSize} height={heartSize} viewBox="0 0 100 100" style={{ position:'absolute', filter:'drop-shadow(0 0 10px rgba(255,120,180,0.9)) drop-shadow(0 0 4px rgba(255,180,220,0.8))' }}>
+            <path d="M50 85 C50 85 12 58 12 35 C12 22 22 13 34 13 C41 13 47 17 50 22 C53 17 59 13 66 13 C78 13 88 22 88 35 C88 58 50 85 50 85Z"
+              fill="url(#heartGrad)" />
+            <defs>
+              <radialGradient id="heartGrad" cx="40%" cy="35%" r="60%">
+                <stop offset="0%" stopColor="#ffb3d9" />
+                <stop offset="50%" stopColor="#ff69b4" />
+                <stop offset="100%" stopColor="#e0006a" />
+              </radialGradient>
+            </defs>
+            {/* Highlight shine */}
+            <ellipse cx="38" cy="30" rx="10" ry="7" fill="rgba(255,255,255,0.3)" transform="rotate(-20,38,30)" />
+          </svg>
+          {/* Number on top of heart */}
+          <span style={{ position:'relative', zIndex:1, fontSize: fs, fontWeight: 900, color: 'white', textShadow: '0 1px 4px rgba(180,0,80,0.7)', lineHeight: 1, letterSpacing: '-0.02em' }}>
             {pts ?? 0}
           </span>
         </div>
@@ -328,6 +344,8 @@ export function BotCanvas({ botElements, robotColor, facePixels, faceColorPalett
             }
             if (el.type === 'chest') {
               const pts = starPoints ?? 0;
+              const heartSize = Math.round(el.w * 0.52);
+              const fs = Math.round(el.w * 0.22);
               return (
                 <div key={el.id} style={{
                   position: 'absolute', left: el.cx, top: el.cy,
@@ -339,7 +357,18 @@ export function BotCanvas({ botElements, robotColor, facePixels, faceColorPalett
                   overflow: 'hidden', zIndex: 2,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <span style={{ fontSize: Math.round(el.w * 0.28), fontWeight: 900, color: '#8be9fd', textShadow: '0 0 14px #8be9fd, 0 0 6px rgba(139,233,253,0.6)', letterSpacing: '0.04em', lineHeight: 1 }}>
+                  <svg width={heartSize} height={heartSize} viewBox="0 0 100 100" style={{ position:'absolute', filter:'drop-shadow(0 0 10px rgba(255,120,180,0.9)) drop-shadow(0 0 4px rgba(255,180,220,0.8))' }}>
+                    <path d="M50 85 C50 85 12 58 12 35 C12 22 22 13 34 13 C41 13 47 17 50 22 C53 17 59 13 66 13 C78 13 88 22 88 35 C88 58 50 85 50 85Z" fill="url(#heartGrad2)" />
+                    <defs>
+                      <radialGradient id="heartGrad2" cx="40%" cy="35%" r="60%">
+                        <stop offset="0%" stopColor="#ffb3d9" />
+                        <stop offset="50%" stopColor="#ff69b4" />
+                        <stop offset="100%" stopColor="#e0006a" />
+                      </radialGradient>
+                    </defs>
+                    <ellipse cx="38" cy="30" rx="10" ry="7" fill="rgba(255,255,255,0.3)" transform="rotate(-20,38,30)" />
+                  </svg>
+                  <span style={{ position:'relative', zIndex:1, fontSize: fs, fontWeight: 900, color: 'white', textShadow: '0 1px 4px rgba(180,0,80,0.7)', lineHeight: 1, letterSpacing: '-0.02em' }}>
                     {pts}
                   </span>
                 </div>
