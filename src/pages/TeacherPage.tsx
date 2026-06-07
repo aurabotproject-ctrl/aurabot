@@ -1192,8 +1192,7 @@ const DB_RARITY_FILTERS = [
 function TeacherCardDatabaseView({ session }: { session: NonNullable<import('../lib/auth').Session> }) {
   const [allCards, setAllCards] = React.useState<any[]>([]);
   const [loading, setLoading]   = React.useState(true);
-  const [typeFilter, setTypeFilter]     = React.useState('all');
-  const [rarityFilter, setRarityFilter] = React.useState('all');
+  const [typeFilter, setTypeFilter] = React.useState('all');
   const [page, setPage] = React.useState(0);
 
   const load = async () => {
@@ -1209,13 +1208,9 @@ function TeacherCardDatabaseView({ session }: { session: NonNullable<import('../
   };
 
   React.useEffect(() => { load(); }, []);
-  React.useEffect(() => { setPage(0); }, [typeFilter, rarityFilter]);
+  React.useEffect(() => { setPage(0); }, [typeFilter]);
 
-  const filtered = allCards.filter(c => {
-    const typeOk   = typeFilter   === 'all' || c.type   === typeFilter;
-    const rarityOk = rarityFilter === 'all' || c.rarity === rarityFilter;
-    return typeOk && rarityOk;
-  });
+  const filtered = allCards.filter(c => typeFilter === 'all' || c.type === typeFilter);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / DB_PAGE_SIZE));
   const safePage   = Math.min(page, totalPages - 1);
@@ -1236,23 +1231,12 @@ function TeacherCardDatabaseView({ session }: { session: NonNullable<import('../
   return (
     <div>
       {/* Filter row — Type */}
-      <div style={{ marginBottom: 10 }}>
+      <div style={{ marginBottom: 22 }}>
         <div style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.1em', color: '#a0a0c0', textTransform: 'uppercase', marginBottom: 6 }}>Category</div>
         <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
           {DB_TYPE_FILTERS.map(t => {
             const count = t.id === 'all' ? allCards.length : allCards.filter(c => c.type === t.id).length;
             return <FBtn key={t.id} active={typeFilter === t.id} color={t.color} onClick={() => setTypeFilter(t.id)}>{t.emoji} {t.label} <span style={{ opacity: 0.6 }}>({count})</span></FBtn>;
-          })}
-        </div>
-      </div>
-
-      {/* Filter row — Rarity */}
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.1em', color: '#a0a0c0', textTransform: 'uppercase', marginBottom: 6 }}>Rarity</div>
-        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-          {DB_RARITY_FILTERS.map(r => {
-            const count = r.id === 'all' ? allCards.length : allCards.filter(c => c.rarity === r.id).length;
-            return <FBtn key={r.id} active={rarityFilter === r.id} color={r.color} onClick={() => setRarityFilter(r.id)}>{r.label} <span style={{ opacity: 0.6 }}>({count})</span></FBtn>;
           })}
         </div>
       </div>
