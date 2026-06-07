@@ -43,8 +43,8 @@ function LoginPage() {
     const s = stateRef.current;
 
     const theme = {
-      base: '#c8d8f0',
-      dark: '#8090b8',
+      base: '#f4a8c8',
+      dark: '#d4608a',
       screenDark: '#0d1117',
       accent: '#a8e6ff',
     };
@@ -202,6 +202,14 @@ function LoginPage() {
 
       const breatheY = Math.sin(timestamp * 0.002) * -3;
       const armSway = Math.sin(timestamp * 0.0015) * 0.03;
+
+      // Pink aura glow behind robot — mascot effect
+      const aura = ctx.createRadialGradient(0, breatheY, 0, 0, breatheY, 180);
+      aura.addColorStop(0,   'rgba(244,168,200,0.18)');
+      aura.addColorStop(0.5, 'rgba(244,100,160,0.08)');
+      aura.addColorStop(1,   'rgba(244,100,160,0)');
+      ctx.fillStyle = aura;
+      ctx.beginPath(); ctx.ellipse(0, breatheY, 180, 200, 0, 0, Math.PI * 2); ctx.fill();
 
       // Legs & Arms
       [-1, 1].forEach(side => {
