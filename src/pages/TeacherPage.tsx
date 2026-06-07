@@ -28,7 +28,6 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
   const [modal, setModal] = useState<{ type: string; data?: any } | null>(null);
   const [modalError, setModalError] = useState('');
   const [detailCard, setDetailCard] = useState<Card | null>(null);
-  const [filterStudent, setFilterStudent] = useState<string | null>(null);
 
   // Home Communications state
   type HomeComm = { id: string; teacher_id: string; event_date: string; comment: string; created_at: string };
@@ -293,7 +292,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         {/* Tab bar */}
         <div style={{ display:'flex', gap:6, marginBottom:24, flexWrap:'wrap' }}>
           {TABS.map(t => (
-            <button key={t.key} className={`tp-tab${tab === t.key ? ' active' : ''}`} onClick={() => { setTab(t.key); setFilterStudent(null); }}>
+            <button key={t.key} className={`tp-tab${tab === t.key ? ' active' : ''}`} onClick={() => { setTab(t.key); }}>
               {t.label}
             </button>
           ))}
@@ -377,7 +376,6 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                       <td>{cards.filter(c => c.student_id === s.id).length}</td>
                       <td>
                         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                          <button onClick={() => { setFilterStudent(s.id); setTab('cards'); }} className="tp-btn-outline">View</button>
                           <button onClick={() => setModal({ type: 'downloadCards', data: s })} className="tp-btn-outline">⬇ Cards</button>
                           <button onClick={() => setModal({ type: 'editStudent', data: s })} className="tp-btn-outline">✏ Edit</button>
                           <button onClick={() => { setModalError(''); setModal({ type: 'resetPassword', data: s }); }} className="tp-btn-outline" style={{ borderColor:'rgba(80,200,120,0.35)', color:'#2a7a50' }}>🔑 Reset PIN</button>
