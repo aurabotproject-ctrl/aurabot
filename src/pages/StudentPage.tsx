@@ -282,7 +282,7 @@ function PixelEditor({ faceColorPalettes, onSend, onReset }: {
   };
 
   return (
-    <div style={{ marginTop: 12, background: 'rgba(10,20,55,0.75)', borderRadius: 20, padding: '14px 16px', border: '1.5px solid rgba(80,120,255,0.2)', boxShadow: '0 4px 16px rgba(180,120,220,0.08)' }}>
+    <div style={{ marginTop: 12, background: 'var(--panel-bg,rgba(10,20,55,0.75))', borderRadius: 20, padding: '14px 16px', border: '1.5px solid rgba(80,120,255,0.2)', boxShadow: '0 4px 16px rgba(180,120,220,0.08)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <span style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(120,160,255,0.6)', textTransform: 'uppercase' }}>
           Draw your face
@@ -334,11 +334,11 @@ function SignalPanel({ knob, onKnobChange, colorThemes, onLockColor, lockSaved }
   };
 
   return (
-    <div style={{ flex: 1, background: 'rgba(10,20,55,0.75)', borderRadius: 28, padding: '20px 24px', boxShadow: '0 8px 32px rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)', border: '1.5px solid rgba(80,120,255,0.2)' }}>
+    <div style={{ flex: 1, background: 'var(--panel-bg,rgba(10,20,55,0.75))', borderRadius: 28, padding: '20px 24px', boxShadow: '0 8px 32px rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)', border: '1.5px solid rgba(80,120,255,0.2)' }}>
       {/* Label */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 14 }}>
         <div style={{ width: 8, height: 8, borderRadius: '50%', background: theme.wave, boxShadow: `0 0 8px ${theme.wave}`, transition: 'background 0.3s, box-shadow 0.3s' }} />
-        <span style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.18em', color: 'rgba(120,160,255,0.6)', textTransform: 'uppercase' }}>ClassCard Signal</span>
+        <span style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.18em', color: 'var(--text-muted,rgba(120,160,255,0.6))', textTransform: 'uppercase' }}>ClassCard Signal</span>
         <div style={{ width: 8, height: 8, borderRadius: '50%', background: theme.wave, boxShadow: `0 0 8px ${theme.wave}`, transition: 'background 0.3s, box-shadow 0.3s' }} />
       </div>
 
@@ -507,7 +507,7 @@ function LevelUpModal({ level, unlockedChoices, onChoose }: LevelUpModalProps) {
   );
 }
 
-function StatsPanel({ total, medals, scoreboard, weekEnd, onSignOut, studentName, studentId }: {
+function StatsPanel({ total, medals, scoreboard, weekEnd, onSignOut, studentName, studentId, isDark, toggleTheme }: {
   total: number;
   medals: { gold: number; silver: number; bronze: number };
   scoreboard: { student_id: string; name: string; wins: number }[];
@@ -515,6 +515,8 @@ function StatsPanel({ total, medals, scoreboard, weekEnd, onSignOut, studentName
   onSignOut: () => void;
   studentName: string;
   studentId: string;
+  isDark: boolean;
+  toggleTheme: () => void;
 }) {
   const MEDAL_STYLES = [
     { bg: 'linear-gradient(135deg,#ffd700,#ffb700)', shadow: 'rgba(255,200,0,0.4)', label: '🥇', text: '#7a5c00' },
@@ -525,12 +527,22 @@ function StatsPanel({ total, medals, scoreboard, weekEnd, onSignOut, studentName
   return (
     <div style={{ width: 200, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* User badge */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: 'rgba(8,18,50,0.75)', borderRadius: 20, border: '1.5px solid rgba(60,100,200,0.2)', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', backdropFilter: 'blur(16px)', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: 'var(--panel-bg,rgba(8,18,50,0.75))', borderRadius: 20, border: '1.5px solid var(--panel-border,rgba(60,100,200,0.2))', boxShadow: 'var(--panel-shadow,0 4px 16px rgba(0,0,0,0.3))', backdropFilter: 'blur(16px)', overflow: 'hidden' }}>
         {/* Name area */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', flex: 1, minWidth: 0 }}>
           <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#fce4ec,#e8eaf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', boxShadow: '0 2px 8px rgba(200,140,180,0.2)', flexShrink: 0 }}>🤖</div>
-          <span style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.06em', color: '#5060a0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{studentName.toUpperCase()}</span>
+          <span style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.06em', color: isDark ? 'rgba(140,180,255,0.85)' : '#5060a0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{studentName.toUpperCase()}</span>
         </div>
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          style={{ width: 44, alignSelf: 'stretch', flexShrink: 0, background: 'none', border: 'none', borderLeft: '1.5px solid rgba(80,120,255,0.12)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', transition: 'background 0.2s' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
+        >
+          {isDark ? '☀️' : '🌙'}
+        </button>
         {/* Sign out — square, same height as badge */}
         <button
           onClick={onSignOut}
@@ -544,16 +556,16 @@ function StatsPanel({ total, medals, scoreboard, weekEnd, onSignOut, studentName
       </div>
 
       {/* Stats card */}
-      <div style={{ background: 'rgba(8,18,50,0.75)', borderRadius: 24, padding: '18px 16px', border: '1.5px solid rgba(60,100,200,0.2)', boxShadow: '0 8px 24px rgba(0,0,0,0.35)', backdropFilter: 'blur(16px)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ background: 'var(--panel-bg,rgba(8,18,50,0.75))', borderRadius: 24, padding: '18px 16px', border: '1.5px solid var(--panel-border,rgba(60,100,200,0.2))', boxShadow: 'var(--panel-shadow,0 8px 24px rgba(0,0,0,0.35))', backdropFilter: 'blur(16px)', display: 'flex', flexDirection: 'column', gap: 14 }}>
         {/* Total cards */}
         <div>
-          <div style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(120,160,255,0.6)', textTransform: 'uppercase', marginBottom: 3 }}>TOTAL CARDS</div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#a8d8ff', lineHeight: 1 }}>{total}</div>
+          <div style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--text-muted,rgba(120,160,255,0.6))', textTransform: 'uppercase', marginBottom: 3 }}>TOTAL CARDS</div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--text-primary,#a8d8ff)', lineHeight: 1 }}>{total}</div>
         </div>
 
         {/* Arena medals */}
         <div>
-          <div style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(120,160,255,0.6)', textTransform: 'uppercase', marginBottom: 8 }}>ARENA MEDALS</div>
+          <div style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--text-muted,rgba(120,160,255,0.6))', textTransform: 'uppercase', marginBottom: 8 }}>ARENA MEDALS</div>
           <div style={{ display: 'flex', gap: 6 }}>
             {[medals.gold, medals.silver, medals.bronze].map((count, i) => (
               <div key={i} style={{ flex: 1, borderRadius: 14, padding: '8px 4px', background: count > 0 ? MEDAL_STYLES[i].bg : 'rgba(200,200,220,0.15)', boxShadow: count > 0 ? `0 4px 12px ${MEDAL_STYLES[i].shadow}` : 'none', textAlign: 'center', transition: 'all 0.3s', opacity: count > 0 ? 1 : 0.4 }}>
@@ -562,7 +574,7 @@ function StatsPanel({ total, medals, scoreboard, weekEnd, onSignOut, studentName
               </div>
             ))}
           </div>
-          <div style={{ fontSize: '0.52rem', color: 'rgba(120,160,255,0.4)', marginTop: 6, textAlign: 'center', letterSpacing: '0.05em' }}>all-time finishes</div>
+          <div style={{ fontSize: '0.52rem', color: 'var(--text-muted,rgba(120,160,255,0.4))', marginTop: 6, textAlign: 'center', letterSpacing: '0.05em' }}>all-time finishes</div>
         </div>
       </div>
 
@@ -582,13 +594,13 @@ function StatsPanel({ total, medals, scoreboard, weekEnd, onSignOut, studentName
       </div>
 
       {/* Weekly scoreboard */}
-      <div style={{ background: 'rgba(8,18,50,0.75)', borderRadius: 20, padding: '14px 14px', border: '1.5px solid rgba(60,100,200,0.2)', boxShadow: '0 4px 16px rgba(0,0,0,0.3)', backdropFilter: 'blur(16px)' }}>
+      <div style={{ background: 'var(--panel-bg,rgba(8,18,50,0.75))', borderRadius: 20, padding: '14px 14px', border: '1.5px solid var(--panel-border,rgba(60,100,200,0.2))', boxShadow: 'var(--panel-shadow,0 4px 16px rgba(0,0,0,0.3))', backdropFilter: 'blur(16px)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <span style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.13em', color: 'rgba(140,180,255,0.65)', textTransform: 'uppercase' }}>🏆 This Week</span>
           <span style={{ fontSize: '0.52rem', color: '#b0b8d0', letterSpacing: '0.04em' }}>ends {weekEnd}</span>
         </div>
         {scoreboard.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '12px 0', color: 'rgba(140,180,255,0.5)', fontSize: '0.68rem' }}>No battles yet!</div>
+          <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--text-muted,rgba(140,180,255,0.5))', fontSize: '0.68rem' }}>No battles yet!</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {scoreboard.map((entry, i) => {
@@ -605,7 +617,7 @@ function StatsPanel({ total, medals, scoreboard, weekEnd, onSignOut, studentName
           </div>
         )}
         <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(200,200,220,0.3)', textAlign: 'center' }}>
-          <span style={{ fontSize: '0.52rem', color: 'rgba(140,180,255,0.45)', letterSpacing: '0.08em' }}>RESETS MONDAY · 1 BATTLE / OPPONENT</span>
+          <span style={{ fontSize: '0.52rem', color: 'var(--text-muted,rgba(140,180,255,0.45))', letterSpacing: '0.08em' }}>RESETS MONDAY · 1 BATTLE / OPPONENT</span>
         </div>
       </div>
     </div>
@@ -899,6 +911,15 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
   const [botRenderKey, setBotRenderKey] = useState(0);
   const [lockSaved, setLockSaved] = useState(false);
   const [myStarPoints, setMyStarPoints] = useState(0);
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    try { return localStorage.getItem('sd_theme') !== 'light'; }
+    catch { return true; }
+  });
+  const toggleTheme = () => setIsDark(d => {
+    const next = !d;
+    try { localStorage.setItem('sd_theme', next ? 'dark' : 'light'); } catch {}
+    return next;
+  });
   const faceKey = `classcard_face_${session.user.id}`;
   const [facePixels, setFacePixelsRaw] = useState<string[] | null>(() => {
     try { const v = localStorage.getItem(faceKey); return v ? JSON.parse(v) : null; }
@@ -1093,11 +1114,29 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
         .sd-page ::-webkit-scrollbar { height: 4px; }
         .sd-page ::-webkit-scrollbar-track { background: rgba(255,255,255,0.06); border-radius: 10px; }
         .sd-page ::-webkit-scrollbar-thumb { background: rgba(100,140,255,0.25); border-radius: 10px; }
+
+        /* Theme tokens */
+        .sd-page.sd-dark  { --panel-bg: rgba(8,18,50,0.82); --panel-border: rgba(60,100,200,0.22); --panel-shadow: 0 8px 32px rgba(0,0,0,0.45); --text-primary: #a8d8ff; --text-secondary: rgba(140,180,255,0.7); --text-muted: rgba(120,160,255,0.45); --outer-bg: rgba(8,18,48,0.72); --outer-border: rgba(80,120,255,0.18); --outer-shadow: 0 20px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(80,120,255,0.15); --btn-bg: rgba(255,255,255,0.07); --btn-border: rgba(80,120,255,0.2); --btn-color: rgba(140,180,255,0.8); }
+        .sd-page.sd-light { --panel-bg: rgba(255,255,255,0.88); --panel-border: rgba(180,160,220,0.3); --panel-shadow: 0 8px 32px rgba(160,120,220,0.1); --text-primary: #2030a0; --text-secondary: #8090c0; --text-muted: #b0b8d0; --outer-bg: rgba(255,255,255,0.55); --outer-border: rgba(255,255,255,0.9); --outer-shadow: 0 20px 80px rgba(180,120,220,0.14), 0 4px 24px rgba(200,160,240,0.1); --btn-bg: rgba(180,160,220,0.1); --btn-border: rgba(180,160,220,0.28); --btn-color: #7070b0; }
+
+        /* Apply tokens to structural panels */
+        .sd-panel { background: var(--panel-bg) !important; border-color: var(--panel-border) !important; box-shadow: var(--panel-shadow) !important; backdrop-filter: blur(20px) !important; }
+        .sd-outer { background: var(--outer-bg) !important; border-color: var(--outer-border) !important; box-shadow: var(--outer-shadow) !important; }
+        .sd-text-primary   { color: var(--text-primary)   !important; }
+        .sd-text-secondary { color: var(--text-secondary) !important; }
+        .sd-text-muted     { color: var(--text-muted)     !important; }
+        .sd-btn-ghost { background: var(--btn-bg) !important; border-color: var(--btn-border) !important; color: var(--btn-color) !important; }
+
+        /* Light mode overrides the star canvas opacity */
+        .sd-page.sd-light  ~ canvas, .sd-light-canvas { opacity: 0.18 !important; }
+        .sd-page.sd-light .sd-outer { backdrop-filter: blur(18px) !important; }
+
+        @keyframes toggleSlide { from { transform: translateX(0); } to { transform: translateX(22px); } }
       `}</style>
 
-      <canvas ref={spaceCanvasRef} style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none' }} />
+      <canvas ref={spaceCanvasRef} style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none', opacity: isDark ? 1 : 0.18, transition: 'opacity 0.6s' }} />
       <div
-        className="sd-page"
+        className={`sd-page ${isDark ? 'sd-dark' : 'sd-light'}`}
         style={{
           minHeight: '100vh',
           background: 'transparent',
@@ -1122,14 +1161,14 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
       )}
 
       {/* Outer container */}
-        <div style={{
+        <div className="sd-outer" style={{
           width: '100%',
           maxWidth: 1160,
-          background: 'rgba(8,18,48,0.72)',
+          background: 'var(--outer-bg,rgba(8,18,48,0.72))',
           borderRadius: 40,
           padding: '28px 32px',
-          boxShadow: '0 20px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(80,120,255,0.15)',
-          border: '1.5px solid rgba(80,120,255,0.18)',
+          boxShadow: 'var(--outer-shadow,0 20px 80px rgba(0,0,0,0.6))',
+          border: '1.5px solid var(--outer-border,rgba(80,120,255,0.18))',
           backdropFilter: 'blur(24px)',
           display: 'flex',
           flexDirection: 'column',
@@ -1142,10 +1181,10 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
             {/* Welcome + Robot */}
             <div style={{ display: 'flex', gap: 20, alignItems: 'flex-end', flexShrink: 0 }}>
               <div>
-                <h1 style={{ fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 900, color: '#a8d8ff', margin: 0, lineHeight: 1.1 }}>
+                <h1 style={{ fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 900, color: 'var(--text-primary,#a8d8ff)', margin: 0, lineHeight: 1.1 }}>
                   Hey {firstName}!
                 </h1>
-                <p style={{ fontSize: '0.85rem', color: 'rgba(160,200,255,0.7)', margin: '6px 0 0', fontWeight: 600 }}>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary,rgba(160,200,255,0.7))', margin: '6px 0 0', fontWeight: 600 }}>
                   You've collected {cards.length} card{cards.length !== 1 ? 's' : ''}
                 </p>
                 <div style={{ marginTop: 16 }}>
@@ -1238,6 +1277,8 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
               onSignOut={handleSignOut}
               studentName={studentName}
               studentId={studentId}
+              isDark={isDark}
+              toggleTheme={toggleTheme}
             />
           </div>
 
@@ -1292,7 +1333,7 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
           {/* ── HOME COMMUNICATION ── */}
           {(pinboard || homeComms.length > 0) && (
-            <div style={{ marginTop: 28, borderRadius: 22, background: 'rgba(8,18,50,0.75)', border: '1.5px solid rgba(60,100,200,0.2)', boxShadow: '0 6px 28px rgba(0,0,0,0.4)', padding: '22px 24px', backdropFilter: 'blur(16px)' }}>
+            <div style={{ marginTop: 28, borderRadius: 22, background: 'var(--panel-bg,rgba(8,18,50,0.75))', border: '1.5px solid var(--panel-border,rgba(60,100,200,0.2))', boxShadow: 'var(--panel-shadow,0 6px 28px rgba(0,0,0,0.4))', padding: '22px 24px', backdropFilter: 'blur(16px)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
                 <span style={{ fontSize: '1.15rem' }}>🏠</span>
                 <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#a8d8ff', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Home Communication</h2>
