@@ -26,6 +26,11 @@ function LoginPage() {
     rippleRadius: 0, rippleAlpha: 0, rippleX: 0, rippleY: 0,
     currentRole: 'Admin' as Role,
     studentPin: '',
+    // Stars
+    stars: [] as { x: number; y: number; r: number; twinkleOffset: number; twinkleSpeed: number; brightness: number }[],
+    // Asteroids
+    asteroids: [] as { x: number; y: number; vx: number; vy: number; r: number; angle: number; spin: number; trail: number; active: boolean; timer: number }[],
+    nextAsteroid: 3000,
   });
 
   useEffect(() => { stateRef.current.currentRole = currentRole; }, [currentRole]);
@@ -38,8 +43,8 @@ function LoginPage() {
     const s = stateRef.current;
 
     const theme = {
-      base: '#e8a0a0',
-      dark: '#c87878',
+      base: '#c8d8f0',
+      dark: '#8090b8',
       screenDark: '#0d1117',
       accent: '#a8e6ff',
     };
@@ -53,6 +58,20 @@ function LoginPage() {
     }
     resize();
     window.addEventListener('resize', resize);
+
+    // Initialise stars
+    const initStars = () => {
+      s.stars = Array.from({ length: 180 }, () => ({
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        r: Math.random() * 1.6 + 0.3,
+        twinkleOffset: Math.random() * Math.PI * 2,
+        twinkleSpeed: 0.0008 + Math.random() * 0.002,
+        brightness: 0.4 + Math.random() * 0.6,
+      }));
+    };
+    initStars();
+    window.addEventListener('resize', initStars);
 
     function drawRoundRect(x: number, y: number, w: number, h: number, r: number) {
       ctx.beginPath();
@@ -75,6 +94,103 @@ function LoginPage() {
       s.time = timestamp;
       ctx.clearRect(0, 0, W, H);
 
+      // ── Space background ──────────────────────────────────────────
+      // Deep space gradient
+      const bg = ctx.createRadialGradient(W * 0.5, H * 0.4, 0, W * 0.5, H * 0.5, Math.max(W, H) * 0.85);
+      bg.addColorStop(0,   '#0d1b3e');
+      bg.addColorStop(0.4, '#08112a');
+      bg.addColorStop(0.8, '#050c1a');
+      bg.addColorStop(1,   '#020608');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+
+      // Nebula glow — subtle purple/teal clouds
+      const neb1 = ctx.createRadialGradient(W * 0.75, H * 0.25, 0, W * 0.75, H * 0.25, W * 0.35);
+      neb1.addColorStop(0,   'rgba(80,40,140,0.18)');
+      neb1.addColorStop(1,   'rgba(80,40,140,0)');
+      ctx.fillStyle = neb1; ctx.fillRect(0, 0, W, H);
+
+      const neb2 = ctx.createRadialGradient(W * 0.2, H * 0.7, 0, W * 0.2, H * 0.7, W * 0.3);
+      neb2.addColorStop(0,   'rgba(20,80,120,0.15)');
+      neb2.addColorStop(1,   'rgba(20,80,120,0)');
+      ctx.fillStyle = neb2; ctx.fillRect(0, 0, W, H);
+
+      // Stars
+      for (const star of s.stars) {
+        const twinkle = star.brightness * (0.55 + 0.45 * Math.sin(timestamp * star.twinkleSpeed + star.twinkleOffset));
+        // Occasional sparkle cross on larger stars
+        if (star.r > 1.2 && twinkle > 0.85) {
+          ctx.strokeStyle = `rgba(180,220,255,${twinkle * 0.5})`;
+          ctx.lineWidth = 0.5;
+          ctx.beginPath(); ctx.moveTo(star.x - star.r * 3, star.y); ctx.lineTo(star.x + star.r * 3, star.y); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(star.x, star.y - star.r * 3); ctx.lineTo(star.x, star.y + star.r * 3); ctx.stroke();
+        }
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(200,225,255,${twinkle})`;
+        ctx.fill();
+      }
+
+      // Asteroids
+      // Spawn new asteroid occasionally
+      if (timestamp > s.nextAsteroid) {
+        const fromTop = Math.random() > 0.5;
+        const ast = {
+          x: fromTop ? Math.random() * W * 1.2 - W * 0.1 : -60,
+          y: fromTop ? -60 : Math.random() * H * 0.6,
+          vx: fromTop ? (Math.random() * 3 + 2) * (Math.random() > 0.5 ? 1 : -1) : Math.random() * 4 + 3,
+          vy: fromTop ? Math.random() * 3 + 2 : Math.random() * 2 - 1,
+          r: Math.random() * 8 + 4,
+          angle: Math.random() * Math.PI * 2,
+          spin: (Math.random() - 0.5) * 0.06,
+          trail: Math.random() * 30 + 20,
+          active: true,
+          timer: 0,
+        };
+        s.asteroids.push(ast);
+        s.nextAsteroid = timestamp + 4000 + Math.random() * 6000;
+      }
+
+      // Draw & move asteroids
+      s.asteroids = s.asteroids.filter(a => a.active);
+      for (const a of s.asteroids) {
+        a.x += a.vx; a.y += a.vy; a.angle += a.spin; a.timer++;
+        if (a.x > W + 100 || a.y > H + 100 || a.x < -100) { a.active = false; continue; }
+
+        // Trail
+        const grad = ctx.createLinearGradient(a.x, a.y, a.x - a.vx * a.trail, a.y - a.vy * a.trail);
+        grad.addColorStop(0,   'rgba(200,210,255,0.7)');
+        grad.addColorStop(0.4, 'rgba(160,180,255,0.3)');
+        grad.addColorStop(1,   'rgba(100,120,220,0)');
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = a.r * 0.6;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(a.x - a.vx * a.trail, a.y - a.vy * a.trail);
+        ctx.stroke();
+
+        // Rock body
+        ctx.save();
+        ctx.translate(a.x, a.y);
+        ctx.rotate(a.angle);
+        ctx.fillStyle = 'rgba(160,170,190,0.9)';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, a.r, a.r * 0.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(100,110,130,0.5)';
+        ctx.beginPath();
+        ctx.ellipse(a.r * 0.15, -a.r * 0.1, a.r * 0.3, a.r * 0.2, 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        // Highlight
+        ctx.fillStyle = 'rgba(220,230,255,0.4)';
+        ctx.beginPath();
+        ctx.ellipse(-a.r * 0.2, -a.r * 0.2, a.r * 0.25, a.r * 0.15, -0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      // ── End space background ──────────────────────────────────────
+
       s.mouseX += (s.targetMouseX - s.mouseX) * 0.1;
       s.mouseY += (s.targetMouseY - s.mouseY) * 0.1;
       s.zoom += (s.targetZoom - s.zoom) * 0.08;
@@ -86,10 +202,6 @@ function LoginPage() {
 
       const breatheY = Math.sin(timestamp * 0.002) * -3;
       const armSway = Math.sin(timestamp * 0.0015) * 0.03;
-
-      // Ground shadow
-      ctx.fillStyle = 'rgba(60,30,40,0.15)';
-      ctx.beginPath(); ctx.ellipse(0, 220, 110, 18, 0, 0, Math.PI * 2); ctx.fill();
 
       // Legs & Arms
       [-1, 1].forEach(side => {
@@ -217,6 +329,7 @@ function LoginPage() {
     return () => {
       cancelAnimationFrame(animRef.current);
       window.removeEventListener('resize', resize);
+      window.removeEventListener('resize', initStars);
       document.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('click', handleClick);
     };
