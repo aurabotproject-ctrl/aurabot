@@ -282,7 +282,7 @@ function PixelEditor({ faceColorPalettes, onSend, onReset }: {
   };
 
   return (
-    <div style={{ marginTop: 12, background: 'var(--panel-bg,rgba(10,20,55,0.75))', borderRadius: 20, padding: '14px 16px', border: '1.5px solid rgba(80,120,255,0.2)', boxShadow: '0 4px 16px rgba(180,120,220,0.08)' }}>
+    <div className="sd-panel" style={{ marginTop: 12, background: 'var(--panel-bg,rgba(10,20,55,0.75))', borderRadius: 20, padding: '14px 16px', border: '1.5px solid rgba(80,120,255,0.2)', boxShadow: '0 4px 16px rgba(180,120,220,0.08)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <span style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(120,160,255,0.6)', textTransform: 'uppercase' }}>
           Draw your face
@@ -334,7 +334,7 @@ function SignalPanel({ knob, onKnobChange, colorThemes, onLockColor, lockSaved }
   };
 
   return (
-    <div style={{ flex: 1, background: 'var(--panel-bg,rgba(10,20,55,0.75))', borderRadius: 28, padding: '20px 24px', boxShadow: '0 8px 32px rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)', border: '1.5px solid rgba(80,120,255,0.2)' }}>
+    <div className="sd-panel" style={{ flex: 1, background: 'var(--panel-bg,rgba(10,20,55,0.75))', borderRadius: 28, padding: '20px 24px', boxShadow: '0 8px 32px rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)', border: '1.5px solid rgba(80,120,255,0.2)' }}>
       {/* Label */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 14 }}>
         <div style={{ width: 8, height: 8, borderRadius: '50%', background: theme.wave, boxShadow: `0 0 8px ${theme.wave}`, transition: 'background 0.3s, box-shadow 0.3s' }} />
@@ -527,7 +527,7 @@ function StatsPanel({ total, medals, scoreboard, weekEnd, onSignOut, studentName
   return (
     <div style={{ width: 200, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* User badge */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: 'var(--panel-bg,rgba(8,18,50,0.75))', borderRadius: 20, border: '1.5px solid var(--panel-border,rgba(60,100,200,0.2))', boxShadow: 'var(--panel-shadow,0 4px 16px rgba(0,0,0,0.3))', backdropFilter: 'blur(16px)', overflow: 'hidden' }}>
+      <div className="sd-panel" style={{ display: 'flex', alignItems: 'center', gap: 0, background: 'var(--panel-bg,rgba(8,18,50,0.75))', borderRadius: 20, border: '1.5px solid var(--panel-border,rgba(60,100,200,0.2))', boxShadow: 'var(--panel-shadow,0 4px 16px rgba(0,0,0,0.3))', backdropFilter: 'blur(16px)', overflow: 'hidden' }}>
         {/* Name area */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', flex: 1, minWidth: 0 }}>
           <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#fce4ec,#e8eaf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', boxShadow: '0 2px 8px rgba(200,140,180,0.2)', flexShrink: 0 }}>🤖</div>
@@ -556,7 +556,7 @@ function StatsPanel({ total, medals, scoreboard, weekEnd, onSignOut, studentName
       </div>
 
       {/* Stats card */}
-      <div style={{ background: 'var(--panel-bg,rgba(8,18,50,0.75))', borderRadius: 24, padding: '18px 16px', border: '1.5px solid var(--panel-border,rgba(60,100,200,0.2))', boxShadow: 'var(--panel-shadow,0 8px 24px rgba(0,0,0,0.35))', backdropFilter: 'blur(16px)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="sd-panel" style={{ background: 'var(--panel-bg,rgba(8,18,50,0.75))', borderRadius: 24, padding: '18px 16px', border: '1.5px solid var(--panel-border,rgba(60,100,200,0.2))', boxShadow: 'var(--panel-shadow,0 8px 24px rgba(0,0,0,0.35))', backdropFilter: 'blur(16px)', display: 'flex', flexDirection: 'column', gap: 14 }}>
         {/* Total cards */}
         <div>
           <div style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--text-muted,rgba(120,160,255,0.6))', textTransform: 'uppercase', marginBottom: 3 }}>TOTAL CARDS</div>
@@ -594,7 +594,7 @@ function StatsPanel({ total, medals, scoreboard, weekEnd, onSignOut, studentName
       </div>
 
       {/* Weekly scoreboard */}
-      <div style={{ background: 'var(--panel-bg,rgba(8,18,50,0.75))', borderRadius: 20, padding: '14px 14px', border: '1.5px solid var(--panel-border,rgba(60,100,200,0.2))', boxShadow: 'var(--panel-shadow,0 4px 16px rgba(0,0,0,0.3))', backdropFilter: 'blur(16px)' }}>
+      <div className="sd-panel" style={{ background: 'var(--panel-bg,rgba(8,18,50,0.75))', borderRadius: 20, padding: '14px 14px', border: '1.5px solid var(--panel-border,rgba(60,100,200,0.2))', boxShadow: 'var(--panel-shadow,0 4px 16px rgba(0,0,0,0.3))', backdropFilter: 'blur(16px)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <span style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.13em', color: 'rgba(140,180,255,0.65)', textTransform: 'uppercase' }}>🏆 This Week</span>
           <span style={{ fontSize: '0.52rem', color: '#b0b8d0', letterSpacing: '0.04em' }}>ends {weekEnd}</span>
@@ -1117,7 +1117,27 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
         /* Theme tokens */
         .sd-page.sd-dark  { --panel-bg: rgba(8,18,50,0.82); --panel-border: rgba(60,100,200,0.22); --panel-shadow: 0 8px 32px rgba(0,0,0,0.45); --text-primary: #a8d8ff; --text-secondary: rgba(140,180,255,0.7); --text-muted: rgba(120,160,255,0.45); --outer-bg: rgba(8,18,48,0.72); --outer-border: rgba(80,120,255,0.18); --outer-shadow: 0 20px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(80,120,255,0.15); --btn-bg: rgba(255,255,255,0.07); --btn-border: rgba(80,120,255,0.2); --btn-color: rgba(140,180,255,0.8); }
-        .sd-page.sd-light { --panel-bg: rgba(255,255,255,0.88); --panel-border: rgba(180,160,220,0.3); --panel-shadow: 0 8px 32px rgba(160,120,220,0.1); --text-primary: #2030a0; --text-secondary: #8090c0; --text-muted: #b0b8d0; --outer-bg: rgba(255,255,255,0.55); --outer-border: rgba(255,255,255,0.9); --outer-shadow: 0 20px 80px rgba(180,120,220,0.14), 0 4px 24px rgba(200,160,240,0.1); --btn-bg: rgba(180,160,220,0.1); --btn-border: rgba(180,160,220,0.28); --btn-color: #7070b0; }
+        .sd-page.sd-light {
+          --panel-bg: rgba(235,242,255,0.82);
+          --panel-bg-alt: rgba(248,250,255,0.9);
+          --panel-border: rgba(160,190,240,0.35);
+          --panel-shadow: 0 4px 24px rgba(60,90,180,0.08), 0 1px 4px rgba(60,90,180,0.06);
+          --text-primary: #1a2b6b;
+          --text-secondary: #3a4e8a;
+          --text-muted: #7080a8;
+          --outer-bg: rgba(220,232,255,0.55);
+          --outer-border: rgba(140,180,240,0.3);
+          --outer-shadow: 0 20px 60px rgba(40,70,160,0.12), 0 4px 20px rgba(80,120,200,0.08);
+          --btn-bg: rgba(180,210,255,0.18);
+          --btn-border: rgba(120,170,240,0.3);
+          --btn-color: #3a4e8a;
+        }
+
+        /* Light mode page background */
+        body:has(.sd-light) { background: linear-gradient(160deg, #dce8ff 0%, #eaf0ff 40%, #f0f5ff 70%, #e8eeff 100%) !important; }
+
+        /* Alternating panel tone in light mode — every other panel slightly different */
+        .sd-page.sd-light .sd-panel:nth-child(even) { background: var(--panel-bg-alt, rgba(248,250,255,0.9)) !important; }
 
         /* Apply tokens to structural panels */
         .sd-panel { background: var(--panel-bg) !important; border-color: var(--panel-border) !important; box-shadow: var(--panel-shadow) !important; backdrop-filter: blur(20px) !important; }
@@ -1134,7 +1154,7 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
         @keyframes toggleSlide { from { transform: translateX(0); } to { transform: translateX(22px); } }
       `}</style>
 
-      <canvas ref={spaceCanvasRef} style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none', opacity: isDark ? 1 : 0.18, transition: 'opacity 0.6s' }} />
+      <canvas ref={spaceCanvasRef} style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none', opacity: isDark ? 1 : 0, transition: 'opacity 0.6s' }} />
       <div
         className={`sd-page ${isDark ? 'sd-dark' : 'sd-light'}`}
         style={{
@@ -1333,7 +1353,7 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
           {/* ── HOME COMMUNICATION ── */}
           {(pinboard || homeComms.length > 0) && (
-            <div style={{ marginTop: 28, borderRadius: 22, background: 'var(--panel-bg,rgba(8,18,50,0.75))', border: '1.5px solid var(--panel-border,rgba(60,100,200,0.2))', boxShadow: 'var(--panel-shadow,0 6px 28px rgba(0,0,0,0.4))', padding: '22px 24px', backdropFilter: 'blur(16px)' }}>
+            <div className="sd-panel" style={{ marginTop: 28, borderRadius: 22, background: 'var(--panel-bg,rgba(8,18,50,0.75))', border: '1.5px solid var(--panel-border,rgba(60,100,200,0.2))', boxShadow: 'var(--panel-shadow,0 6px 28px rgba(0,0,0,0.4))', padding: '22px 24px', backdropFilter: 'blur(16px)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
                 <span style={{ fontSize: '1.15rem' }}>🏠</span>
                 <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#a8d8ff', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Home Communication</h2>
