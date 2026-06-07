@@ -230,10 +230,6 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
     AI.setGeminiKey(geminiKey);
   };
 
-  // Filtered cards
-  const displayCards = filterStudent
-    ? cards.filter(c => c.student_id === filterStudent)
-    : cards;
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#fce4ec 0%,#f3e5f5 30%,#e8eaf6 60%,#e1f5fe 100%)', fontFamily: "'Nunito','Segoe UI',sans-serif" }}>
@@ -946,14 +942,6 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
     }
   }
 
-  async function handleRegenImage(card: Card) {
-    try {
-      const newUrl = AI.generateImageUrl(card.card_name + ' ' + card.type);
-      await new Promise<void>(r => { const img = new Image(); img.onload = () => r(); img.onerror = () => r(); img.src = newUrl; setTimeout(r, 2000); });
-      await Dashboard.updateCard(card.id, { image_url: newUrl });
-      loadData();
-    } catch (err: any) { console.error(err.message); }
-  }
 }
 
 // ── Modal Components ──
@@ -1463,18 +1451,12 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
       setWeakActionName(''); setStrongActionName('');
       setIsRareExclusive(false); setMaxCopies(5);
       setDbScale(1); setDbRotation(0); setDbPosition({ x: 0, y: 0 });
-      loadDbCards();
     } catch (err: any) {
       setSavedMsg('Error: ' + (err.message || 'Save failed'));
     }
     setSaving(false);
   };
 
-  const handleDeleteCard = async (id: string) => {
-    if (!confirm('Delete this card from the database?')) return;
-    await sb.from('card_database').delete().eq('id', id);
-    setDbCards(prev => prev.filter(c => c.id !== id));
-  };
 
   const currentImage = dbCroppedImage || dbImage;
   const currentRange = RARITY_RANGES[cardRarity] || RARITY_RANGES['common'];
