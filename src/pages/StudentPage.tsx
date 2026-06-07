@@ -806,6 +806,84 @@ function CardDetail({ card, onClose }: { card: Card; onClose: () => void }) {
    Main dashboard
 ───────────────────────────────────────────── */
 function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; onSignOut: () => void }) {
+  const spaceCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Space background — stars only
+  useEffect(() => {
+    const canvas = spaceCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+    let animId = 0;
+    type Star = { x: number; y: number; r: number; offset: number; speed: number; brightness: number };
+    let stars: Star[] = [];
+
+    const init = () => {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width  = window.innerWidth  * dpr;
+      canvas.height = window.innerHeight * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      stars = Array.from({ length: 160 }, () => ({
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        r: Math.random() * 1.5 + 0.3,
+        offset: Math.random() * Math.PI * 2,
+        speed: 0.0008 + Math.random() * 0.002,
+        brightness: 0.4 + Math.random() * 0.6,
+      }));
+    };
+    init();
+    window.addEventListener('resize', init);
+
+    const draw = (ts: number) => {
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+      ctx.clearRect(0, 0, W, H);
+
+      // Deep space gradient
+      const bg = ctx.createRadialGradient(W * 0.5, H * 0.35, 0, W * 0.5, H * 0.5, Math.max(W, H) * 0.9);
+      bg.addColorStop(0,   '#0d1b3e');
+      bg.addColorStop(0.4, '#08112a');
+      bg.addColorStop(0.8, '#050c1a');
+      bg.addColorStop(1,   '#020608');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+
+      // Nebula glows
+      const neb1 = ctx.createRadialGradient(W * 0.8, H * 0.2, 0, W * 0.8, H * 0.2, W * 0.35);
+      neb1.addColorStop(0, 'rgba(80,40,140,0.16)');
+      neb1.addColorStop(1, 'rgba(80,40,140,0)');
+      ctx.fillStyle = neb1; ctx.fillRect(0, 0, W, H);
+
+      const neb2 = ctx.createRadialGradient(W * 0.15, H * 0.75, 0, W * 0.15, H * 0.75, W * 0.28);
+      neb2.addColorStop(0, 'rgba(20,80,120,0.13)');
+      neb2.addColorStop(1, 'rgba(20,80,120,0)');
+      ctx.fillStyle = neb2; ctx.fillRect(0, 0, W, H);
+
+      // Stars
+      for (const star of stars) {
+        const t = star.brightness * (0.5 + 0.5 * Math.sin(ts * star.speed + star.offset));
+        if (star.r > 1.2 && t > 0.82) {
+          ctx.strokeStyle = `rgba(180,220,255,${t * 0.45})`;
+          ctx.lineWidth = 0.5;
+          ctx.beginPath(); ctx.moveTo(star.x - star.r * 3, star.y); ctx.lineTo(star.x + star.r * 3, star.y); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(star.x, star.y - star.r * 3); ctx.lineTo(star.x, star.y + star.r * 3); ctx.stroke();
+        }
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(200,225,255,${t})`;
+        ctx.fill();
+      }
+
+      animId = requestAnimationFrame(draw);
+    };
+    animId = requestAnimationFrame(draw);
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', init);
+    };
+  }, []);
+
   const [cards, setCards] = useState<Card[]>([]);
   const [detailCard, setDetailCard] = useState<Card | null>(null);
   const [studentName, setStudentName] = useState('Student');
@@ -1017,15 +1095,18 @@ function StudentPage({ session, onSignOut }: { session: NonNullable<Session>; on
         .sd-page ::-webkit-scrollbar-thumb { background: rgba(160,140,200,0.3); border-radius: 10px; }
       `}</style>
 
+      <canvas ref={spaceCanvasRef} style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none' }} />
       <div
         className="sd-page"
         style={{
           minHeight: '100vh',
-          background: 'linear-gradient(135deg, #fce4ec 0%, #f3e5f5 30%, #e8eaf6 60%, #e1f5fe 100%)',
+          background: 'transparent',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           padding: '20px',
+          position: 'relative',
+          zIndex: 1,
         }}
       >
         {/* Level up unlock modal */}
