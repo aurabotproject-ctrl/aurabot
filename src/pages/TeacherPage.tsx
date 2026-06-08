@@ -297,7 +297,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
     <div style={{ position:'relative', minHeight:'100vh', fontFamily:"'Nunito','Segoe UI',sans-serif" }}>
       <canvas ref={spaceCanvasRef} style={{ position:'fixed', inset:0, width:'100%', height:'100%', zIndex:0, pointerEvents:'none', opacity: isDark ? 1 : 0, transition:'opacity 0.6s' }} />
       {!isDark && <div style={{ position:'fixed', inset:0, zIndex:0, background:'linear-gradient(160deg,#dce8ff 0%,#eaf0ff 40%,#f0f5ff 70%,#e8eeff 100%)' }} />}
-      <div className={`tp-page ${isDark ? 'tp-dark' : 'tp-light'}`} style={{ position:'relative', zIndex:1, minHeight:'100vh' }}>
+      <div className={'tp-page ' + (isDark ? 'tp-dark' : 'tp-light')} style={{ position:'relative', zIndex:1, minHeight:'100vh' }}>
 
       {/* Header */}
       <header style={{ background:'var(--tp-header-bg)', borderBottom:'1.5px solid var(--tp-header-border)', backdropFilter:'blur(20px)', position:'sticky', top:0, zIndex:100, boxShadow:'0 2px 16px rgba(0,0,0,0.2)' }}>
@@ -792,7 +792,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
   <meta charset="UTF-8" />
   <title>${modal.data.name}'s Cards</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet" />
-  <style>
+  ${"<"}style>
     body { margin: 0; padding: 32px; background: linear-gradient(135deg,#fce4ec,#f3e5f5,#e8eaf6,#e1f5fe); font-family: 'Nunito','Segoe UI',sans-serif; min-height: 100vh; }
     h1 { text-align: center; color: #5060a0; font-size: 1.6rem; margin-bottom: 8px; }
     p.subtitle { text-align: center; color: #8090b0; font-size: 0.85rem; margin-bottom: 32px; }
@@ -826,7 +826,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
     .card-footer { margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding-top: 3px; flex-shrink: 0; }
     .card-rarity-tag { font-size: 7px; font-weight: 700; color: #3a2200; }
     .card-student-name { font-size: 7px; color: #5a3a00; font-style: italic; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  </style>
+  ${"</"}style>
 </head>
 <body>
   <h1>🎴 ${modal.data.name}'s Cards</h1>
@@ -1113,17 +1113,6 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <style>{`
-        @keyframes cardGlow { 0%,100%{box-shadow:0 2px 12px rgba(0,0,0,0.07)} 50%{box-shadow:0 0 32px 8px rgba(255,200,0,0.45)} }
-        @keyframes ptsPop   { 0%{transform:scale(1)} 50%{transform:scale(1.45)} 100%{transform:scale(1)} }
-        .star-btn { transition: transform 0.12s, box-shadow 0.12s !important; }
-        .star-btn:hover:not(:disabled) { transform: scale(1.18) !important; }
-        .star-btn:active:not(:disabled) { transform: scale(0.9) !important; }
-        .star-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .card-flash { animation: cardGlow 1s ease-out forwards; }
-        .pts-pop    { animation: ptsPop 0.35s ease-out; }
-      `}</style>
-
       {/* Header */}
       <div style={{ background: 'linear-gradient(135deg,rgba(255,215,0,0.12),rgba(255,165,0,0.08))', borderRadius: 20, padding: '18px 24px', border: '1.5px solid rgba(255,200,50,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>

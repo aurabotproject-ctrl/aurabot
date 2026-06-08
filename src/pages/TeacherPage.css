@@ -42,3 +42,13 @@
 .tp-page ::-webkit-scrollbar { height:4px; width:4px; }
 .tp-page ::-webkit-scrollbar-track { background:rgba(255,255,255,0.04); border-radius:10px; }
 .tp-page ::-webkit-scrollbar-thumb { background:rgba(100,140,255,0.25); border-radius:10px; }
+
+/* Stars tab animations */
+@keyframes cardGlow { 0%,100%{box-shadow:0 2px 12px rgba(0,0,0,0.07)} 50%{box-shadow:0 0 32px 8px rgba(255,200,0,0.45)} }
+@keyframes ptsPop   { 0%{transform:scale(1)} 50%{transform:scale(1.45)} 100%{transform:scale(1)} }
+.star-btn { transition: transform 0.12s, box-shadow 0.12s !important; }
+.star-btn:hover:not(:disabled) { transform: scale(1.18) !important; }
+.star-btn:active:not(:disabled) { transform: scale(0.9) !important; }
+.star-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.card-flash { animation: cardGlow 1s ease-out forwards; }
+.pts-pop    { animation: ptsPop 0.35s ease-out; }
