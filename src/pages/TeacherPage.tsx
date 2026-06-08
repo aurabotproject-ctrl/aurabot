@@ -656,7 +656,6 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         )}
         </div>{/* inner container */}
         </div>{/* main padding */}
-      </div>{/* tp-page */}
 
       {/* Modals */}
       {renderModal()}
