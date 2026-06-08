@@ -21,6 +21,68 @@ const TABS: { key: TabKey; label: string }[] = [
 ];
 
 function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; onSignOut: () => void }) {
+  const spaceCanvasRef = React.useRef<HTMLCanvasElement>(null);
+  const [isDark, setIsDark] = React.useState<boolean>(() => {
+    try { return localStorage.getItem('tp_theme') !== 'light'; } catch { return true; }
+  });
+  const toggleTheme = () => setIsDark(d => {
+    const next = !d;
+    try { localStorage.setItem('tp_theme', next ? 'dark' : 'light'); } catch {}
+    return next;
+  });
+
+  React.useEffect(() => {
+    const canvas = spaceCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+    let animId = 0;
+    type Star = { x: number; y: number; r: number; offset: number; speed: number; brightness: number };
+    let stars: Star[] = [];
+    const init = () => {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width  = window.innerWidth  * dpr;
+      canvas.height = window.innerHeight * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      stars = Array.from({ length: 160 }, () => ({
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        r: Math.random() * 1.5 + 0.3,
+        offset: Math.random() * Math.PI * 2,
+        speed: 0.0008 + Math.random() * 0.002,
+        brightness: 0.4 + Math.random() * 0.6,
+      }));
+    };
+    init();
+    window.addEventListener('resize', init);
+    const draw = (ts: number) => {
+      const W = window.innerWidth, H = window.innerHeight;
+      ctx.clearRect(0, 0, W, H);
+      const bg = ctx.createRadialGradient(W*.5, H*.35, 0, W*.5, H*.5, Math.max(W,H)*.9);
+      bg.addColorStop(0, '#0d1b3e'); bg.addColorStop(0.4, '#08112a');
+      bg.addColorStop(0.8, '#050c1a'); bg.addColorStop(1, '#020608');
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+      const n1 = ctx.createRadialGradient(W*.8, H*.2, 0, W*.8, H*.2, W*.35);
+      n1.addColorStop(0,'rgba(80,40,140,0.16)'); n1.addColorStop(1,'rgba(80,40,140,0)');
+      ctx.fillStyle = n1; ctx.fillRect(0, 0, W, H);
+      const n2 = ctx.createRadialGradient(W*.15, H*.75, 0, W*.15, H*.75, W*.28);
+      n2.addColorStop(0,'rgba(20,80,120,0.13)'); n2.addColorStop(1,'rgba(20,80,120,0)');
+      ctx.fillStyle = n2; ctx.fillRect(0, 0, W, H);
+      for (const s of stars) {
+        const t = s.brightness * (0.5 + 0.5 * Math.sin(ts * s.speed + s.offset));
+        if (s.r > 1.2 && t > 0.82) {
+          ctx.strokeStyle = `rgba(180,220,255,${t*.45})`; ctx.lineWidth = 0.5;
+          ctx.beginPath(); ctx.moveTo(s.x-s.r*3,s.y); ctx.lineTo(s.x+s.r*3,s.y); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(s.x,s.y-s.r*3); ctx.lineTo(s.x,s.y+s.r*3); ctx.stroke();
+        }
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(200,225,255,${t})`; ctx.fill();
+      }
+      animId = requestAnimationFrame(draw);
+    };
+    animId = requestAnimationFrame(draw);
+    return () => { cancelAnimationFrame(animId); window.removeEventListener('resize', init); };
+  }, []);
+
   const [tab, setTab] = useState<TabKey>('generate');
   const [students, setStudents] = useState<Student[]>([]);
   const [cards, setCards] = useState<Card[]>([]);
@@ -231,55 +293,65 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#fce4ec 0%,#f3e5f5 30%,#e8eaf6 60%,#e1f5fe 100%)', fontFamily: "'Nunito','Segoe UI',sans-serif" }}>
+    <div style={{ position:'relative', minHeight:'100vh', fontFamily:"'Nunito','Segoe UI',sans-serif" }}>
+      <canvas ref={spaceCanvasRef} style={{ position:'fixed', inset:0, width:'100%', height:'100%', zIndex:0, pointerEvents:'none', opacity: isDark ? 1 : 0, transition:'opacity 0.6s' }} />
+      {!isDark && <div style={{ position:'fixed', inset:0, zIndex:0, background:'linear-gradient(160deg,#dce8ff 0%,#eaf0ff 40%,#f0f5ff 70%,#e8eeff 100%)' }} />}
+      <div className={`tp-page ${isDark ? 'tp-dark' : 'tp-light'}`} style={{ position:'relative', zIndex:1, minHeight:'100vh' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
         .tp-page * { font-family: 'Nunito','Segoe UI',sans-serif !important; }
-        .tp-tab { padding:9px 18px; border-radius:14px; border:1.5px solid transparent; font-size:0.78rem; font-weight:800; cursor:pointer; background:transparent; color:#8090b0; letter-spacing:0.04em; transition:all 0.2s; }
-        .tp-tab:hover { background:rgba(255,255,255,0.6); color:#5060a0; }
-        .tp-tab.active { background:rgba(255,255,255,0.85); border-color:rgba(180,160,220,0.35); color:#3040a0; box-shadow:0 4px 16px rgba(160,120,220,0.12); }
-        .tp-panel { background:rgba(255,255,255,0.72); border-radius:20px; padding:20px; border:1.5px solid rgba(255,255,255,0.9); box-shadow:0 4px 24px rgba(180,120,220,0.08); backdrop-filter:blur(8px); }
-        .tp-label { display:block; font-size:0.68rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:#8090b0; margin-bottom:6px; }
-        .tp-input { width:100%; padding:10px 14px; border:1.5px solid rgba(180,160,220,0.3); border-radius:12px; font-size:0.88rem; background:rgba(255,255,255,0.8); color:#3040a0; font-family:inherit; outline:none; transition:border-color 0.2s; box-sizing:border-box; }
-        .tp-input:focus { border-color:#a090d0; box-shadow:0 0 0 3px rgba(160,140,210,0.12); }
-        .tp-btn-primary { padding:10px 20px; border-radius:14px; border:none; background:linear-gradient(135deg,#b39ddb,#9575cd); color:#fff; font-weight:800; font-size:0.85rem; cursor:pointer; letter-spacing:0.06em; transition:all 0.2s; box-shadow:0 4px 16px rgba(150,100,200,0.25); font-family:inherit; }
-        .tp-btn-primary:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 6px 20px rgba(150,100,200,0.35); }
+        .tp-dark  { --tp-panel:rgba(8,18,50,0.82); --tp-border:rgba(60,100,200,0.22); --tp-shadow:0 4px 24px rgba(0,0,0,0.45); --tp-outer:rgba(8,18,48,0.72); --tp-outer-border:rgba(80,120,255,0.18); --tp-outer-shadow:0 20px 80px rgba(0,0,0,0.6); --tp-text:#a8d8ff; --tp-text2:rgba(140,180,255,0.75); --tp-muted:rgba(120,160,255,0.45); --tp-input-bg:rgba(255,255,255,0.06); --tp-input-border:rgba(80,120,255,0.25); --tp-header-bg:rgba(8,18,50,0.88); --tp-header-border:rgba(60,100,200,0.2); }
+        .tp-light { --tp-panel:rgba(235,242,255,0.88); --tp-border:rgba(160,190,240,0.35); --tp-shadow:0 4px 24px rgba(60,90,180,0.08); --tp-outer:rgba(220,232,255,0.6); --tp-outer-border:rgba(140,180,240,0.3); --tp-outer-shadow:0 20px 60px rgba(40,70,160,0.1); --tp-text:#1a2b6b; --tp-text2:#3a4e8a; --tp-muted:#7080a8; --tp-input-bg:rgba(180,210,255,0.18); --tp-input-border:rgba(120,170,240,0.3); --tp-header-bg:rgba(220,232,255,0.85); --tp-header-border:rgba(140,180,240,0.3); }
+        .tp-tab { padding:9px 18px; border-radius:14px; border:1.5px solid transparent; font-size:0.78rem; font-weight:800; cursor:pointer; background:transparent; color:var(--tp-muted); letter-spacing:0.04em; transition:all 0.2s; }
+        .tp-tab:hover { background:rgba(80,120,255,0.08); color:var(--tp-text2); }
+        .tp-tab.active { background:var(--tp-panel); border-color:var(--tp-border); color:var(--tp-text); box-shadow:var(--tp-shadow); }
+        .tp-panel { background:var(--tp-panel); border-radius:20px; padding:20px; border:1.5px solid var(--tp-border); box-shadow:var(--tp-shadow); backdrop-filter:blur(20px); }
+        .tp-label { display:block; font-size:0.68rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--tp-muted); margin-bottom:6px; }
+        .tp-input { width:100%; padding:10px 14px; border:1.5px solid var(--tp-input-border); border-radius:12px; font-size:0.88rem; background:var(--tp-input-bg); color:var(--tp-text); font-family:inherit; outline:none; transition:border-color 0.2s; box-sizing:border-box; }
+        .tp-input:focus { border-color:rgba(100,150,255,0.6); box-shadow:0 0 0 3px rgba(80,120,255,0.12); }
+        .tp-textarea { width:100%; padding:10px 14px; border:1.5px solid var(--tp-input-border); border-radius:12px; font-size:0.82rem; background:var(--tp-input-bg); color:var(--tp-text); font-family:inherit; outline:none; resize:vertical; box-sizing:border-box; }
+        .tp-select { padding:9px 14px; border-radius:12px; border:1.5px solid var(--tp-input-border); background:var(--tp-input-bg); color:var(--tp-text); font-size:0.82rem; font-family:inherit; outline:none; }
+        .tp-btn-primary { padding:10px 20px; border-radius:14px; border:none; background:linear-gradient(135deg,#4a6fd4,#2e4fa3); color:#fff; font-weight:800; font-size:0.85rem; cursor:pointer; letter-spacing:0.06em; transition:all 0.2s; box-shadow:0 4px 16px rgba(60,100,200,0.3); font-family:inherit; }
+        .tp-btn-primary:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 6px 20px rgba(60,100,200,0.4); }
         .tp-btn-primary:disabled { opacity:0.6; cursor:not-allowed; }
         .tp-btn-gold { padding:9px 18px; border-radius:12px; border:none; background:linear-gradient(135deg,#ffd54f,#ffb300); color:#5a3a00; font-weight:800; font-size:0.82rem; cursor:pointer; transition:all 0.2s; box-shadow:0 3px 12px rgba(200,150,0,0.25); font-family:inherit; }
-        .tp-btn-gold:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 5px 18px rgba(200,150,0,0.35); }
+        .tp-btn-gold:hover:not(:disabled) { transform:translateY(-1px); }
         .tp-btn-gold:disabled { opacity:0.6; cursor:not-allowed; }
-        .tp-btn-outline { padding:7px 14px; border-radius:10px; border:1.5px solid rgba(160,140,210,0.35); background:rgba(255,255,255,0.6); color:#6070b0; font-weight:700; font-size:0.78rem; cursor:pointer; transition:all 0.2s; font-family:inherit; }
-        .tp-btn-outline:hover { background:rgba(255,255,255,0.9); border-color:rgba(160,140,210,0.6); }
-        .tp-btn-danger { padding:7px 14px; border-radius:10px; border:1.5px solid rgba(220,80,80,0.3); background:rgba(255,200,200,0.15); color:#c04040; font-weight:700; font-size:0.78rem; cursor:pointer; transition:all 0.2s; font-family:inherit; }
-        .tp-btn-danger:hover { background:rgba(255,180,180,0.3); }
-        .tp-chip { padding:6px 14px; border-radius:20px; border:1.5px solid rgba(180,160,220,0.3); background:rgba(255,255,255,0.6); color:#6070b0; font-size:0.78rem; font-weight:700; cursor:pointer; transition:all 0.2s; font-family:inherit; }
-        .tp-chip-active { background:rgba(160,140,220,0.15); border-color:#a090d0; color:#3040a0; }
-        .tp-rarity { border-radius:12px; padding:8px 4px; border:1.5px solid rgba(180,160,220,0.25); background:rgba(255,255,255,0.5); color:#8090b0; font-size:0.72rem; font-weight:800; cursor:pointer; text-align:center; transition:all 0.2s; font-family:inherit; }
-        .tp-rarity-active { border-color:#a090d0; background:rgba(160,140,220,0.12); color:#3040a0; }
+        .tp-btn-outline { padding:7px 14px; border-radius:10px; border:1.5px solid var(--tp-border); background:var(--tp-input-bg); color:var(--tp-text2); font-weight:700; font-size:0.78rem; cursor:pointer; transition:all 0.2s; font-family:inherit; }
+        .tp-btn-outline:hover { background:rgba(80,120,255,0.12); }
+        .tp-btn-danger { padding:7px 14px; border-radius:10px; border:1.5px solid rgba(239,68,68,0.3); background:rgba(239,68,68,0.1); color:#ff8080; font-weight:700; font-size:0.78rem; cursor:pointer; transition:all 0.2s; font-family:inherit; }
+        .tp-btn-danger:hover { background:rgba(239,68,68,0.2); }
+        .tp-chip { padding:6px 14px; border-radius:20px; border:1.5px solid var(--tp-border); background:var(--tp-input-bg); color:var(--tp-text2); font-size:0.78rem; font-weight:700; cursor:pointer; transition:all 0.2s; font-family:inherit; }
+        .tp-chip-active { background:rgba(80,120,255,0.15); border-color:rgba(80,140,255,0.5); color:var(--tp-text); }
+        .tp-rarity { border-radius:12px; padding:8px 4px; border:1.5px solid var(--tp-border); background:var(--tp-input-bg); color:var(--tp-muted); font-size:0.72rem; font-weight:800; cursor:pointer; text-align:center; transition:all 0.2s; font-family:inherit; }
+        .tp-rarity-active { border-color:rgba(80,140,255,0.5); background:rgba(80,120,255,0.15); color:var(--tp-text); }
         .tp-table { width:100%; border-collapse:collapse; }
-        .tp-table th { font-size:0.62rem; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:#9090c0; padding:10px 14px; border-bottom:1.5px solid rgba(180,160,220,0.2); text-align:left; }
-        .tp-table td { padding:12px 14px; border-bottom:1px solid rgba(180,160,220,0.1); font-size:0.84rem; color:#4050a0; vertical-align:middle; }
-        .tp-table tr:hover td { background:rgba(255,255,255,0.5); }
-        .tp-section { font-size:0.65rem; font-weight:800; letter-spacing:0.16em; text-transform:uppercase; color:#9090c0; margin-bottom:14px; }
-        .tp-status-working { padding:10px 16px; border-radius:12px; font-size:0.8rem; font-weight:700; margin-top:10px; background:rgba(100,160,255,0.1); border:1px solid rgba(100,160,255,0.3); color:#3060c0; }
-        .tp-status-done { padding:10px 16px; border-radius:12px; font-size:0.8rem; font-weight:700; margin-top:10px; background:rgba(80,200,120,0.1); border:1px solid rgba(80,200,120,0.3); color:#1a6a3a; }
-        .tp-status-error { padding:10px 16px; border-radius:12px; font-size:0.8rem; font-weight:700; margin-top:10px; background:rgba(255,80,80,0.08); border:1px solid rgba(255,80,80,0.25); color:#c03030; }
-        .tp-modal-bg { position:fixed; inset:0; background:rgba(100,80,160,0.25); backdrop-filter:blur(12px); display:flex; align-items:center; justify-content:center; z-index:200; padding:20px; }
-        .tp-modal { background:linear-gradient(145deg,rgba(255,255,255,0.98),rgba(248,244,255,0.98)); border-radius:28px; padding:32px; width:100%; max-width:480px; position:relative; box-shadow:0 24px 64px rgba(120,80,200,0.18); border:1.5px solid rgba(255,255,255,0.9); }
+        .tp-table th { font-size:0.62rem; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:var(--tp-muted); padding:10px 14px; border-bottom:1.5px solid var(--tp-border); text-align:left; }
+        .tp-table td { padding:12px 14px; border-bottom:1px solid var(--tp-border); font-size:0.84rem; color:var(--tp-text2); vertical-align:middle; }
+        .tp-table tr:hover td { background:rgba(80,120,255,0.05); }
+        .tp-section { font-size:0.65rem; font-weight:800; letter-spacing:0.16em; text-transform:uppercase; color:var(--tp-muted); margin-bottom:14px; }
+        .tp-status-working { padding:10px 16px; border-radius:12px; font-size:0.8rem; font-weight:700; margin-top:10px; background:rgba(100,160,255,0.12); border:1px solid rgba(100,160,255,0.3); color:#6aadff; }
+        .tp-status-done { padding:10px 16px; border-radius:12px; font-size:0.8rem; font-weight:700; margin-top:10px; background:rgba(80,200,120,0.1); border:1px solid rgba(80,200,120,0.3); color:#4caf80; }
+        .tp-status-error { padding:10px 16px; border-radius:12px; font-size:0.8rem; font-weight:700; margin-top:10px; background:rgba(255,80,80,0.1); border:1px solid rgba(255,80,80,0.25); color:#ff8080; }
+        .tp-modal-bg { position:fixed; inset:0; background:rgba(0,10,30,0.55); backdrop-filter:blur(16px); display:flex; align-items:center; justify-content:center; z-index:200; padding:20px; }
+        .tp-modal { background:var(--tp-panel); border-radius:28px; padding:32px; width:100%; max-width:480px; position:relative; box-shadow:0 24px 64px rgba(0,0,30,0.5); border:1.5px solid var(--tp-border); backdrop-filter:blur(24px); }
         .tp-modal-wide { max-width:780px; max-height:90vh; overflow-y:auto; }
-        .tp-modal h3 { font-weight:800; font-size:1.1rem; margin-bottom:20px; color:#3040a0; }
-        .tp-err { background:rgba(255,80,80,0.08); border:1px solid rgba(255,80,80,0.25); color:#c03030; border-radius:10px; padding:8px 14px; font-size:0.78rem; margin-bottom:14px; }
-        .tp-alert-success { background:rgba(80,200,120,0.1); border:1px solid rgba(80,200,120,0.3); color:#1a6a3a; border-radius:12px; padding:10px 16px; font-size:0.82rem; font-weight:700; }
+        .tp-modal h3 { font-weight:800; font-size:1.1rem; margin-bottom:20px; color:var(--tp-text); }
+        .tp-err { background:rgba(255,80,80,0.1); border:1px solid rgba(255,80,80,0.3); color:#ff8080; border-radius:10px; padding:8px 14px; font-size:0.78rem; margin-bottom:14px; }
+        .tp-alert-success { background:rgba(80,200,120,0.1); border:1px solid rgba(80,200,120,0.3); color:#4caf80; border-radius:12px; padding:10px 16px; font-size:0.82rem; font-weight:700; }
+        .tp-page ::-webkit-scrollbar { height:4px; width:4px; }
+        .tp-page ::-webkit-scrollbar-track { background:rgba(255,255,255,0.04); border-radius:10px; }
+        .tp-page ::-webkit-scrollbar-thumb { background:rgba(100,140,255,0.25); border-radius:10px; }
       `}</style>
 
-      <div className="tp-page">
       {/* Header */}
-      <header style={{ background:'rgba(255,255,255,0.65)', borderBottom:'1.5px solid rgba(255,255,255,0.9)', backdropFilter:'blur(12px)', position:'sticky', top:0, zIndex:100, boxShadow:'0 2px 16px rgba(180,120,220,0.08)' }}>
+      <header style={{ background:'var(--tp-header-bg)', borderBottom:'1.5px solid var(--tp-header-border)', backdropFilter:'blur(20px)', position:'sticky', top:0, zIndex:100, boxShadow:'0 2px 16px rgba(0,0,0,0.2)' }}>
         <div style={{ maxWidth:1240, margin:'0 auto', padding:'0 28px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60 }}>
-          <span style={{ fontSize:'1.1rem', fontWeight:900, background:'linear-gradient(135deg,#ce93d8,#9575cd,#64b5f6)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', letterSpacing:'0.04em' }}>✦ ClassCard ✦</span>
+          <span style={{ fontSize:'1.1rem', fontWeight:900, background:'linear-gradient(135deg,#f4a8c8,#a8d8ff,#c8b0ff)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', letterSpacing:'0.04em' }}>✦ ClassCard ✦</span>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <span style={{ fontSize:'0.72rem', padding:'4px 12px', borderRadius:20, background:'rgba(160,140,220,0.1)', border:'1px solid rgba(160,140,220,0.25)', color:'#6070b0', fontWeight:600 }}>{session.user.email}</span>
-            <span style={{ fontSize:'0.65rem', padding:'4px 10px', borderRadius:20, background:'linear-gradient(135deg,rgba(200,160,255,0.2),rgba(160,200,255,0.2))', border:'1px solid rgba(160,140,220,0.3)', color:'#6060b0', fontWeight:800, letterSpacing:'0.1em', textTransform:'uppercase' }}>Teacher</span>
+            <span style={{ fontSize:'0.72rem', padding:'4px 12px', borderRadius:20, background:'var(--tp-input-bg)', border:'1px solid var(--tp-border)', color:'var(--tp-text2)', fontWeight:600 }}>{session.user.email}</span>
+            <span style={{ fontSize:'0.65rem', padding:'4px 10px', borderRadius:20, background:'rgba(80,120,255,0.15)', border:'1px solid rgba(80,120,255,0.25)', color:'var(--tp-text)', fontWeight:800, letterSpacing:'0.1em', textTransform:'uppercase' }}>Teacher</span>
+            <button onClick={toggleTheme} style={{ width:34, height:34, borderRadius:'50%', border:'1.5px solid var(--tp-border)', background:'var(--tp-input-bg)', cursor:'pointer', fontSize:'0.9rem', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.2s', color:'var(--tp-text)' }} title={isDark ? 'Light mode' : 'Dark mode'}>{isDark ? '☀️' : '🌙'}</button>
             <button onClick={onSignOut} className="tp-btn-outline" style={{ fontSize:'0.72rem', padding:'6px 14px' }}>Sign Out</button>
           </div>
         </div>
@@ -287,7 +359,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
       {/* Main */}
       <div style={{ maxWidth:1240, margin:'0 auto', padding:'24px 28px' }}>
-        <div style={{ background:'rgba(255,255,255,0.45)', borderRadius:40, padding:'24px 28px', boxShadow:'0 20px 80px rgba(180,120,220,0.12)', border:'2px solid rgba(255,255,255,0.8)', backdropFilter:'blur(12px)' }}>
+        <div style={{ background:'var(--tp-outer)', borderRadius:40, padding:'24px 28px', boxShadow:'var(--tp-outer-shadow)', border:'1.5px solid var(--tp-outer-border)', backdropFilter:'blur(20px)' }}>
 
         {/* Tab bar */}
         <div style={{ display:'flex', gap:6, marginBottom:24, flexWrap:'wrap' }}>
@@ -2114,7 +2186,8 @@ function WeeklyProjectTab({
           </div>
         </div>
       )}
-    </div>
+      </div>{/* tp-page */}
+    </div>{/* outer */}
   );
 }
 
