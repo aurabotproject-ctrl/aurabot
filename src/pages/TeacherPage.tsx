@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import './TeacherPage.css';
 import PokeCard from '../components/PokeCard';
 import { Auth } from '../lib/auth';
 import { Dashboard } from '../lib/dashboard';
@@ -19,53 +20,6 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'homecomms',    label: '🏠 Home Communication' },
   { key: 'settings',     label: 'Settings' },
 ];
-
-const TP_STYLES = `
-        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
-        .tp-page * { font-family: 'Nunito','Segoe UI',sans-serif !important; }
-        .tp-dark  { --tp-panel:rgba(8,18,50,0.82); --tp-border:rgba(60,100,200,0.22); --tp-shadow:0 4px 24px rgba(0,0,0,0.45); --tp-outer:rgba(8,18,48,0.72); --tp-outer-border:rgba(80,120,255,0.18); --tp-outer-shadow:0 20px 80px rgba(0,0,0,0.6); --tp-text:#a8d8ff; --tp-text2:rgba(140,180,255,0.75); --tp-muted:rgba(120,160,255,0.45); --tp-input-bg:rgba(255,255,255,0.06); --tp-input-border:rgba(80,120,255,0.25); --tp-header-bg:rgba(8,18,50,0.88); --tp-header-border:rgba(60,100,200,0.2); }
-        .tp-light { --tp-panel:rgba(235,242,255,0.88); --tp-border:rgba(160,190,240,0.35); --tp-shadow:0 4px 24px rgba(60,90,180,0.08); --tp-outer:rgba(220,232,255,0.6); --tp-outer-border:rgba(140,180,240,0.3); --tp-outer-shadow:0 20px 60px rgba(40,70,160,0.1); --tp-text:#1a2b6b; --tp-text2:#3a4e8a; --tp-muted:#7080a8; --tp-input-bg:rgba(180,210,255,0.18); --tp-input-border:rgba(120,170,240,0.3); --tp-header-bg:rgba(220,232,255,0.85); --tp-header-border:rgba(140,180,240,0.3); }
-        .tp-tab { padding:9px 18px; border-radius:14px; border:1.5px solid transparent; font-size:0.78rem; font-weight:800; cursor:pointer; background:transparent; color:var(--tp-muted); letter-spacing:0.04em; transition:all 0.2s; }
-        .tp-tab:hover { background:rgba(80,120,255,0.08); color:var(--tp-text2); }
-        .tp-tab.active { background:var(--tp-panel); border-color:var(--tp-border); color:var(--tp-text); box-shadow:var(--tp-shadow); }
-        .tp-panel { background:var(--tp-panel); border-radius:20px; padding:20px; border:1.5px solid var(--tp-border); box-shadow:var(--tp-shadow); backdrop-filter:blur(20px); }
-        .tp-label { display:block; font-size:0.68rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--tp-muted); margin-bottom:6px; }
-        .tp-input { width:100%; padding:10px 14px; border:1.5px solid var(--tp-input-border); border-radius:12px; font-size:0.88rem; background:var(--tp-input-bg); color:var(--tp-text); font-family:inherit; outline:none; transition:border-color 0.2s; box-sizing:border-box; }
-        .tp-input:focus { border-color:rgba(100,150,255,0.6); box-shadow:0 0 0 3px rgba(80,120,255,0.12); }
-        .tp-textarea { width:100%; padding:10px 14px; border:1.5px solid var(--tp-input-border); border-radius:12px; font-size:0.82rem; background:var(--tp-input-bg); color:var(--tp-text); font-family:inherit; outline:none; resize:vertical; box-sizing:border-box; }
-        .tp-select { padding:9px 14px; border-radius:12px; border:1.5px solid var(--tp-input-border); background:var(--tp-input-bg); color:var(--tp-text); font-size:0.82rem; font-family:inherit; outline:none; }
-        .tp-btn-primary { padding:10px 20px; border-radius:14px; border:none; background:linear-gradient(135deg,#4a6fd4,#2e4fa3); color:#fff; font-weight:800; font-size:0.85rem; cursor:pointer; letter-spacing:0.06em; transition:all 0.2s; box-shadow:0 4px 16px rgba(60,100,200,0.3); font-family:inherit; }
-        .tp-btn-primary:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 6px 20px rgba(60,100,200,0.4); }
-        .tp-btn-primary:disabled { opacity:0.6; cursor:not-allowed; }
-        .tp-btn-gold { padding:9px 18px; border-radius:12px; border:none; background:linear-gradient(135deg,#ffd54f,#ffb300); color:#5a3a00; font-weight:800; font-size:0.82rem; cursor:pointer; transition:all 0.2s; box-shadow:0 3px 12px rgba(200,150,0,0.25); font-family:inherit; }
-        .tp-btn-gold:hover:not(:disabled) { transform:translateY(-1px); }
-        .tp-btn-gold:disabled { opacity:0.6; cursor:not-allowed; }
-        .tp-btn-outline { padding:7px 14px; border-radius:10px; border:1.5px solid var(--tp-border); background:var(--tp-input-bg); color:var(--tp-text2); font-weight:700; font-size:0.78rem; cursor:pointer; transition:all 0.2s; font-family:inherit; }
-        .tp-btn-outline:hover { background:rgba(80,120,255,0.12); }
-        .tp-btn-danger { padding:7px 14px; border-radius:10px; border:1.5px solid rgba(239,68,68,0.3); background:rgba(239,68,68,0.1); color:#ff8080; font-weight:700; font-size:0.78rem; cursor:pointer; transition:all 0.2s; font-family:inherit; }
-        .tp-btn-danger:hover { background:rgba(239,68,68,0.2); }
-        .tp-chip { padding:6px 14px; border-radius:20px; border:1.5px solid var(--tp-border); background:var(--tp-input-bg); color:var(--tp-text2); font-size:0.78rem; font-weight:700; cursor:pointer; transition:all 0.2s; font-family:inherit; }
-        .tp-chip-active { background:rgba(80,120,255,0.15); border-color:rgba(80,140,255,0.5); color:var(--tp-text); }
-        .tp-rarity { border-radius:12px; padding:8px 4px; border:1.5px solid var(--tp-border); background:var(--tp-input-bg); color:var(--tp-muted); font-size:0.72rem; font-weight:800; cursor:pointer; text-align:center; transition:all 0.2s; font-family:inherit; }
-        .tp-rarity-active { border-color:rgba(80,140,255,0.5); background:rgba(80,120,255,0.15); color:var(--tp-text); }
-        .tp-table { width:100%; border-collapse:collapse; }
-        .tp-table th { font-size:0.62rem; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:var(--tp-muted); padding:10px 14px; border-bottom:1.5px solid var(--tp-border); text-align:left; }
-        .tp-table td { padding:12px 14px; border-bottom:1px solid var(--tp-border); font-size:0.84rem; color:var(--tp-text2); vertical-align:middle; }
-        .tp-table tr:hover td { background:rgba(80,120,255,0.05); }
-        .tp-section { font-size:0.65rem; font-weight:800; letter-spacing:0.16em; text-transform:uppercase; color:var(--tp-muted); margin-bottom:14px; }
-        .tp-status-working { padding:10px 16px; border-radius:12px; font-size:0.8rem; font-weight:700; margin-top:10px; background:rgba(100,160,255,0.12); border:1px solid rgba(100,160,255,0.3); color:#6aadff; }
-        .tp-status-done { padding:10px 16px; border-radius:12px; font-size:0.8rem; font-weight:700; margin-top:10px; background:rgba(80,200,120,0.1); border:1px solid rgba(80,200,120,0.3); color:#4caf80; }
-        .tp-status-error { padding:10px 16px; border-radius:12px; font-size:0.8rem; font-weight:700; margin-top:10px; background:rgba(255,80,80,0.1); border:1px solid rgba(255,80,80,0.25); color:#ff8080; }
-        .tp-modal-bg { position:fixed; inset:0; background:rgba(0,10,30,0.55); backdrop-filter:blur(16px); display:flex; align-items:center; justify-content:center; z-index:200; padding:20px; }
-        .tp-modal { background:var(--tp-panel); border-radius:28px; padding:32px; width:100%; max-width:480px; position:relative; box-shadow:0 24px 64px rgba(0,0,30,0.5); border:1.5px solid var(--tp-border); backdrop-filter:blur(24px); }
-        .tp-modal-wide { max-width:780px; max-height:90vh; overflow-y:auto; }
-        .tp-modal h3 { font-weight:800; font-size:1.1rem; margin-bottom:20px; color:var(--tp-text); }
-        .tp-err { background:rgba(255,80,80,0.1); border:1px solid rgba(255,80,80,0.3); color:#ff8080; border-radius:10px; padding:8px 14px; font-size:0.78rem; margin-bottom:14px; }
-        .tp-alert-success { background:rgba(80,200,120,0.1); border:1px solid rgba(80,200,120,0.3); color:#4caf80; border-radius:12px; padding:10px 16px; font-size:0.82rem; font-weight:700; }
-        .tp-page ::-webkit-scrollbar { height:4px; width:4px; }
-        .tp-page ::-webkit-scrollbar-track { background:rgba(255,255,255,0.04); border-radius:10px; }
-        .tp-page ::-webkit-scrollbar-thumb { background:rgba(100,140,255,0.25); border-radius:10px; }
-`;
 
 function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; onSignOut: () => void }) {
   const spaceCanvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -344,7 +298,6 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
       <canvas ref={spaceCanvasRef} style={{ position:'fixed', inset:0, width:'100%', height:'100%', zIndex:0, pointerEvents:'none', opacity: isDark ? 1 : 0, transition:'opacity 0.6s' }} />
       {!isDark && <div style={{ position:'fixed', inset:0, zIndex:0, background:'linear-gradient(160deg,#dce8ff 0%,#eaf0ff 40%,#f0f5ff 70%,#e8eeff 100%)' }} />}
       <div className={`tp-page ${isDark ? 'tp-dark' : 'tp-light'}`} style={{ position:'relative', zIndex:1, minHeight:'100vh' }}>
-      <style dangerouslySetInnerHTML={{__html: TP_STYLES}} />
 
       {/* Header */}
       <header style={{ background:'var(--tp-header-bg)', borderBottom:'1.5px solid var(--tp-header-border)', backdropFilter:'blur(20px)', position:'sticky', top:0, zIndex:100, boxShadow:'0 2px 16px rgba(0,0,0,0.2)' }}>
