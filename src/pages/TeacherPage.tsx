@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './TeacherPage.css';
 import PokeCard from '../components/PokeCard';
+import { TeacherBotThumbnail } from '../components/BotAvatar';
 import { Auth } from '../lib/auth';
 import { Dashboard } from '../lib/dashboard';
 import { AI } from '../lib/ai';
@@ -300,7 +301,6 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
       {!isDark && <div style={{ position:'fixed', inset:0, zIndex:0, background:'linear-gradient(160deg,#dce8ff 0%,#eaf0ff 40%,#f0f5ff 70%,#e8eeff 100%)' }} />}
       <div className={'tp-page ' + (isDark ? 'tp-dark' : 'tp-light')} style={{ position:'relative', zIndex:1, minHeight:'100vh' }}>
 
-      <div className="tp-page">
       {/* Header */}
       <header style={{ background:'var(--tp-header-bg,rgba(8,18,50,0.88))', borderBottom:'1.5px solid var(--tp-header-border,rgba(60,100,200,0.2))', backdropFilter:'blur(20px)', position:'sticky', top:0, zIndex:100, boxShadow:'0 2px 16px rgba(0,0,0,0.2)' }}>
         <div style={{ maxWidth:1240, margin:'0 auto', padding:'0 28px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60 }}>
@@ -681,7 +681,8 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
           </div>
         </div>
       )}
-    </div>
+    </div>{/* tp-page */}
+    </div>{/* outer */}
   );
 
   function renderModal() {
@@ -1070,7 +1071,6 @@ function ModalForm({ fields, onSubmit, submitLabel, error, onCancel }: {
 // ══════════════════════════════════════════════════════════════════════
 
 // Bot thumbnails use the shared BotAvatar component
-import { TeacherBotThumbnail } from '../components/BotAvatar';
 
 // Alias for backwards compatibility within this file
 const MiniBotAvatar = ({ colorIndex, size = 90, facePixels, botElements, starPoints }: { colorIndex: number; size?: number; facePixels?: string[] | null; botElements?: any[] | null; starPoints?: number }) =>

@@ -33,6 +33,7 @@
 .tp-status-working { padding:10px 16px; border-radius:12px; font-size:0.8rem; font-weight:700; margin-top:10px; background:rgba(100,160,255,0.12); border:1px solid rgba(100,160,255,0.3); color:#6aadff; }
 .tp-status-done { padding:10px 16px; border-radius:12px; font-size:0.8rem; font-weight:700; margin-top:10px; background:rgba(80,200,120,0.1); border:1px solid rgba(80,200,120,0.3); color:#4caf80; }
 .tp-status-error { padding:10px 16px; border-radius:12px; font-size:0.8rem; font-weight:700; margin-top:10px; background:rgba(255,80,80,0.1); border:1px solid rgba(255,80,80,0.25); color:#ff8080; }
+.tp-status-default { display:none; }
 .tp-modal-bg { position:fixed; inset:0; background:rgba(0,10,30,0.55); backdrop-filter:blur(16px); display:flex; align-items:center; justify-content:center; z-index:200; padding:20px; }
 .tp-modal { background:var(--tp-panel); border-radius:28px; padding:32px; width:100%; max-width:480px; position:relative; box-shadow:0 24px 64px rgba(0,0,30,0.5); border:1.5px solid var(--tp-border); backdrop-filter:blur(24px); }
 .tp-modal-wide { max-width:780px; max-height:90vh; overflow-y:auto; }
