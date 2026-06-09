@@ -1145,9 +1145,9 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
   };
 
   const starColors = {
-    bronze: { bg: 'linear-gradient(135deg,#fbbf24,#f59e0b)', label: '✨', pts: 1, glow: 'rgba(251,191,36,0.5)', name: 'Bronze' },
-    silver: { bg: 'linear-gradient(135deg,#94a3b8,#64748b)', label: '⭐', pts: 2, glow: 'rgba(148,163,184,0.5)', name: 'Silver' },
-    gold:   { bg: 'linear-gradient(135deg,#f59e0b,#d97706)', label: '🌟', pts: 3, glow: 'rgba(245,158,11,0.6)', name: 'Gold'   },
+    bronze: { bg: 'linear-gradient(135deg,#f59e0b,#d97706)', label: '⭐', pts: 1, glow: 'rgba(245,158,11,0.5)', name: 'Bronze' },
+    silver: { bg: 'linear-gradient(135deg,#94a3b8,#64748b)', label: '🌟', pts: 2, glow: 'rgba(148,163,184,0.5)', name: 'Silver' },
+    gold:   { bg: 'linear-gradient(135deg,#fbbf24,#f59e0b)', label: '✨', pts: 3, glow: 'rgba(251,191,36,0.6)', name: 'Gold'   },
   };
 
   return (
@@ -1155,17 +1155,17 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
 
 
       {/* Header */}
-      <div style={{ background: 'var(--tp-panel)', borderRadius: 20, padding: '18px 24px', border: '1.5px solid var(--tp-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ background: 'linear-gradient(135deg,rgba(255,215,0,0.12),rgba(255,165,0,0.08))', borderRadius: 20, padding: '18px 24px', border: '1.5px solid rgba(255,200,50,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <div style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--tp-text)', marginBottom: 4 }}>⭐ Star Points</div>
-          <div style={{ fontSize: '0.8rem', color: 'var(--tp-text2)', lineHeight: 1.5 }}>
+          <div style={{ fontSize: '1rem', fontWeight: 900, color: '#92400e', marginBottom: 4 }}>⭐ Star Points</div>
+          <div style={{ fontSize: '0.8rem', color: '#b45309', lineHeight: 1.5 }}>
             Tap a star to award points — students spend them on card packs.&nbsp;
-            <span style={{ background: 'rgba(251,191,36,0.15)', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: 'var(--tp-text2)', border: '1px solid rgba(251,191,36,0.25)' }}>✨ = 1pt</span>&nbsp;
-            <span style={{ background: 'rgba(148,163,184,0.15)', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: 'var(--tp-text2)', border: '1px solid rgba(148,163,184,0.25)' }}>⭐ = 2pts</span>&nbsp;
-            <span style={{ background: 'rgba(245,158,11,0.15)', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: 'var(--tp-text2)', border: '1px solid rgba(245,158,11,0.25)' }}>🌟 = 3pts</span>
+            <span style={{ background: '#f59e0b22', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#92400e' }}>⭐ = 1pt</span>&nbsp;
+            <span style={{ background: '#94a3b822', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>🌟 = 2pts</span>&nbsp;
+            <span style={{ background: '#fbbf2422', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#a07000' }}>✨ = 3pts</span>
           </div>
         </div>
-        <div style={{ fontSize: '0.75rem', color: 'var(--tp-muted)', fontWeight: 700 }}>{students.length} students</div>
+        <div style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 700 }}>{students.length} students</div>
       </div>
 
       {loading ? (
@@ -1182,11 +1182,11 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
             return (
               <div key={student.id}
                 className={isFlashing ? 'card-flash' : ''}
-                style={{ background: 'white', borderRadius: 22, padding: '14px 10px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1.5px solid rgba(180,160,220,0.15)', position: 'relative' }}>
+                style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 22, padding: '14px 10px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, boxShadow: '0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.13)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', position: 'relative' }}>
 
                 {/* Points badge — re-keys on pts to retrigger ptsPop animation */}
                 <div key={`pts-${student.id}-${pts}`} className="pts-pop"
-                  style={{ position: 'absolute', top: -11, right: -11, background: pts > 0 ? 'linear-gradient(135deg,#fbbf24,#f59e0b)' : '#e5e7eb', color: pts > 0 ? 'white' : '#9ca3af', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.85rem', boxShadow: pts > 0 ? '0 2px 8px rgba(251,191,36,0.6)' : 'none', border: '2.5px solid white', zIndex: 1 }}>
+                  style={{ position: 'absolute', top: -11, right: -11, background: pts > 0 ? 'linear-gradient(135deg,#fbbf24,#f59e0b)' : 'rgba(255,255,255,0.12)', color: pts > 0 ? 'white' : 'rgba(255,255,255,0.4)', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.85rem', boxShadow: pts > 0 ? '0 2px 8px rgba(251,191,36,0.6)' : 'none', border: '1.5px solid rgba(255,255,255,0.2)', zIndex: 1 }}>
                   {pts}
                 </div>
 
@@ -1194,7 +1194,7 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
                 <MiniBotAvatar colorIndex={colorIdx} size={90} facePixels={facePixelMap[student.id]} botElements={botElementMap[student.id]} starPoints={pts} />
 
                 {/* Name */}
-                <div style={{ fontWeight: 800, fontSize: '0.82rem', color: 'var(--tp-accent-blue)', textAlign: 'center', lineHeight: 1.2 }}>{student.name}</div>
+                <div style={{ fontWeight: 800, fontSize: '0.82rem', color: 'var(--tp-text)', textAlign: 'center', lineHeight: 1.2 }}>{student.name}</div>
 
                 {/* Star buttons */}
                 <div style={{ display: 'flex', gap: 5, width: '100%', marginTop: 2 }}>
