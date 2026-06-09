@@ -622,38 +622,30 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
       <div className={'tp-page ' + (isDark ? 'tp-dark' : 'tp-light')} style={{ position:'relative', zIndex:1, minHeight:'100vh' }}>
 
       {/* Header */}
-      <header className="tp-header">
-        <div className="tp-header-inner">
-          <div style={{ display:'flex', alignItems:'center' }}>
-            <span className="tp-logo-icon">🤖</span>
-            <span className="tp-logo">COLLECTCARD</span>
-          </div>
+      <header style={{ background:'var(--tp-header-bg,rgba(8,18,50,0.88))', borderBottom:'1.5px solid var(--tp-header-border,rgba(60,100,200,0.2))', backdropFilter:'blur(20px)', position:'sticky', top:0, zIndex:100, boxShadow:'0 2px 16px rgba(0,0,0,0.2)' }}>
+        <div style={{ maxWidth:1240, margin:'0 auto', padding:'0 28px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60 }}>
+          <span style={{ fontSize:'1.1rem', fontWeight:900, background:'linear-gradient(135deg,#f4a8c8,#a8d8ff,#c8b0ff)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', letterSpacing:'0.04em' }}>✦ ClassCard ✦</span>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <span className="tp-pill-email">{session.user.email}</span>
-            <span className="tp-pill-role">Teacher</span>
-            <div className="tp-notif-wrap">
-              <button className="tp-btn-icon" title="Notifications">🔔</button>
-              <span className="tp-notif-badge">1</span>
-            </div>
-            <button onClick={toggleTheme} className="tp-btn-icon" title={isDark ? 'Light mode' : 'Dark mode'}>{isDark ? '☀️' : '🌙'}</button>
-            <button onClick={onSignOut} className="tp-btn-outline" style={{ fontSize:'0.72rem', padding:'6px 16px', display:'flex', alignItems:'center', gap:6 }}>↪ Sign Out</button>
+            <span style={{ fontSize:'0.72rem', padding:'4px 12px', borderRadius:20, background:'rgba(160,140,220,0.1)', border:'1px solid rgba(160,140,220,0.25)', color:'#6070b0', fontWeight:600 }}>{session.user.email}</span>
+            <span style={{ fontSize:'0.65rem', padding:'4px 10px', borderRadius:20, background:'linear-gradient(135deg,rgba(200,160,255,0.2),rgba(160,200,255,0.2))', border:'1px solid rgba(160,140,220,0.3)', color:'#6060b0', fontWeight:800, letterSpacing:'0.1em', textTransform:'uppercase' }}>Teacher</span>
+            <button onClick={toggleTheme} style={{ width:34, height:34, borderRadius:'50%', border:'1.5px solid var(--tp-border,rgba(60,100,200,0.22))', background:'var(--tp-input-bg,rgba(255,255,255,0.06))', cursor:'pointer', fontSize:'0.9rem', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.2s' }} title={isDark ? 'Light mode' : 'Dark mode'}>{isDark ? '☀️' : '🌙'}</button>
+            <button onClick={onSignOut} className="tp-btn-outline" style={{ fontSize:'0.72rem', padding:'6px 14px' }}>Sign Out</button>
           </div>
         </div>
       </header>
 
       {/* Main */}
-      <div style={{ maxWidth:1280, margin:'0 auto', padding:'24px 28px' }}>
-        <div style={{ background:'var(--tp-outer)', borderRadius:28, boxShadow:'var(--tp-outer-shadow)', border:'1.5px solid var(--tp-outer-border)', backdropFilter:'blur(20px)', overflow:'hidden' }}>
+      <div style={{ maxWidth:1240, margin:'0 auto', padding:'24px 28px' }}>
+        <div style={{ background:'var(--tp-outer,rgba(8,18,48,0.72))', borderRadius:40, padding:'24px 28px', boxShadow:'var(--tp-outer-shadow,0 20px 80px rgba(0,0,0,0.6))', border:'1.5px solid var(--tp-outer-border,rgba(80,120,255,0.18))', backdropFilter:'blur(20px)' }}>
 
         {/* Tab bar */}
-        <div className="tp-tabs">
+        <div style={{ display:'flex', gap:6, marginBottom:24, flexWrap:'wrap' }}>
           {TABS.map(t => (
             <button key={t.key} className={`tp-tab${tab === t.key ? ' active' : ''}`} onClick={() => { setTab(t.key); setFilterStudent(null); }}>
               {t.label}
             </button>
           ))}
         </div>
-        <div className="tp-content-area">
 
         {/* Generate Card Tab */}
         {tab === 'generate' && (
@@ -966,8 +958,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
             </div>
           </div>
         )}
-        </div>{/* tp-content-area */}
-        </div>{/* outer card */}
+        </div>{/* inner container */}
         </div>{/* main padding */}
 
       {/* Modals */}
@@ -1154,9 +1145,9 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
   };
 
   const starColors = {
-    bronze: { bg: 'linear-gradient(135deg,#f59e0b,#d97706)', label: '⭐', pts: 1, glow: 'rgba(245,158,11,0.5)', name: 'Bronze' },
-    silver: { bg: 'linear-gradient(135deg,#94a3b8,#64748b)', label: '🌟', pts: 2, glow: 'rgba(148,163,184,0.5)', name: 'Silver' },
-    gold:   { bg: 'linear-gradient(135deg,#fbbf24,#f59e0b)', label: '✨', pts: 3, glow: 'rgba(251,191,36,0.6)', name: 'Gold'   },
+    bronze: { bg: 'linear-gradient(135deg,#fbbf24,#f59e0b)', label: '✨', pts: 1, glow: 'rgba(251,191,36,0.5)', name: 'Bronze' },
+    silver: { bg: 'linear-gradient(135deg,#94a3b8,#64748b)', label: '⭐', pts: 2, glow: 'rgba(148,163,184,0.5)', name: 'Silver' },
+    gold:   { bg: 'linear-gradient(135deg,#f59e0b,#d97706)', label: '🌟', pts: 3, glow: 'rgba(245,158,11,0.6)', name: 'Gold'   },
   };
 
   return (
@@ -1164,17 +1155,17 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
 
 
       {/* Header */}
-      <div style={{ background: 'linear-gradient(135deg,rgba(255,215,0,0.12),rgba(255,165,0,0.08))', borderRadius: 20, padding: '18px 24px', border: '1.5px solid rgba(255,200,50,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ background: 'var(--tp-panel)', borderRadius: 20, padding: '18px 24px', border: '1.5px solid var(--tp-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <div style={{ fontSize: '1rem', fontWeight: 900, color: '#92400e', marginBottom: 4 }}>⭐ Star Points</div>
-          <div style={{ fontSize: '0.8rem', color: '#b45309', lineHeight: 1.5 }}>
+          <div style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--tp-text)', marginBottom: 4 }}>⭐ Star Points</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--tp-text2)', lineHeight: 1.5 }}>
             Tap a star to award points — students spend them on card packs.&nbsp;
-            <span style={{ background: '#f59e0b22', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#92400e' }}>⭐ = 1pt</span>&nbsp;
-            <span style={{ background: '#94a3b822', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>🌟 = 2pts</span>&nbsp;
-            <span style={{ background: '#fbbf2422', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#a07000' }}>✨ = 3pts</span>
+            <span style={{ background: 'rgba(251,191,36,0.15)', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: 'var(--tp-text2)', border: '1px solid rgba(251,191,36,0.25)' }}>✨ = 1pt</span>&nbsp;
+            <span style={{ background: 'rgba(148,163,184,0.15)', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: 'var(--tp-text2)', border: '1px solid rgba(148,163,184,0.25)' }}>⭐ = 2pts</span>&nbsp;
+            <span style={{ background: 'rgba(245,158,11,0.15)', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: 'var(--tp-text2)', border: '1px solid rgba(245,158,11,0.25)' }}>🌟 = 3pts</span>
           </div>
         </div>
-        <div style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 700 }}>{students.length} students</div>
+        <div style={{ fontSize: '0.75rem', color: 'var(--tp-muted)', fontWeight: 700 }}>{students.length} students</div>
       </div>
 
       {loading ? (
@@ -1203,7 +1194,7 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
                 <MiniBotAvatar colorIndex={colorIdx} size={90} facePixels={facePixelMap[student.id]} botElements={botElementMap[student.id]} starPoints={pts} />
 
                 {/* Name */}
-                <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#3040a0', textAlign: 'center', lineHeight: 1.2 }}>{student.name}</div>
+                <div style={{ fontWeight: 800, fontSize: '0.82rem', color: 'var(--tp-accent-blue)', textAlign: 'center', lineHeight: 1.2 }}>{student.name}</div>
 
                 {/* Star buttons */}
                 <div style={{ display: 'flex', gap: 5, width: '100%', marginTop: 2 }}>
@@ -1854,11 +1845,10 @@ function WeeklyProjectTab({
       {/* ── Header ── */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
-          <div className="tp-card-header">
-            <div className="tp-card-header-icon">📋</div>
-            <span className="tp-card-header-title">Weekly Project Card</span>
-          </div>
-          <p className="tp-week-label" style={{ paddingLeft: 48 }}>
+          <h2 className="font-display font-bold text-xs uppercase tracking-[0.15em] mb-1" style={{ color: '#c8a000' }}>
+            📋 Weekly Project Card
+          </h2>
+          <p className="text-xs italic" style={{ color: '#9a7040' }}>
             {weeklyProject?.week_label || getCurrentWeekLabel()}
             {weeklyProject?.end_date && ` · Due ${new Date(weeklyProject.end_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`}
             {!weeklyProject?.end_date && ' · Students see this task and earn the card for completing it'}
@@ -1868,20 +1858,20 @@ function WeeklyProjectTab({
           {hasProject && (
             <>
               {/* View toggle */}
-              <div style={{ display: 'flex', borderRadius: 10, overflow: 'hidden', border: '1.5px solid var(--tp-border)' }}>
+              <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(90,50,10,0.2)' }}>
                 <button
                   onClick={() => setWeeklyView('project')}
-                  style={{ padding: '6px 16px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', border: 'none', background: weeklyView === 'project' ? 'rgba(160,100,255,0.18)' : 'transparent', color: weeklyView === 'project' ? 'var(--tp-text)' : 'var(--tp-muted)' }}
+                  style={{ padding: '5px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', border: 'none', background: weeklyView === 'project' ? 'rgba(200,160,0,0.15)' : 'transparent', color: weeklyView === 'project' ? '#8b6a00' : '#9a7040' }}
                 >📋 Project</button>
                 <button
                   onClick={handleViewSubmissions}
-                  style={{ padding: '6px 16px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', border: 'none', borderLeft: '1.5px solid var(--tp-border)', background: weeklyView === 'submissions' ? 'rgba(160,100,255,0.18)' : 'transparent', color: weeklyView === 'submissions' ? 'var(--tp-text)' : 'var(--tp-muted)' }}
-                >📥 Submissions {submissions.length > 0 && <span style={{ background: 'var(--tp-accent-pink)', color: 'white', borderRadius: '50%', padding: '1px 5px', fontSize: '0.62rem', marginLeft: 4 }}>{submissions.length}</span>}</button>
+                  style={{ padding: '5px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', border: 'none', borderLeft: '1px solid rgba(90,50,10,0.2)', background: weeklyView === 'submissions' ? 'rgba(200,160,0,0.15)' : 'transparent', color: weeklyView === 'submissions' ? '#8b6a00' : '#9a7040' }}
+                >📥 Submissions {submissions.length > 0 && <span style={{ background: '#c8a000', color: 'white', borderRadius: '50%', padding: '1px 5px', fontSize: '0.62rem', marginLeft: 4 }}>{submissions.length}</span>}</button>
               </div>
-              <button onClick={handleOpenAward} className="tp-btn-gold">
+              <button onClick={handleOpenAward} className="tp-btn-gold" style={{ fontFamily: "'Cinzel',serif" }}>
                 🏅 Award Students
               </button>
-              <button onClick={handleNewProject} className="tp-btn-outline">
+              <button onClick={handleNewProject} className="tp-btn-outline" style={{ borderColor: 'rgba(90,40,10,0.3)', color: '#7a5a40' }}>
                 + New Project
               </button>
             </>
@@ -1978,7 +1968,7 @@ function WeeklyProjectTab({
         <div className="grid gap-6" style={{ gridTemplateColumns: 'minmax(320px,420px) 1fr' }}>
 
           {/* Left: form */}
-          <div className="tp-panel" style={{ padding: '24px' }}>
+          <div className="p-6 rounded-xs" style={{ background: 'rgba(255,248,222,0.65)', border: '1px solid rgba(90,50,10,0.18)', boxShadow: '2px 3px 12px rgba(0,0,0,0.09)' }}>
 
             <div className="mb-4">
               <label className="tp-label">Project Title</label>
@@ -2020,8 +2010,8 @@ function WeeklyProjectTab({
               )}
             </div>
 
-            <button onClick={handleGenerate} disabled={weeklyGenerating} className="tp-btn-primary" style={{ width:'100%', marginBottom:10, padding:'14px 24px', fontSize:'0.9rem' }}>
-              🤖 {weeklyGenerating ? 'Generating…' : 'GENERATE CARD'}
+            <button onClick={handleGenerate} disabled={weeklyGenerating} className="tp-btn-primary" style={{ width:'100%', marginBottom:10 }}>
+              {weeklyGenerating ? 'Generating…' : '✦ Generate Card ✦'}
             </button>
 
             {weeklyCard && !weeklyGenerating && (
@@ -2050,12 +2040,9 @@ function WeeklyProjectTab({
                 </div>
               </>
             ) : (
-              <div className="tp-preview-empty">
-                <span className="tp-preview-robot">🤖</span>
-                <div className="tp-preview-title">Ready to create!</div>
-                <div className="tp-preview-subtitle">
-                  Fill in the task details on the left and click <span className="tp-preview-highlight">Generate</span> to create your weekly project card.
-                </div>
+              <div className="flex flex-col items-center justify-center rounded-xs" style={{ minHeight: 380, border: '2px dashed rgba(200,160,0,0.2)', background: 'rgba(255,248,222,0.3)' }}>
+                <span className="text-5xl mb-3" style={{ opacity: 0.2 }}>📋</span>
+                <span className="text-sm italic" style={{ color: '#9a7040' }}>Fill in the task and click Generate</span>
               </div>
             )}
           </div>
