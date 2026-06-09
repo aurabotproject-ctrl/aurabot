@@ -1001,8 +1001,10 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
           </div>
         </div>
       )}
-    </div>{/* tp-page */}
-    </div>{/* outer */}
+   {/* tp-page */}
+</div>
+   {/* outer */}
+</div>
   );
 }
 
