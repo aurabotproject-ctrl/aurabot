@@ -789,7 +789,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                   <label className="tp-label">Message</label>
                   <textarea
                     className="tp-input"
-                    placeholder="e.g. Welcome to Term 2! It's going to be a great term full of exciting learning…"
+                    placeholder={"e.g. Welcome to Term 2! It's going to be a great term full of exciting learning…"}
                     value={pbMessage}
                     onChange={e => setPbMessage(e.target.value)}
                     rows={5}
