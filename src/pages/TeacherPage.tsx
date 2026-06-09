@@ -2103,9 +2103,7 @@ function WeeklyProjectTab({
           </div>
         </div>
       )}
-    </div>{/* outer-wrapper */}
-      </div>{/* tp-page */}
-    </div>{/* outer */}
+    </div>
   );
 }
 
