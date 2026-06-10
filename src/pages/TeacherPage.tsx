@@ -697,34 +697,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
         {/* My Cards Tab */}
         {tab === 'cards' && (
-          <div>
-            {filterStudent && (
-              <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
-                <span style={{ fontSize:'0.84rem', color:'#5060a0' }}>Showing cards for: <strong>{students.find(s => s.id === filterStudent)?.name}</strong></span>
-                <button onClick={() => setFilterStudent(null)} className="tp-btn-outline">Show All</button>
-              </div>
-            )}
-            <div className="tp-section">Cards You've Created</div>
-            {displayCards.length === 0 ? (
-              <div style={{ textAlign:'center', padding:'60px 20px' }}>
-                <span style={{ fontSize:'3rem', opacity:0.2, display:'block', marginBottom:12 }}>🃏</span>
-                <span style={{ fontSize:'0.85rem', color:'#a0a8c8', fontStyle:'italic' }}>No cards yet.</span>
-              </div>
-            ) : (
-              <div style={{ display:'flex', flexWrap:'wrap', gap:28, padding:'8px 0' }}>
-                {displayCards.map(c => (
-                  <div key={c.id} style={{ position:'relative' }}>
-                    <PokeCard card={c} showShimmerBtn onClick={() => setDetailCard(c)} />
-                    <div style={{ display:'flex', gap:6, justifyContent:'center', marginTop:8, flexWrap:'wrap' }}>
-                      <button onClick={() => setModal({ type: 'editCard', data: c })} className="tp-btn-outline">✏ Edit</button>
-                      <button onClick={() => handleRegenImage(c)} className="tp-btn-outline" style={{ borderColor:'rgba(100,160,255,0.35)', color:'#5070c0' }}>🎨 New Image</button>
-                      <button onClick={() => setModal({ type: 'deleteCard', data: c })} className="tp-btn-danger">🗑 Delete</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <CharacterPoolTab session={session} />
         )}
 
         {/* Students Tab */}
@@ -1393,29 +1366,25 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
   const currentImage = dbCroppedImage || dbImage;
   const currentRange = RARITY_RANGES[cardRarity] || RARITY_RANGES['common'];
 
-  // Filter state for the database gallery
-  const [dbFilter, setDbFilter] = React.useState<string>('all');
-  const filteredCards = dbFilter === 'all' ? dbCards : dbCards.filter(c => c.type === dbFilter);
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-      {/* ── Header ── */}
-      <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: '18px 24px', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
-        <div style={{ fontSize: '1rem', fontWeight: 900, marginBottom: 4, background: 'linear-gradient(135deg,#c084fc,#818cf8,#38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>🃏 Card Database</div>
-        <div style={{ fontSize: '0.8rem', color: 'rgba(180,210,255,0.7)', lineHeight: 1.5 }}>
-          Create characters for your card pool. Students spend ⭐ star points on packs — each pack pulls random cards from this database.
+      {/* Header */}
+      <div style={{ background: 'linear-gradient(135deg,rgba(160,120,255,0.12),rgba(100,180,255,0.1))', borderRadius: 20, padding: '18px 24px', border: '1.5px solid rgba(160,140,220,0.2)' }}>
+        <div style={{ fontSize: '1rem', fontWeight: 900, color: '#3040a0', marginBottom: 4 }}>🃏 Card Database</div>
+        <div style={{ fontSize: '0.8rem', color: '#6070b0', lineHeight: 1.5 }}>
+          Create cards for the pack pool. Students spend ⭐ star points on packs — each pack pulls random cards from this database. Higher rarity cards appear less often.
         </div>
       </div>
 
-      {/* ── Card Builder ── */}
+      {/* Card Builder */}
       <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr 260px', gap: '1.5rem', alignItems: 'start' }}>
 
         {/* Column 1: Image */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div className="tp-panel">
             <div className="tp-section">1 · Upload Image</div>
-            <div style={{ background: '#0d1230', borderRadius: 8, border: '2px dashed rgba(192,132,252,0.25)', aspectRatio: '4/3', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 8, position: 'relative' }}>
+            <div style={{ background: '#1a1a2e', borderRadius: 8, border: '2px dashed rgba(120,100,200,0.3)', aspectRatio: '4/3', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 8, position: 'relative' }}>
               {dbImage ? (
                 <img src={dbImage} alt="preview" draggable={false}
                   onMouseDown={e => { if (dbCroppedImage) return; e.preventDefault(); setDbIsDragging(true); setDbDragStart({ clientX: e.clientX, clientY: e.clientY, startX: dbPosition.x, startY: dbPosition.y }); }}
@@ -1424,36 +1393,34 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
                   style={{ width: '100%', height: '100%', objectFit: 'cover', transform: `translate(${dbPosition.x}%, ${dbPosition.y}%) scale(${dbScale}) rotate(${dbRotation}deg)`, cursor: dbCroppedImage ? 'default' : (dbIsDragging ? 'grabbing' : 'grab'), userSelect: 'none', minHeight: 130 }}
                 />
               ) : (
-                <div style={{ textAlign: 'center', color: 'rgba(180,210,255,0.35)', fontSize: '0.75rem', padding: 16 }}>
-                  <div style={{ fontSize: '2rem', marginBottom: 4, opacity: 0.4 }}>🖼</div>No image
-                </div>
+                <div style={{ textAlign: 'center', color: '#6070b0', fontSize: '0.75rem', padding: 16 }}><div style={{ fontSize: '2rem', marginBottom: 4 }}>🖼</div>No image</div>
               )}
             </div>
             {dbImage && (
               <div style={{ display: 'flex', gap: 4, marginBottom: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
                 {[['↺', () => setDbRotation(r => r - 90)], ['↻', () => setDbRotation(r => r + 90)], ['⟳', () => { setDbScale(1); setDbRotation(0); setDbPosition({ x:0,y:0 }); setDbCroppedImage(null); }]].map(([l, fn]: any) => (
-                  <button key={l} onClick={fn} style={{ fontSize:'0.68rem', padding:'3px 9px', border:'1px solid rgba(255,255,255,0.15)', borderRadius:4, background:'rgba(255,255,255,0.08)', cursor:'pointer', color:'rgba(200,220,255,0.8)' }}>{l}</button>
+                  <button key={l} onClick={fn} style={{ fontSize:'0.68rem', padding:'3px 9px', border:'1px solid rgba(160,140,220,0.25)', borderRadius:4, background:'rgba(255,255,255,0.6)', cursor:'pointer', color:'#6070b0' }}>{l}</button>
                 ))}
               </div>
             )}
             {dbImage && (
               <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
-                <span style={{ fontSize:'0.65rem', color:'rgba(180,210,255,0.5)', flexShrink:0 }}>🔍</span>
+                <span style={{ fontSize:'0.65rem', color:'#8090b0', flexShrink:0 }}>🔍</span>
                 <input type="range" min="0.3" max="5" step="0.05" value={dbScale}
-                  onChange={e => setDbScale(parseFloat(e.target.value))} style={{ flex:1, accentColor:'#c084fc' }} />
-                <span style={{ fontSize:'0.68rem', color:'rgba(180,210,255,0.6)', width:28, textAlign:'right' }}>{dbScale.toFixed(1)}×</span>
+                  onChange={e => setDbScale(parseFloat(e.target.value))} style={{ flex:1, accentColor:'#9575cd' }} />
+                <span style={{ fontSize:'0.68rem', color:'#8090b0', width:28, textAlign:'right' }}>{dbScale.toFixed(1)}×</span>
               </div>
             )}
             <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} style={{ display:'none' }} />
-            <button onClick={() => fileInputRef.current?.click()} style={{ width:'100%', padding:'0.5rem', border:'1.5px dashed rgba(192,132,252,0.4)', borderRadius:8, background:'rgba(192,132,252,0.07)', color:'rgba(192,132,252,0.9)', fontSize:'0.8rem', cursor:'pointer', fontWeight:700 }}>
+            <button onClick={() => fileInputRef.current?.click()} style={{ width:'100%', padding:'0.5rem', border:'1.5px dashed rgba(160,140,220,0.35)', borderRadius:8, background:'rgba(160,140,220,0.06)', color:'#6070b0', fontSize:'0.8rem', cursor:'pointer', fontWeight:700 }}>
               📁 Upload Image
             </button>
             {dbImage && (
               <>
-                <button onClick={handleCrop} style={{ width:'100%', marginTop:6, padding:'0.45rem', border:`2px solid ${dbCroppedImage ? 'rgba(80,200,120,0.5)' : 'rgba(80,200,120,0.3)'}`, borderRadius:8, background: dbCroppedImage ? 'rgba(80,200,120,0.12)' : 'rgba(80,200,120,0.06)', color:'#4cba80', fontSize:'0.8rem', cursor:'pointer', fontWeight:800 }}>
+                <button onClick={handleCrop} style={{ width:'100%', marginTop:6, padding:'0.45rem', border:`2px solid ${dbCroppedImage ? 'rgba(80,160,80,0.5)' : 'rgba(80,160,80,0.3)'}`, borderRadius:8, background: dbCroppedImage ? 'rgba(80,160,80,0.12)' : 'rgba(80,160,80,0.06)', color:'#1a6a2a', fontSize:'0.8rem', cursor:'pointer', fontWeight:800 }}>
                   {dbCroppedImage ? '✓ Re-crop' : '✂ Crop & Apply'}
                 </button>
-                <button onClick={() => { setDbImage(null); setDbCroppedImage(null); setDbScale(1); setDbRotation(0); setDbPosition({x:0,y:0}); }} style={{ width:'100%', marginTop:4, padding:'0.3rem', border:'1px solid rgba(255,80,80,0.25)', borderRadius:6, background:'transparent', color:'rgba(255,100,100,0.8)', fontSize:'0.72rem', cursor:'pointer' }}>
+                <button onClick={() => { setDbImage(null); setDbCroppedImage(null); setDbScale(1); setDbRotation(0); setDbPosition({x:0,y:0}); }} style={{ width:'100%', marginTop:4, padding:'0.3rem', border:'1px solid rgba(200,50,50,0.2)', borderRadius:6, background:'transparent', color:'#b04040', fontSize:'0.72rem', cursor:'pointer' }}>
                   ✕ Remove
                 </button>
               </>
@@ -1465,17 +1432,19 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
         <div className="tp-panel" style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <div className="tp-section">2 · Card Details</div>
 
+          {/* Name */}
           <div>
             <label className="tp-label">Card Name</label>
             <input type="text" className="tp-input" placeholder="e.g. Zephyr the Storm Fox"
               value={cardName} onChange={e => setCardName(e.target.value)} />
           </div>
 
+          {/* Rarity — preview only, does not affect card creation */}
           <div>
-            <label className="tp-label">Preview Rarity <span style={{ fontWeight:400, fontSize:'0.7rem', color:'rgba(180,210,255,0.4)', textTransform:'none', letterSpacing:0 }}>(assigned randomly when a pack is opened)</span></label>
+            <label className="tp-label">Preview Rarity <span style={{ fontWeight:400, fontSize:'0.7rem', color:'#b0b8cc', textTransform:'none', letterSpacing:0 }}>(for preview only — rarity is assigned when a pack is opened)</span></label>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
               {DB_RARITY_OPTIONS.map(r => (
-                <button key={r.id} onClick={() => setCardRarity(r.id)} style={{ padding:'8px 10px', borderRadius:10, fontSize:'0.78rem', fontWeight:700, cursor:'pointer', textAlign:'left', border: cardRarity === r.id ? `2px solid ${r.color}` : '1px solid rgba(255,255,255,0.1)', background: cardRarity === r.id ? `${r.color}22` : 'rgba(255,255,255,0.05)', color: cardRarity === r.id ? r.color : 'rgba(180,210,255,0.55)' }}>
+                <button key={r.id} onClick={() => setCardRarity(r.id)} style={{ padding:'8px 10px', borderRadius:10, fontSize:'0.78rem', fontWeight:700, cursor:'pointer', textAlign:'left', border: cardRarity === r.id ? `2px solid ${r.color}` : '1.5px solid rgba(180,160,220,0.2)', background: cardRarity === r.id ? `${r.color}18` : 'rgba(255,255,255,0.5)', color: cardRarity === r.id ? r.color : '#8090b0' }}>
                   <div>{r.label}</div>
                   <div style={{ fontSize:'0.65rem', opacity:0.7, marginTop:1 }}>{r.hint}</div>
                 </button>
@@ -1483,17 +1452,19 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
             </div>
           </div>
 
+          {/* Deck Type */}
           <div>
             <label className="tp-label">Deck Type</label>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
               {DB_DECK_OPTIONS.map(d => (
-                <button key={d.id} onClick={() => setCardDeck(d.id)} style={{ padding:'5px 12px', borderRadius:20, fontSize:'0.76rem', fontWeight:700, cursor:'pointer', border: cardDeck === d.id ? `2px solid ${d.color}` : '1px solid rgba(255,255,255,0.1)', background: cardDeck === d.id ? `${d.color}22` : 'rgba(255,255,255,0.05)', color: cardDeck === d.id ? d.color : 'rgba(180,210,255,0.55)' }}>
+                <button key={d.id} onClick={() => setCardDeck(d.id)} style={{ padding:'5px 12px', borderRadius:20, fontSize:'0.76rem', fontWeight:700, cursor:'pointer', border: cardDeck === d.id ? `2px solid ${d.color}` : '1.5px solid rgba(180,160,220,0.2)', background: cardDeck === d.id ? `${d.color}18` : 'rgba(255,255,255,0.5)', color: cardDeck === d.id ? d.color : '#8090b0' }}>
                   {d.label}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Description */}
           <div>
             <label className="tp-label">Description</label>
             <textarea className="tp-input" rows={2} style={{ resize:'none' }}
@@ -1501,42 +1472,56 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
               value={cardDescription} onChange={e => setCardDescription(e.target.value)} />
           </div>
 
+          {/* Actions */}
           <div>
             <label className="tp-label">Action Names</label>
-            <div style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, padding:'12px 14px', display:'flex', flexDirection:'column', gap:10 }}>
-              <div style={{ background:'rgba(192,132,252,0.1)', border:'1px solid rgba(192,132,252,0.2)', borderRadius:8, padding:'8px 10px', fontSize:'0.72rem', color:'rgba(192,132,252,0.9)', lineHeight:1.5 }}>
-                🔒 <strong>Stats are sealed</strong> — HP and damage are rolled randomly when a student opens their pack. Only name the actions here.
+            <div style={{ background:'rgba(255,255,255,0.5)', border:'1.5px solid rgba(180,160,220,0.2)', borderRadius:12, padding:'12px 14px', display:'flex', flexDirection:'column', gap:10 }}>
+
+              <div style={{ background:'rgba(160,140,220,0.06)', border:'1px solid rgba(160,140,220,0.15)', borderRadius:8, padding:'8px 10px', fontSize:'0.72rem', color:'#6070b0', lineHeight:1.5 }}>
+                🔒 <strong>Stats are sealed</strong> — HP and damage values are rolled randomly when a student opens their pack. Only name the actions here.
               </div>
+
+              {/* Weak action */}
               <div>
-                <div style={{ fontSize:'0.72rem', color:'rgba(180,210,255,0.6)', fontWeight:700, marginBottom:4 }}>⚡ Weak Action <span style={{ fontWeight:400, color:'rgba(180,210,255,0.4)' }}>({currentRange.weakMin}–{currentRange.weakMax} dmg)</span></div>
-                <input type="text" className="tp-input" placeholder="e.g. Quick Scratch" value={weakActionName} onChange={e => setWeakActionName(e.target.value)} />
+                <div style={{ fontSize:'0.72rem', color:'#8090b0', fontWeight:700, marginBottom:4 }}>⚡ Weak Action <span style={{ fontWeight:400, color:'#b0b8cc' }}>({currentRange.weakMin}–{currentRange.weakMax} dmg when opened)</span></div>
+                <input type="text" className="tp-input"
+                  placeholder="e.g. Quick Scratch" value={weakActionName}
+                  onChange={e => setWeakActionName(e.target.value)} />
               </div>
+
+              {/* Strong action */}
               <div>
-                <div style={{ fontSize:'0.72rem', color:'rgba(180,210,255,0.6)', fontWeight:700, marginBottom:4 }}>💥 Strong Action <span style={{ fontWeight:400, color:'rgba(180,210,255,0.4)' }}>({currentRange.strongMin}–{currentRange.strongMax} dmg)</span></div>
-                <input type="text" className="tp-input" placeholder="e.g. Thunder Strike" value={strongActionName} onChange={e => setStrongActionName(e.target.value)} />
+                <div style={{ fontSize:'0.72rem', color:'#8090b0', fontWeight:700, marginBottom:4 }}>💥 Strong Action <span style={{ fontWeight:400, color:'#b0b8cc' }}>({currentRange.strongMin}–{currentRange.strongMax} dmg when opened)</span></div>
+                <input type="text" className="tp-input"
+                  placeholder="e.g. Thunder Strike" value={strongActionName}
+                  onChange={e => setStrongActionName(e.target.value)} />
               </div>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:6, borderTop:'1px solid rgba(255,255,255,0.08)', fontSize:'0.72rem', color:'rgba(180,210,255,0.5)' }}>
+
+              {/* HP range info */}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:6, borderTop:'1px solid rgba(180,160,220,0.15)', fontSize:'0.72rem', color:'#8090b0' }}>
                 <span>❤️ Hit Points</span>
-                <span style={{ fontWeight:700, color:'rgba(180,210,255,0.7)' }}>{currentRange.hpMin}–{currentRange.hpMax} (rolled on open)</span>
+                <span style={{ fontWeight:700, color:'#b0b8cc' }}>{currentRange.hpMin}–{currentRange.hpMax} (rolled on open)</span>
               </div>
             </div>
           </div>
 
-          <div style={{ background: isRareExclusive ? 'rgba(192,132,252,0.1)' : 'rgba(255,255,255,0.05)', border:`1px solid ${isRareExclusive ? 'rgba(192,132,252,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius:12, padding:'10px 14px' }}>
+          {/* Rare Exclusive */}
+          <div style={{ background: isRareExclusive ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.4)', border:`1.5px solid ${isRareExclusive ? 'rgba(245,158,11,0.3)' : 'rgba(180,160,220,0.2)'}`, borderRadius:12, padding:'10px 14px' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: isRareExclusive ? 8 : 0 }}>
               <div>
-                <div style={{ fontSize:'0.8rem', fontWeight:800, color: isRareExclusive ? '#c084fc' : 'rgba(180,210,255,0.6)' }}>🌟 Rare Exclusive</div>
-                <div style={{ fontSize:'0.65rem', color:'rgba(180,210,255,0.45)', marginTop:2 }}>Limit how many students can own this card</div>
+                <div style={{ fontSize:'0.8rem', fontWeight:800, color: isRareExclusive ? '#92400e' : '#6070b0' }}>🌟 Rare Exclusive</div>
+                <div style={{ fontSize:'0.65rem', color:'#8090b0', marginTop:2 }}>Limit how many students can own this card</div>
               </div>
-              <button onClick={() => setIsRareExclusive(v => !v)} style={{ padding:'4px 14px', borderRadius:20, fontSize:'0.75rem', fontWeight:800, border:'none', cursor:'pointer', background: isRareExclusive ? 'rgba(192,132,252,0.2)' : 'rgba(255,255,255,0.08)', color: isRareExclusive ? '#c084fc' : 'rgba(180,210,255,0.5)' }}>
+              <button onClick={() => setIsRareExclusive(v => !v)} style={{ padding:'4px 14px', borderRadius:20, fontSize:'0.75rem', fontWeight:800, border:'none', cursor:'pointer', background: isRareExclusive ? 'rgba(245,158,11,0.2)' : 'rgba(180,160,220,0.15)', color: isRareExclusive ? '#92400e' : '#8090b0' }}>
                 {isRareExclusive ? 'ON' : 'OFF'}
               </button>
             </div>
             {isRareExclusive && (
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <label className="tp-label" style={{ margin:0, flexShrink:0 }}>Max copies:</label>
-                <input type="number" min={1} max={50} value={maxCopies} onChange={e => setMaxCopies(parseInt(e.target.value)||1)} className="tp-input" style={{ width:70, textAlign:'center' }} />
-                <span style={{ fontSize:'0.7rem', color:'rgba(180,210,255,0.5)' }}>students can own this</span>
+                <input type="number" min={1} max={50} value={maxCopies} onChange={e => setMaxCopies(parseInt(e.target.value)||1)}
+                  className="tp-input" style={{ width:70, textAlign:'center' }} />
+                <span style={{ fontSize:'0.7rem', color:'#9a7040' }}>students can own this</span>
               </div>
             )}
           </div>
@@ -1546,26 +1531,34 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
           <div className="tp-section">3 · Preview & Save</div>
 
+          {/* PokeCard preview */}
           <div style={{ transform:'scale(0.72)', transformOrigin:'top center', marginBottom: '-80px' }}>
             <PokeCard card={{
-              id: 'preview', student_id: '', teacher_id: '',
-              card_name: cardName || 'Card Name', hp: 0, type: cardDeck, rarity: cardRarity as any,
+              id: 'preview',
+              student_id: '',
+              teacher_id: '',
+              card_name: cardName || 'Card Name',
+              hp: 0,
+              type: cardDeck,
+              rarity: cardRarity as any,
               description: cardDescription || 'A mysterious creature awaits…',
-              stat1_name: 'HP',                               stat1_val: 0,
-              stat2_name: weakActionName   || 'Weak Action',  stat2_val: 0,
+              stat1_name: 'HP',                              stat1_val: 0,
+              stat2_name: weakActionName   || 'Weak Action', stat2_val: 0,
               stat3_name: strongActionName || 'Strong Action', stat3_val: 0,
-              move1_name: weakActionName   || 'Weak Action',  move1_dmg: 0,
+              move1_name: weakActionName   || 'Weak Action', move1_dmg: 0,
               move2_name: strongActionName || 'Strong Action', move2_dmg: 0,
-              image_url: currentImage || '', created_at: '',
+              image_url: currentImage || '',
+              created_at: '',
             }} showShimmerBtn />
           </div>
 
-          <div style={{ background:'rgba(192,132,252,0.08)', border:'1px solid rgba(192,132,252,0.2)', borderRadius:12, padding:'10px 14px', textAlign:'center' }}>
-            <div style={{ fontSize:'0.8rem', fontWeight:800, color:'#c084fc' }}>🔒 Stats Sealed</div>
-            <div style={{ fontSize:'0.68rem', color:'rgba(180,210,255,0.6)', marginTop:3, lineHeight:1.4 }}>
-              HP, damage & skill points rolled<br/>randomly when a pack is opened
+          {/* Sealed badge */}
+          <div style={{ background:'rgba(100,80,180,0.08)', border:'1.5px solid rgba(100,80,180,0.2)', borderRadius:12, padding:'10px 14px', textAlign:'center' }}>
+            <div style={{ fontSize:'0.8rem', fontWeight:800, color:'#4040a0' }}>🔒 Stats Sealed</div>
+            <div style={{ fontSize:'0.68rem', color:'#6070b0', marginTop:3, lineHeight:1.4 }}>
+              HP, damage & skill points are rolled<br/>randomly when a student opens their pack
             </div>
-            <div style={{ display:'flex', justifyContent:'center', gap:12, marginTop:8, fontSize:'0.7rem', color:'rgba(180,210,255,0.5)' }}>
+            <div style={{ display:'flex', justifyContent:'center', gap:12, marginTop:8, fontSize:'0.7rem', color:'#8090b0' }}>
               <span>❤️ {currentRange.hpMin}–{currentRange.hpMax}</span>
               <span>⚡ {currentRange.weakMin}–{currentRange.weakMax}</span>
               <span>💥 {currentRange.strongMin}–{currentRange.strongMax}</span>
@@ -1573,7 +1566,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
           </div>
 
           {savedMsg && (
-            <div style={{ padding:'8px 14px', borderRadius:10, fontSize:'0.8rem', fontWeight:700, background: savedMsg.startsWith('✓') ? 'rgba(80,200,120,0.1)' : 'rgba(255,80,80,0.08)', border:`1px solid ${savedMsg.startsWith('✓') ? 'rgba(80,200,120,0.3)' : 'rgba(255,80,80,0.25)'}`, color: savedMsg.startsWith('✓') ? '#4cba80' : '#ff7070', textAlign:'center' }}>
+            <div style={{ padding:'8px 14px', borderRadius:10, fontSize:'0.8rem', fontWeight:700, background: savedMsg.startsWith('✓') ? 'rgba(80,200,120,0.1)' : 'rgba(255,80,80,0.08)', border:`1px solid ${savedMsg.startsWith('✓') ? 'rgba(80,200,120,0.3)' : 'rgba(255,80,80,0.25)'}`, color: savedMsg.startsWith('✓') ? '#1a6a3a' : '#c03030', textAlign:'center' }}>
               {savedMsg}
             </div>
           )}
@@ -1587,82 +1580,113 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
           </p>
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* ── Character Gallery ── */}
-      <div style={{ background:'rgba(255,255,255,0.04)', borderRadius:20, padding:'20px 24px', border:'1px solid rgba(255,255,255,0.08)', backdropFilter:'blur(16px)' }}>
+// ══════════════════════════════════════════════════════════════════════
+// CHARACTER POOL TAB — shows all teacher-created characters for the pack pool
+// ══════════════════════════════════════════════════════════════════════
 
-        {/* Gallery header + filter tabs */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12, marginBottom:16 }}>
-          <div>
-            <div style={{ fontSize:'0.9rem', fontWeight:900, background:'linear-gradient(135deg,#c084fc,#818cf8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>
-              Character Pool <span style={{ fontSize:'0.72rem', fontWeight:600, color:'rgba(180,210,255,0.45)', WebkitTextFillColor:'rgba(180,210,255,0.45)' }}>({filteredCards.length} of {dbCards.length})</span>
-            </div>
-            <div style={{ fontSize:'0.72rem', color:'rgba(180,210,255,0.5)', marginTop:2 }}>Characters available in student card packs</div>
-          </div>
-          <button onClick={loadDbCards} className="tp-btn-outline" style={{ fontSize:'0.72rem', padding:'5px 12px' }}>↺ Refresh</button>
+function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/auth').Session> }) {
+  const [cards, setCards]       = React.useState<any[]>([]);
+  const [loading, setLoading]   = React.useState(true);
+  const [filter, setFilter]     = React.useState<string>('all');
+
+  const loadCards = async () => {
+    setLoading(true);
+    try {
+      const { data } = await sb.from('card_database')
+        .select('*')
+        .eq('teacher_id', session.user.id)
+        .order('created_at', { ascending: false });
+      setCards(data || []);
+    } catch { setCards([]); }
+    setLoading(false);
+  };
+
+  React.useEffect(() => { loadCards(); }, []);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this character from the database?')) return;
+    await sb.from('card_database').delete().eq('id', id);
+    setCards(prev => prev.filter(c => c.id !== id));
+  };
+
+  const filtered = filter === 'all' ? cards : cards.filter(c => c.type === filter);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      {/* Header */}
+      <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: '18px 24px', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
+        <div style={{ fontSize: '1rem', fontWeight: 900, marginBottom: 4, background: 'linear-gradient(135deg,#c084fc,#818cf8,#38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>🃏 Card Database</div>
+        <div style={{ fontSize: '0.8rem', color: 'rgba(180,210,255,0.7)', lineHeight: 1.5 }}>
+          All characters available in student card packs. Use <strong style={{ color: 'rgba(192,132,252,0.9)' }}>Card Creation</strong> to add new characters.
         </div>
+      </div>
 
-        {/* Deck type filter pills */}
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:20 }}>
-          <button onClick={() => setDbFilter('all')}
-            style={{ padding:'5px 14px', borderRadius:20, fontSize:'0.75rem', fontWeight:700, cursor:'pointer', border: dbFilter === 'all' ? '2px solid rgba(192,132,252,0.7)' : '1px solid rgba(255,255,255,0.1)', background: dbFilter === 'all' ? 'rgba(192,132,252,0.18)' : 'rgba(255,255,255,0.05)', color: dbFilter === 'all' ? '#c084fc' : 'rgba(180,210,255,0.5)' }}>
-            ✦ All
+      {/* Filter + refresh row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button onClick={() => setFilter('all')}
+            style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === 'all' ? '2px solid rgba(192,132,252,0.7)' : '1px solid rgba(255,255,255,0.1)', background: filter === 'all' ? 'rgba(192,132,252,0.18)' : 'rgba(255,255,255,0.05)', color: filter === 'all' ? '#c084fc' : 'rgba(180,210,255,0.5)' }}>
+            ✦ All <span style={{ opacity: 0.6 }}>({cards.length})</span>
           </button>
           {DB_DECK_OPTIONS.map(d => {
-            const count = dbCards.filter(c => c.type === d.id).length;
+            const count = cards.filter(c => c.type === d.id).length;
             return (
-              <button key={d.id} onClick={() => setDbFilter(d.id)}
-                style={{ padding:'5px 14px', borderRadius:20, fontSize:'0.75rem', fontWeight:700, cursor:'pointer', border: dbFilter === d.id ? `2px solid ${d.color}` : '1px solid rgba(255,255,255,0.1)', background: dbFilter === d.id ? `${d.color}22` : 'rgba(255,255,255,0.05)', color: dbFilter === d.id ? d.color : 'rgba(180,210,255,0.5)' }}>
-                {d.label} {count > 0 && <span style={{ fontSize:'0.65rem', opacity:0.7 }}>({count})</span>}
+              <button key={d.id} onClick={() => setFilter(d.id)}
+                style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === d.id ? `2px solid ${d.color}` : '1px solid rgba(255,255,255,0.1)', background: filter === d.id ? `${d.color}22` : 'rgba(255,255,255,0.05)', color: filter === d.id ? d.color : 'rgba(180,210,255,0.5)' }}>
+                {d.label} <span style={{ opacity: 0.6 }}>({count})</span>
               </button>
             );
           })}
         </div>
-
-        {/* Cards grid */}
-        {loadingDb ? (
-          <div style={{ textAlign:'center', color:'rgba(180,210,255,0.5)', fontSize:'0.85rem', padding:32 }}>Loading…</div>
-        ) : filteredCards.length === 0 ? (
-          <div style={{ textAlign:'center', padding:'3rem 2rem', border:'2px dashed rgba(192,132,252,0.15)', borderRadius:16 }}>
-            <div style={{ fontSize:'2.5rem', marginBottom:8, opacity:0.25 }}>🃏</div>
-            <p style={{ fontSize:'0.85rem', color:'rgba(180,210,255,0.4)', fontStyle:'italic', margin:0 }}>
-              {dbCards.length === 0 ? 'No characters yet — create your first one above!' : `No ${dbFilter} characters yet.`}
-            </p>
-          </div>
-        ) : (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:14 }}>
-            {filteredCards.map(c => {
-              const dc = DB_DECK_OPTIONS.find(d => d.id === c.type)?.color || '#818cf8';
-              return (
-                <div key={c.id} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:16, overflow:'hidden', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', boxShadow:'0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)', position:'relative' }}>
-                  {/* Coloured top stripe */}
-                  <div style={{ height:3, background:`linear-gradient(90deg,${dc},${dc}88)` }} />
-                  {/* Character image */}
-                  {c.image_url ? (
-                    <img src={c.image_url} alt={c.card_name} style={{ width:'100%', height:120, objectFit:'cover', display:'block' }} />
-                  ) : (
-                    <div style={{ width:'100%', height:120, background:'rgba(255,255,255,0.04)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'2.5rem', opacity:0.25 }}>🃏</div>
-                  )}
-                  <div style={{ padding:'10px 12px' }}>
-                    <div style={{ fontWeight:800, fontSize:'0.82rem', color:'rgba(210,230,255,0.95)', marginBottom:3, lineHeight:1.2 }}>{c.card_name}</div>
-                    <div style={{ fontSize:'0.65rem', color:'rgba(180,210,255,0.5)', marginBottom:8, fontStyle:'italic', lineHeight:1.35, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{c.description}</div>
-                    <div style={{ display:'flex', gap:5, marginBottom:8, flexWrap:'wrap', alignItems:'center' }}>
-                      <span style={{ fontSize:'0.6rem', padding:'2px 7px', borderRadius:20, background:`${dc}22`, color:dc, fontWeight:700, border:`1px solid ${dc}44` }}>{c.type}</span>
-                      {c.is_rare_exclusive && <span style={{ fontSize:'0.6rem', padding:'2px 7px', borderRadius:20, background:'rgba(192,132,252,0.15)', color:'#c084fc', fontWeight:700, border:'1px solid rgba(192,132,252,0.3)' }}>🌟 ×{c.max_copies}</span>}
-                    </div>
-                    <div style={{ display:'flex', gap:5, fontSize:'0.62rem', color:'rgba(180,210,255,0.5)', marginBottom:8 }}>
-                      <span>⚡ {c.move1_name || c.stat2_name || '—'}</span>
-                      <span style={{ opacity:0.4 }}>·</span>
-                      <span>💥 {c.move2_name || c.stat3_name || '—'}</span>
-                    </div>
-                    <button onClick={() => handleDeleteCard(c.id)} className="tp-btn-danger" style={{ fontSize:'0.65rem', padding:'3px 10px', width:'100%' }}>Delete</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <button onClick={loadCards} className="tp-btn-outline" style={{ fontSize: '0.72rem', padding: '5px 12px' }}>↺ Refresh</button>
       </div>
+
+      {/* Grid */}
+      {loading ? (
+        <div style={{ textAlign: 'center', color: 'rgba(180,210,255,0.5)', fontSize: '0.85rem', padding: 48 }}>Loading…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '4rem 2rem', border: '2px dashed rgba(192,132,252,0.15)', borderRadius: 20 }}>
+          <div style={{ fontSize: '3rem', marginBottom: 12, opacity: 0.2 }}>🃏</div>
+          <p style={{ fontSize: '0.85rem', color: 'rgba(180,210,255,0.4)', fontStyle: 'italic', margin: 0 }}>
+            {cards.length === 0 ? 'No characters yet — go to Card Creation to add some!' : `No ${filter} characters yet.`}
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 16 }}>
+          {filtered.map(c => {
+            const dc = DB_DECK_OPTIONS.find(d => d.id === c.type)?.color || '#818cf8';
+            return (
+              <div key={c.id} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, overflow: 'hidden', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
+                <div style={{ height: 3, background: `linear-gradient(90deg,${dc},${dc}66)` }} />
+                {c.image_url ? (
+                  <img src={c.image_url} alt={c.card_name} style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <div style={{ width: '100%', height: 130, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', opacity: 0.2 }}>🃏</div>
+                )}
+                <div style={{ padding: '10px 12px' }}>
+                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'rgba(210,230,255,0.95)', marginBottom: 3 }}>{c.card_name}</div>
+                  <div style={{ fontSize: '0.65rem', color: 'rgba(180,210,255,0.5)', marginBottom: 8, fontStyle: 'italic', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{c.description}</div>
+                  <div style={{ display: 'flex', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.6rem', padding: '2px 8px', borderRadius: 20, background: `${dc}22`, color: dc, fontWeight: 700, border: `1px solid ${dc}44` }}>{c.type}</span>
+                    {c.is_rare_exclusive && <span style={{ fontSize: '0.6rem', padding: '2px 8px', borderRadius: 20, background: 'rgba(192,132,252,0.15)', color: '#c084fc', fontWeight: 700, border: '1px solid rgba(192,132,252,0.3)' }}>🌟 ×{c.max_copies}</span>}
+                  </div>
+                  <div style={{ fontSize: '0.62rem', color: 'rgba(180,210,255,0.45)', marginBottom: 8, display: 'flex', gap: 6 }}>
+                    <span>⚡ {c.move1_name || '—'}</span>
+                    <span style={{ opacity: 0.4 }}>·</span>
+                    <span>💥 {c.move2_name || '—'}</span>
+                  </div>
+                  <button onClick={() => handleDelete(c.id)} className="tp-btn-danger" style={{ fontSize: '0.65rem', padding: '3px 10px', width: '100%' }}>Delete</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
