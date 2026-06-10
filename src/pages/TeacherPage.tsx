@@ -1545,6 +1545,111 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
 }
 
 // ══════════════════════════════════════════════════════════════════════
+// CHARACTER POOL TAB — Card Database page
+// ══════════════════════════════════════════════════════════════════════
+
+function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/auth').Session> }) {
+  const [cards, setCards]     = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [filter, setFilter]   = React.useState<string>('all');
+
+  const loadCards = async () => {
+    setLoading(true);
+    try {
+      const { data } = await sb.from('card_database')
+        .select('*')
+        .eq('teacher_id', session.user.id)
+        .order('created_at', { ascending: false });
+      setCards(data || []);
+    } catch { setCards([]); }
+    setLoading(false);
+  };
+
+  React.useEffect(() => { loadCards(); }, []);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this character from the database?')) return;
+    await sb.from('card_database').delete().eq('id', id);
+    setCards(prev => prev.filter(c => c.id !== id));
+  };
+
+  const filtered = filter === 'all' ? cards : cards.filter(c => c.type === filter);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: '18px 24px', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
+        <div style={{ fontSize: '1rem', fontWeight: 900, marginBottom: 4, background: 'linear-gradient(135deg,#c084fc,#818cf8,#38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>🃏 Card Database</div>
+        <div style={{ fontSize: '0.8rem', color: 'rgba(180,210,255,0.7)', lineHeight: 1.5 }}>
+          All characters available in student card packs. Use <strong style={{ color: 'rgba(192,132,252,0.9)' }}>Card Creation</strong> to add new characters.
+        </div>
+      </div>
+
+      {/* Filter row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={() => setFilter('all')}
+            style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === 'all' ? '2px solid rgba(192,132,252,0.7)' : '1px solid rgba(255,255,255,0.1)', background: filter === 'all' ? 'rgba(192,132,252,0.18)' : 'rgba(255,255,255,0.05)', color: filter === 'all' ? '#c084fc' : 'rgba(180,210,255,0.5)' }}>
+            ✦ All <span style={{ opacity: 0.6 }}>({cards.length})</span>
+          </button>
+          {DB_DECK_OPTIONS.map(d => {
+            const count = cards.filter(c => c.type === d.id).length;
+            return (
+              <button key={d.id} onClick={() => setFilter(d.id)}
+                style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === d.id ? `2px solid ${d.color}` : '1px solid rgba(255,255,255,0.1)', background: filter === d.id ? `${d.color}22` : 'rgba(255,255,255,0.05)', color: filter === d.id ? d.color : 'rgba(180,210,255,0.5)' }}>
+                {d.label} <span style={{ opacity: 0.6 }}>({count})</span>
+              </button>
+            );
+          })}
+        </div>
+        <button onClick={loadCards} className="tp-btn-outline" style={{ fontSize: '0.72rem', padding: '5px 12px' }}>↺ Refresh</button>
+      </div>
+
+      {/* Grid */}
+      {loading ? (
+        <div style={{ textAlign: 'center', color: 'rgba(180,210,255,0.5)', fontSize: '0.85rem', padding: 48 }}>Loading…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '4rem 2rem', border: '2px dashed rgba(192,132,252,0.15)', borderRadius: 20 }}>
+          <div style={{ fontSize: '3rem', marginBottom: 12, opacity: 0.2 }}>🃏</div>
+          <p style={{ fontSize: '0.85rem', color: 'rgba(180,210,255,0.4)', fontStyle: 'italic', margin: 0 }}>
+            {cards.length === 0 ? 'No characters yet — go to Card Creation to add some!' : `No ${filter} characters yet.`}
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 16 }}>
+          {filtered.map(c => {
+            const dc = DB_DECK_OPTIONS.find(d => d.id === c.type)?.color || '#818cf8';
+            return (
+              <div key={c.id} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, overflow: 'hidden', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
+                <div style={{ height: 3, background: `linear-gradient(90deg,${dc},${dc}66)` }} />
+                {c.image_url ? (
+                  <img src={c.image_url} alt={c.card_name} style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <div style={{ width: '100%', height: 130, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', opacity: 0.2 }}>🃏</div>
+                )}
+                <div style={{ padding: '10px 12px' }}>
+                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'rgba(210,230,255,0.95)', marginBottom: 3 }}>{c.card_name}</div>
+                  <div style={{ fontSize: '0.65rem', color: 'rgba(180,210,255,0.5)', marginBottom: 8, fontStyle: 'italic', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{c.description}</div>
+                  <div style={{ display: 'flex', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.6rem', padding: '2px 8px', borderRadius: 20, background: `${dc}22`, color: dc, fontWeight: 700, border: `1px solid ${dc}44` }}>{c.type}</span>
+                    {c.is_rare_exclusive && <span style={{ fontSize: '0.6rem', padding: '2px 8px', borderRadius: 20, background: 'rgba(192,132,252,0.15)', color: '#c084fc', fontWeight: 700, border: '1px solid rgba(192,132,252,0.3)' }}>🌟 ×{c.max_copies}</span>}
+                  </div>
+                  <div style={{ fontSize: '0.62rem', color: 'rgba(180,210,255,0.45)', marginBottom: 8, display: 'flex', gap: 6 }}>
+                    <span>⚡ {c.move1_name || '—'}</span>
+                    <span style={{ opacity: 0.4 }}>·</span>
+                    <span>💥 {c.move2_name || '—'}</span>
+                  </div>
+                  <button onClick={() => handleDelete(c.id)} className="tp-btn-danger" style={{ fontSize: '0.65rem', padding: '3px 10px', width: '100%' }}>Delete</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
 // WEEKLY PROJECT TAB
 // ══════════════════════════════════════════════════════════════════════
 
