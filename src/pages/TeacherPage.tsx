@@ -290,10 +290,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
     AI.setGeminiKey(geminiKey);
   };
 
-  // Filtered cards
-  const displayCards = filterStudent
-    ? cards.filter(c => c.student_id === filterStudent)
-    : cards;
+  // (card display moved to CharacterPoolTab)
 
   function renderModal() {
     if (!modal) return null;
@@ -606,14 +603,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
     }
   }
 
-  async function handleRegenImage(card: Card) {
-    try {
-      const newUrl = AI.generateImageUrl(card.card_name + ' ' + card.type);
-      await new Promise<void>(r => { const img = new Image(); img.onload = () => r(); img.onerror = () => r(); img.src = newUrl; setTimeout(r, 2000); });
-      await Dashboard.updateCard(card.id, { image_url: newUrl });
-      loadData();
-    } catch (err: any) { console.error(err.message); }
-  }
+  // (image regen handled elsewhere)
 
   return (
     <div style={{ position:'relative', minHeight:'100vh', fontFamily:"'Nunito','Segoe UI',sans-serif" }}>
@@ -1242,31 +1232,12 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
   const [saving, setSaving] = React.useState(false);
   const [savedMsg, setSavedMsg] = React.useState('');
 
-  // Database list
-  const [dbCards, setDbCards] = React.useState<any[]>([]);
-  const [loadingDb, setLoadingDb] = React.useState(true);
-
   // Stat ranges stored for reference — stats are rolled at pack-open time, not here
   const RARITY_RANGES: Record<string, { hpMin:number; hpMax:number; weakMin:number; weakMax:number; strongMin:number; strongMax:number; skillPts:number }> = {
     'common':    { hpMin:80,  hpMax:100, weakMin:40, weakMax:50,  strongMin:50,  strongMax:70,  skillPts:1 },
     'silver':    { hpMin:100, hpMax:120, weakMin:50, weakMax:60,  strongMin:60,  strongMax:80,  skillPts:2 },
     'gold-rare': { hpMin:120, hpMax:140, weakMin:60, weakMax:75,  strongMin:80,  strongMax:100, skillPts:3 },
     'prismatic': { hpMin:150, hpMax:180, weakMin:75, weakMax:95,  strongMin:100, strongMax:130, skillPts:5 },
-  };
-
-  React.useEffect(() => { loadDbCards(); }, []);
-
-  const loadDbCards = async () => {
-    setLoadingDb(true);
-    try {
-      const { data } = await sb.from('card_database')
-        .select('*')
-        .eq('teacher_id', session.user.id)
-        .order('created_at', { ascending: false });
-      setDbCards(data || []);
-    } catch { }
-
-    setLoadingDb(false);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1350,17 +1321,10 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
       setWeakActionName(''); setStrongActionName('');
       setIsRareExclusive(false); setMaxCopies(5);
       setDbScale(1); setDbRotation(0); setDbPosition({ x: 0, y: 0 });
-      loadDbCards();
     } catch (err: any) {
       setSavedMsg('Error: ' + (err.message || 'Save failed'));
     }
     setSaving(false);
-  };
-
-  const handleDeleteCard = async (id: string) => {
-    if (!confirm('Delete this card from the database?')) return;
-    await sb.from('card_database').delete().eq('id', id);
-    setDbCards(prev => prev.filter(c => c.id !== id));
   };
 
   const currentImage = dbCroppedImage || dbImage;
@@ -1585,13 +1549,13 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// CHARACTER POOL TAB — shows all teacher-created characters for the pack pool
+// CHARACTER POOL TAB — Card Database page: shows all created characters
 // ══════════════════════════════════════════════════════════════════════
 
 function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/auth').Session> }) {
-  const [cards, setCards]       = React.useState<any[]>([]);
-  const [loading, setLoading]   = React.useState(true);
-  const [filter, setFilter]     = React.useState<string>('all');
+  const [cards, setCards]     = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [filter, setFilter]   = React.useState<string>('all');
 
   const loadCards = async () => {
     setLoading(true);
@@ -1626,9 +1590,9 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
         </div>
       </div>
 
-      {/* Filter + refresh row */}
+      {/* Filter row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={() => setFilter('all')}
             style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === 'all' ? '2px solid rgba(192,132,252,0.7)' : '1px solid rgba(255,255,255,0.1)', background: filter === 'all' ? 'rgba(192,132,252,0.18)' : 'rgba(255,255,255,0.05)', color: filter === 'all' ? '#c084fc' : 'rgba(180,210,255,0.5)' }}>
             ✦ All <span style={{ opacity: 0.6 }}>({cards.length})</span>
