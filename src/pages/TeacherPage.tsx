@@ -367,7 +367,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
       case 'deleteStudent':
         return (
           <ModalWrapper title="🗑 Delete Student" onClose={() => setModal(null)} danger>
-            <p className="text-sm mb-2" style={{ color: '#3d2b1f' }}>Delete <strong>{modal.data.name}</strong>?</p>
+            <p className="text-sm mb-2" style={{ color: 'rgba(210,230,255,0.95)' }}>Delete <strong>{modal.data.name}</strong>?</p>
             <p className="text-sm mb-4" style={{ color: '#c82020' }}>This will also delete all their cards and cannot be undone.</p>
             <div className="flex gap-3">
               <button onClick={async () => { await Dashboard.deleteStudent(modal.data.id); loadData(); setModal(null); }} className="tp-btn-danger">Yes, Delete Everything</button>
@@ -492,7 +492,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
               <p style={{ color: '#5060a0', fontSize: '0.9rem', marginBottom: 16 }}>
                 Download <strong>{modal.data.name}</strong>'s cards as an HTML file.
               </p>
-              <p style={{ color: '#8090b0', fontSize: '0.8rem', marginBottom: 24 }}>
+              <p style={{ color: 'rgba(180,210,255,0.5)', fontSize: '0.8rem', marginBottom: 24 }}>
                 {studentCards.length === 0
                   ? 'This student has no cards yet.'
                   : `${studentCards.length} card${studentCards.length !== 1 ? 's' : ''} will be included.`}
@@ -544,7 +544,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
       case 'deleteCard':
         return (
           <ModalWrapper title="🗑 Delete Card" onClose={() => setModal(null)} danger>
-            <p className="text-sm mb-2" style={{ color: '#3d2b1f' }}>Delete <strong>{modal.data.card_name}</strong>?</p>
+            <p className="text-sm mb-2" style={{ color: 'rgba(210,230,255,0.95)' }}>Delete <strong>{modal.data.card_name}</strong>?</p>
             <p className="text-sm mb-4" style={{ color: '#c82020' }}>This cannot be undone.</p>
             <div className="flex gap-3">
               <button onClick={async () => { await Dashboard.deleteCard(modal.data.id); loadData(); setModal(null); }} className="tp-btn-danger">Yes, Delete Card</button>
@@ -559,7 +559,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         const setPw2 = (v: string) => setModal((m: any) => ({ ...m, data: { ...m.data, _pw2: v } }));
         return (
           <ModalWrapper title="🔑 Reset PIN" onClose={() => setModal(null)}>
-            <p className="text-sm mb-1" style={{ color: '#7a5a40' }}>
+            <p className="text-sm mb-1" style={{ color: 'rgba(180,210,255,0.6)' }}>
               Setting new keypad PIN for <strong>{modal.data.name}</strong>
             </p>
             <p className="text-xs mb-4" style={{ color: '#9a7a60' }}>
@@ -626,7 +626,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         <div style={{ maxWidth:1240, margin:'0 auto', padding:'0 28px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60 }}>
           <span style={{ fontSize:'1.1rem', fontWeight:900, background:'linear-gradient(135deg,#f4a8c8,#a8d8ff,#c8b0ff)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', letterSpacing:'0.04em' }}>✦ ClassCard ✦</span>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <span style={{ fontSize:'0.72rem', padding:'4px 12px', borderRadius:20, background:'rgba(160,140,220,0.1)', border:'1px solid rgba(160,140,220,0.25)', color:'#6070b0', fontWeight:600 }}>{session.user.email}</span>
+            <span style={{ fontSize:'0.72rem', padding:'4px 12px', borderRadius:20, background:'rgba(160,140,220,0.1)', border:'1px solid rgba(160,140,220,0.25)', color:'rgba(180,210,255,0.65)', fontWeight:600 }}>{session.user.email}</span>
             <span style={{ fontSize:'0.65rem', padding:'4px 10px', borderRadius:20, background:'linear-gradient(135deg,rgba(200,160,255,0.2),rgba(160,200,255,0.2))', border:'1px solid rgba(160,140,220,0.3)', color:'#6060b0', fontWeight:800, letterSpacing:'0.1em', textTransform:'uppercase' }}>Teacher</span>
             <button onClick={toggleTheme} style={{ width:34, height:34, borderRadius:'50%', border:'1.5px solid var(--tp-border,rgba(60,100,200,0.22))', background:'var(--tp-input-bg,rgba(255,255,255,0.06))', cursor:'pointer', fontSize:'0.9rem', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.2s' }} title={isDark ? 'Light mode' : 'Dark mode'}>{isDark ? '☀️' : '🌙'}</button>
             <button onClick={onSignOut} className="tp-btn-outline" style={{ fontSize:'0.72rem', padding:'6px 14px' }}>Sign Out</button>
@@ -747,7 +747,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                   {students.map(s => (
                     <tr key={s.id}>
                       <td style={{ fontWeight:700 }}>{s.name}</td>
-                      <td style={{ fontSize:'0.78rem', color:'#8090b0' }}>{s.login_email || '—'}</td>
+                      <td style={{ fontSize:'0.78rem', color:'rgba(180,210,255,0.5)' }}>{s.login_email || '—'}</td>
                       <td>{cards.filter(c => c.student_id === s.id).length}</td>
                       <td>
                         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
@@ -775,12 +775,12 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         {tab === 'homecomms' && (
           <div style={{ maxWidth: 760 }}>
             <div className="tp-section" style={{ marginBottom: 16 }}>📣 Home Communication</div>
-            <p style={{ fontSize: '0.78rem', color: '#8090b0', marginBottom: 22, lineHeight: 1.6 }}>
+            <p style={{ fontSize: '0.78rem', color: 'rgba(180,210,255,0.5)', marginBottom: 22, lineHeight: 1.6 }}>
               Manage what parents and students see on the Home Communication board. The pinboard message and photo appear at the top; dated events appear below.
             </p>
 
             {/* ── PINBOARD SECTION ── */}
-            <div style={{ marginBottom: 8, fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8090b0' }}>📌 Pinboard Message &amp; Photo</div>
+            <div style={{ marginBottom: 8, fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.5)' }}>📌 Pinboard Message &amp; Photo</div>
             <div className="tp-panel" style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
 
@@ -808,7 +808,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                         style={{ width: '100%', height: 130, objectFit: 'cover', borderRadius: 12, border: '2px solid rgba(160,140,220,0.3)', display: 'block' }}
                       />
                       <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                        <label style={{ flex: 1, padding: '5px 0', background: 'rgba(160,140,220,0.1)', border: '1.5px solid rgba(160,140,220,0.3)', borderRadius: 8, cursor: 'pointer', textAlign: 'center', fontSize: '0.65rem', fontWeight: 700, color: '#6070b0' }}>
+                        <label style={{ flex: 1, padding: '5px 0', background: 'rgba(160,140,220,0.1)', border: '1.5px solid rgba(160,140,220,0.3)', borderRadius: 8, cursor: 'pointer', textAlign: 'center', fontSize: '0.65rem', fontWeight: 700, color: 'rgba(180,210,255,0.65)' }}>
                           🔄 Change
                           <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePbPhotoUpload} disabled={pbUploading} />
                         </label>
@@ -818,7 +818,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                   ) : (
                     <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: 130, background: 'rgba(240,236,255,0.5)', border: '2px dashed rgba(160,140,220,0.4)', borderRadius: 12, cursor: pbUploading ? 'wait' : 'pointer', gap: 6 }}>
                       <span style={{ fontSize: '1.6rem' }}>{pbUploading ? '⏳' : '📷'}</span>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#8090b0' }}>{pbUploading ? 'Uploading…' : 'Click to add photo'}</span>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(180,210,255,0.5)' }}>{pbUploading ? 'Uploading…' : 'Click to add photo'}</span>
                       <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePbPhotoUpload} disabled={pbUploading} />
                     </label>
                   )}
@@ -842,11 +842,11 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
             </div>
 
             {/* ── DATED EVENTS SECTION ── */}
-            <div style={{ marginBottom: 8, fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8090b0' }}>📅 Dates &amp; Events</div>
+            <div style={{ marginBottom: 8, fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.5)' }}>📅 Dates &amp; Events</div>
 
             {/* Add new post */}
             <div className="tp-panel" style={{ marginBottom: 16 }}>
-              <div className="tp-label" style={{ marginBottom: 10, fontSize: '0.72rem', color: '#6070b0' }}>📝 New Event</div>
+              <div className="tp-label" style={{ marginBottom: 10, fontSize: '0.72rem', color: 'rgba(180,210,255,0.65)' }}>📝 New Event</div>
               <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'flex-start' }}>
                 <div style={{ flex: '0 0 170px' }}>
                   <label className="tp-label">Date</label>
@@ -882,7 +882,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
             {/* Events list */}
             {homeComms.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '32px 20px', color: '#a0a8c0', fontSize: '0.85rem', background: 'rgba(240,236,255,0.3)', borderRadius: 16, border: '1.5px dashed rgba(180,160,220,0.3)' }}>
+              <div style={{ textAlign: 'center', padding: '32px 20px', color: 'rgba(180,210,255,0.5)', fontSize: '0.85rem', background: 'rgba(255,255,255,0.05)', borderRadius: 16, border: '1.5px dashed rgba(192,132,252,0.2)' }}>
                 No events yet. Add your first dated event above.
               </div>
             ) : (
@@ -926,7 +926,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                           </div>
                         </div>
                         <div style={{ flex: 1 }}>
-                          <p style={{ margin: 0, fontSize: '0.88rem', color: '#3040a0', lineHeight: 1.6, fontWeight: 600 }}>{hc.comment}</p>
+                          <p style={{ margin: 0, fontSize: '0.88rem', color: 'rgba(210,230,255,0.95)', lineHeight: 1.6, fontWeight: 600 }}>{hc.comment}</p>
                           <div style={{ fontSize: '0.65rem', color: '#b0b8d0', marginTop: 6 }}>
                             Posted {new Date(hc.created_at).toLocaleDateString('en-NZ')}
                           </div>
@@ -974,7 +974,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                 <PokeCard card={detailCard} />
               </div>
               <div style={{ flex:1, minWidth:200 }}>
-                <h2 style={{ fontSize:'1.4rem', fontWeight:900, color:'#3040a0', marginBottom:4 }}>{detailCard.card_name}</h2>
+                <h2 style={{ fontSize:'1.4rem', fontWeight:900, color:'rgba(210,230,255,0.95)', marginBottom:4 }}>{detailCard.card_name}</h2>
                 <div style={{ display:'inline-block', padding:'3px 12px', borderRadius:20, background:'rgba(100,120,220,0.08)', border:'1px solid rgba(100,120,220,0.2)', fontSize:'0.65rem', fontWeight:700, color:'#6070c0', marginBottom:16, textTransform:'uppercase', letterSpacing:'0.1em' }}>{detailCard.rarity}</div>
                 <p style={{ fontSize:'0.88rem', color:'#7080b0', fontStyle:'italic', marginBottom:20, lineHeight:1.5 }}>"{detailCard.description}"</p>
 
@@ -990,12 +990,12 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                     { label: 'Awarded', value: new Date(detailCard.created_at).toLocaleDateString() },
                   ].map((row, i) => (
                     <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid rgba(100,120,220,0.08)' }}>
-                      <span style={{ fontSize:'0.72rem', color:'#9090c0', textTransform:'uppercase', letterSpacing:'0.08em' }}>{row.label}</span>
-                      <span style={{ fontSize:'0.82rem', fontWeight:700, color:'#3040a0' }}>{row.value}</span>
+                      <span style={{ fontSize:'0.72rem', color:'rgba(180,210,255,0.45)', textTransform:'uppercase', letterSpacing:'0.08em' }}>{row.label}</span>
+                      <span style={{ fontSize:'0.82rem', fontWeight:700, color:'rgba(210,230,255,0.95)' }}>{row.value}</span>
                     </div>
                   ))}
                 </div>
-                <p style={{ fontSize:'0.8rem', marginTop:14, color:'#8090b0', fontStyle:'italic' }}>Awarded to: {detailCard.students?.name || 'Unknown'}</p>
+                <p style={{ fontSize:'0.8rem', marginTop:14, color:'rgba(180,210,255,0.5)', fontStyle:'italic' }}>Awarded to: {detailCard.students?.name || 'Unknown'}</p>
               </div>
             </div>
           </div>
@@ -1047,7 +1047,7 @@ function ModalForm({ fields, onSubmit, submitLabel, error, onCancel }: {
     <form onSubmit={handleSubmit}>
       {fields.map(f => (
         <div key={f.name} className="mb-3">
-          <label className="tp-label">{f.label} {f.optional && <span className="text-xs" style={{ color: '#9a7040' }}>(optional)</span>}</label>
+          <label className="tp-label">{f.label} {f.optional && <span className="text-xs" style={{ color: 'rgba(180,210,255,0.5)' }}>(optional)</span>}</label>
           {f.type === 'textarea' ? (
             <textarea className="tp-input" style={{ resize:'none' }} rows={2} placeholder={f.placeholder} value={vals[f.name] || ''} onChange={e => setVals(p => ({ ...p, [f.name]: e.target.value }))} />
           ) : (
@@ -1207,10 +1207,83 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
                   ))}
                 </div>
 
-                {/* pt labels under buttons */}
+                {/* pt labels */}
                 <div style={{ display: 'flex', gap: 5, width: '100%' }}>
                   {(Object.entries(starColors) as [string, typeof starColors.bronze][]).map(([type, cfg]) => (
                     <div key={type} style={{ flex: 1, textAlign: 'center', fontSize: '0.58rem', fontWeight: 700, color: 'rgba(180,210,255,0.5)', letterSpacing: '0.04em' }}>+{cfg.pts}pt</div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+
+      {/* Header */}
+      <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: '18px 24px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <div style={{ fontSize: '1rem', fontWeight: 900, color: '#c084fc', marginBottom: 4 }}>⭐ Star Points</div>
+          <div style={{ fontSize: '0.8rem', color: 'rgba(180,210,255,0.55)', lineHeight: 1.5 }}>
+            Tap a star to award points — students spend them on card packs.&nbsp;
+            <span style={{ background: '#f59e0b22', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#c084fc' }}>⭐ = 1pt</span>&nbsp;
+            <span style={{ background: '#94a3b822', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#38bdf8' }}>🌟 = 2pts</span>&nbsp;
+            <span style={{ background: '#fbbf2422', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#f472b6' }}>✨ = 3pts</span>
+          </div>
+        </div>
+        <div style={{ fontSize: '0.75rem', color: 'rgba(180,210,255,0.55)', fontWeight: 700 }}>{students.length} students</div>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: 'rgba(180,210,255,0.45)', fontSize: '0.85rem' }}>Loading…</div>
+      ) : students.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, color: 'rgba(180,210,255,0.45)', fontSize: '0.85rem', fontStyle: 'italic' }}>No students yet — add some in the Students tab first.</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 18 }}>
+          {students.map(student => {
+            const pts = starPoints[student.id] || 0;
+            const colorIdx = colorMap[student.id] || 0;
+            const isFlashing = !!flash[student.id];
+            const isBusy = giving === student.id;
+            return (
+              <div key={student.id}
+                className={isFlashing ? 'card-flash' : ''}
+                style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 22, padding: '14px 10px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1px solid rgba(255,255,255,0.08)', position: 'relative' }}>
+
+                {/* Points badge — re-keys on pts to retrigger ptsPop animation */}
+                <div key={`pts-${student.id}-${pts}`} className="pts-pop"
+                  style={{ position: 'absolute', top: -11, right: -11, background: pts > 0 ? 'linear-gradient(135deg,#fbbf24,#f59e0b)' : '#e5e7eb', color: pts > 0 ? 'white' : '#9ca3af', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.85rem', boxShadow: pts > 0 ? '0 2px 8px rgba(251,191,36,0.6)' : 'none', border: '2.5px solid white', zIndex: 1 }}>
+                  {pts}
+                </div>
+
+                {/* Bot */}
+                <MiniBotAvatar colorIndex={colorIdx} size={90} facePixels={facePixelMap[student.id]} botElements={botElementMap[student.id]} starPoints={pts} />
+
+                {/* Name */}
+                <div style={{ fontWeight: 800, fontSize: '0.82rem', color: 'rgba(210,230,255,0.95)', textAlign: 'center', lineHeight: 1.2 }}>{student.name}</div>
+
+                {/* Star buttons */}
+                <div style={{ display: 'flex', gap: 5, width: '100%', marginTop: 2 }}>
+                  {(Object.entries(starColors) as [string, typeof starColors.bronze][]).map(([type, cfg]) => (
+                    <button key={type} className="star-btn" disabled={isBusy}
+                      onClick={() => giveStars(student.id, cfg.pts, type as any)}
+                      title={`${cfg.name}: +${cfg.pts} star point${cfg.pts > 1 ? 's' : ''}`}
+                      style={{ flex: 1, height: 46, borderRadius: 12, border: 'none', background: cfg.bg, cursor: 'pointer', fontSize: '1.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 3px 10px ${cfg.glow}` }}>
+                      {isBusy ? '…' : cfg.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* pt labels under buttons */}
+                <div style={{ display: 'flex', gap: 5, width: '100%' }}>
+                  {(Object.entries(starColors) as [string, typeof starColors.bronze][]).map(([type, cfg]) => (
+                    <div key={type} style={{ flex: 1, textAlign: 'center', fontSize: '0.58rem', fontWeight: 700, color: '#a0a0b8', letterSpacing: '0.04em' }}>+{cfg.pts}pt</div>
                   ))}
                 </div>
               </div>
@@ -1396,9 +1469,9 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
       {/* Header */}
-      <div style={{ background: 'linear-gradient(135deg,rgba(160,120,255,0.12),rgba(100,180,255,0.1))', borderRadius: 20, padding: '18px 24px', border: '1.5px solid rgba(160,140,220,0.2)' }}>
-        <div style={{ fontSize: '1rem', fontWeight: 900, color: '#3040a0', marginBottom: 4 }}>🃏 Card Database</div>
-        <div style={{ fontSize: '0.8rem', color: '#6070b0', lineHeight: 1.5 }}>
+      <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: '18px 24px', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
+        <div style={{ fontSize: '1rem', fontWeight: 900, marginBottom: 4, background: 'linear-gradient(135deg,#c084fc,#818cf8,#38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>🃏 Card Database</div>
+        <div style={{ fontSize: '0.8rem', color: 'rgba(180,210,255,0.7)', lineHeight: 1.5 }}>
           Create cards for the pack pool. Students spend ⭐ star points on packs — each pack pulls random cards from this database. Higher rarity cards appear less often.
         </div>
       </div>
@@ -1419,34 +1492,34 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
                   style={{ width: '100%', height: '100%', objectFit: 'cover', transform: `translate(${dbPosition.x}%, ${dbPosition.y}%) scale(${dbScale}) rotate(${dbRotation}deg)`, cursor: dbCroppedImage ? 'default' : (dbIsDragging ? 'grabbing' : 'grab'), userSelect: 'none', minHeight: 130 }}
                 />
               ) : (
-                <div style={{ textAlign: 'center', color: '#6070b0', fontSize: '0.75rem', padding: 16 }}><div style={{ fontSize: '2rem', marginBottom: 4 }}>🖼</div>No image</div>
+                <div style={{ textAlign: 'center', color: 'rgba(180,210,255,0.65)', fontSize: '0.75rem', padding: 16 }}><div style={{ fontSize: '2rem', marginBottom: 4 }}>🖼</div>No image</div>
               )}
             </div>
             {dbImage && (
               <div style={{ display: 'flex', gap: 4, marginBottom: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
                 {[['↺', () => setDbRotation(r => r - 90)], ['↻', () => setDbRotation(r => r + 90)], ['⟳', () => { setDbScale(1); setDbRotation(0); setDbPosition({ x:0,y:0 }); setDbCroppedImage(null); }]].map(([l, fn]: any) => (
-                  <button key={l} onClick={fn} style={{ fontSize:'0.68rem', padding:'3px 9px', border:'1px solid rgba(160,140,220,0.25)', borderRadius:4, background:'rgba(255,255,255,0.6)', cursor:'pointer', color:'#6070b0' }}>{l}</button>
+                  <button key={l} onClick={fn} style={{ fontSize:'0.68rem', padding:'3px 9px', border:'1px solid rgba(255,255,255,0.15)', borderRadius:4, background:'rgba(255,255,255,0.08)', cursor:'pointer', color:'rgba(200,220,255,0.8)' }}>{l}</button>
                 ))}
               </div>
             )}
             {dbImage && (
               <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
-                <span style={{ fontSize:'0.65rem', color:'#8090b0', flexShrink:0 }}>🔍</span>
+                <span style={{ fontSize:'0.65rem', color:'rgba(180,210,255,0.5)', flexShrink:0 }}>🔍</span>
                 <input type="range" min="0.3" max="5" step="0.05" value={dbScale}
-                  onChange={e => setDbScale(parseFloat(e.target.value))} style={{ flex:1, accentColor:'#9575cd' }} />
-                <span style={{ fontSize:'0.68rem', color:'#8090b0', width:28, textAlign:'right' }}>{dbScale.toFixed(1)}×</span>
+                  onChange={e => setDbScale(parseFloat(e.target.value))} style={{ flex:1, accentColor:'#c084fc' }} />
+                <span style={{ fontSize:'0.68rem', color:'rgba(180,210,255,0.5)', width:28, textAlign:'right' }}>{dbScale.toFixed(1)}×</span>
               </div>
             )}
             <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} style={{ display:'none' }} />
-            <button onClick={() => fileInputRef.current?.click()} style={{ width:'100%', padding:'0.5rem', border:'1.5px dashed rgba(160,140,220,0.35)', borderRadius:8, background:'rgba(160,140,220,0.06)', color:'#6070b0', fontSize:'0.8rem', cursor:'pointer', fontWeight:700 }}>
+            <button onClick={() => fileInputRef.current?.click()} style={{ width:'100%', padding:'0.5rem', border:'1.5px dashed rgba(192,132,252,0.4)', borderRadius:8, background:'rgba(192,132,252,0.07)', color:'rgba(192,132,252,0.9)', fontSize:'0.8rem', cursor:'pointer', fontWeight:700 }}>
               📁 Upload Image
             </button>
             {dbImage && (
               <>
-                <button onClick={handleCrop} style={{ width:'100%', marginTop:6, padding:'0.45rem', border:`2px solid ${dbCroppedImage ? 'rgba(80,160,80,0.5)' : 'rgba(80,160,80,0.3)'}`, borderRadius:8, background: dbCroppedImage ? 'rgba(80,160,80,0.12)' : 'rgba(80,160,80,0.06)', color:'#1a6a2a', fontSize:'0.8rem', cursor:'pointer', fontWeight:800 }}>
+                <button onClick={handleCrop} style={{ width:'100%', marginTop:6, padding:'0.45rem', border:`2px solid ${dbCroppedImage ? 'rgba(80,160,80,0.5)' : 'rgba(80,160,80,0.3)'}`, borderRadius:8, background: dbCroppedImage ? 'rgba(80,160,80,0.12)' : 'rgba(80,160,80,0.06)', color:'#4cba80', fontSize:'0.8rem', cursor:'pointer', fontWeight:800 }}>
                   {dbCroppedImage ? '✓ Re-crop' : '✂ Crop & Apply'}
                 </button>
-                <button onClick={() => { setDbImage(null); setDbCroppedImage(null); setDbScale(1); setDbRotation(0); setDbPosition({x:0,y:0}); }} style={{ width:'100%', marginTop:4, padding:'0.3rem', border:'1px solid rgba(200,50,50,0.2)', borderRadius:6, background:'transparent', color:'#b04040', fontSize:'0.72rem', cursor:'pointer' }}>
+                <button onClick={() => { setDbImage(null); setDbCroppedImage(null); setDbScale(1); setDbRotation(0); setDbPosition({x:0,y:0}); }} style={{ width:'100%', marginTop:4, padding:'0.3rem', border:'1px solid rgba(200,50,50,0.2)', borderRadius:6, background:'transparent', color:'rgba(255,100,100,0.8)', fontSize:'0.72rem', cursor:'pointer' }}>
                   ✕ Remove
                 </button>
               </>
@@ -1467,10 +1540,10 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
 
           {/* Rarity — preview only, does not affect card creation */}
           <div>
-            <label className="tp-label">Preview Rarity <span style={{ fontWeight:400, fontSize:'0.7rem', color:'#b0b8cc', textTransform:'none', letterSpacing:0 }}>(for preview only — rarity is assigned when a pack is opened)</span></label>
+            <label className="tp-label">Preview Rarity <span style={{ fontWeight:400, fontSize:'0.7rem', color:'rgba(180,210,255,0.4)', textTransform:'none', letterSpacing:0 }}>(for preview only — rarity is assigned when a pack is opened)</span></label>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
               {DB_RARITY_OPTIONS.map(r => (
-                <button key={r.id} onClick={() => setCardRarity(r.id)} style={{ padding:'8px 10px', borderRadius:10, fontSize:'0.78rem', fontWeight:700, cursor:'pointer', textAlign:'left', border: cardRarity === r.id ? `2px solid ${r.color}` : '1.5px solid rgba(180,160,220,0.2)', background: cardRarity === r.id ? `${r.color}18` : 'rgba(255,255,255,0.5)', color: cardRarity === r.id ? r.color : '#8090b0' }}>
+                <button key={r.id} onClick={() => setCardRarity(r.id)} style={{ padding:'8px 10px', borderRadius:10, fontSize:'0.78rem', fontWeight:700, cursor:'pointer', textAlign:'left', border: cardRarity === r.id ? `2px solid ${r.color}` : '1px solid rgba(255,255,255,0.1)', background: cardRarity === r.id ? `${r.color}22` : 'rgba(255,255,255,0.05)', color: cardRarity === r.id ? r.color : 'rgba(180,210,255,0.55)' }}>
                   <div>{r.label}</div>
                   <div style={{ fontSize:'0.65rem', opacity:0.7, marginTop:1 }}>{r.hint}</div>
                 </button>
@@ -1483,7 +1556,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
             <label className="tp-label">Deck Type</label>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
               {DB_DECK_OPTIONS.map(d => (
-                <button key={d.id} onClick={() => setCardDeck(d.id)} style={{ padding:'5px 12px', borderRadius:20, fontSize:'0.76rem', fontWeight:700, cursor:'pointer', border: cardDeck === d.id ? `2px solid ${d.color}` : '1.5px solid rgba(180,160,220,0.2)', background: cardDeck === d.id ? `${d.color}18` : 'rgba(255,255,255,0.5)', color: cardDeck === d.id ? d.color : '#8090b0' }}>
+                <button key={d.id} onClick={() => setCardDeck(d.id)} style={{ padding:'5px 12px', borderRadius:20, fontSize:'0.76rem', fontWeight:700, cursor:'pointer', border: cardDeck === d.id ? `2px solid ${d.color}` : '1px solid rgba(255,255,255,0.1)', background: cardDeck === d.id ? `${d.color}22` : 'rgba(255,255,255,0.05)', color: cardDeck === d.id ? d.color : 'rgba(180,210,255,0.55)' }}>
                   {d.label}
                 </button>
               ))}
@@ -1501,15 +1574,15 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
           {/* Actions */}
           <div>
             <label className="tp-label">Action Names</label>
-            <div style={{ background:'rgba(255,255,255,0.5)', border:'1.5px solid rgba(180,160,220,0.2)', borderRadius:12, padding:'12px 14px', display:'flex', flexDirection:'column', gap:10 }}>
+            <div style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, padding:'12px 14px', display:'flex', flexDirection:'column', gap:10 }}>
 
-              <div style={{ background:'rgba(160,140,220,0.06)', border:'1px solid rgba(160,140,220,0.15)', borderRadius:8, padding:'8px 10px', fontSize:'0.72rem', color:'#6070b0', lineHeight:1.5 }}>
+              <div style={{ background:'rgba(192,132,252,0.1)', border:'1px solid rgba(192,132,252,0.2)', borderRadius:8, padding:'8px 10px', fontSize:'0.72rem', color:'rgba(192,132,252,0.9)', lineHeight:1.5 }}>
                 🔒 <strong>Stats are sealed</strong> — HP and damage values are rolled randomly when a student opens their pack. Only name the actions here.
               </div>
 
               {/* Weak action */}
               <div>
-                <div style={{ fontSize:'0.72rem', color:'#8090b0', fontWeight:700, marginBottom:4 }}>⚡ Weak Action <span style={{ fontWeight:400, color:'#b0b8cc' }}>({currentRange.weakMin}–{currentRange.weakMax} dmg when opened)</span></div>
+                <div style={{ fontSize:'0.72rem', color:'rgba(180,210,255,0.5)', fontWeight:700, marginBottom:4 }}>⚡ Weak Action <span style={{ fontWeight:400, color:'rgba(180,210,255,0.4)' }}>({currentRange.weakMin}–{currentRange.weakMax} dmg when opened)</span></div>
                 <input type="text" className="tp-input"
                   placeholder="e.g. Quick Scratch" value={weakActionName}
                   onChange={e => setWeakActionName(e.target.value)} />
@@ -1517,28 +1590,28 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
 
               {/* Strong action */}
               <div>
-                <div style={{ fontSize:'0.72rem', color:'#8090b0', fontWeight:700, marginBottom:4 }}>💥 Strong Action <span style={{ fontWeight:400, color:'#b0b8cc' }}>({currentRange.strongMin}–{currentRange.strongMax} dmg when opened)</span></div>
+                <div style={{ fontSize:'0.72rem', color:'rgba(180,210,255,0.5)', fontWeight:700, marginBottom:4 }}>💥 Strong Action <span style={{ fontWeight:400, color:'rgba(180,210,255,0.4)' }}>({currentRange.strongMin}–{currentRange.strongMax} dmg when opened)</span></div>
                 <input type="text" className="tp-input"
                   placeholder="e.g. Thunder Strike" value={strongActionName}
                   onChange={e => setStrongActionName(e.target.value)} />
               </div>
 
               {/* HP range info */}
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:6, borderTop:'1px solid rgba(180,160,220,0.15)', fontSize:'0.72rem', color:'#8090b0' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:6, borderTop:'1px solid rgba(255,255,255,0.08)', fontSize:'0.72rem', color:'rgba(180,210,255,0.5)' }}>
                 <span>❤️ Hit Points</span>
-                <span style={{ fontWeight:700, color:'#b0b8cc' }}>{currentRange.hpMin}–{currentRange.hpMax} (rolled on open)</span>
+                <span style={{ fontWeight:700, color:'rgba(180,210,255,0.4)' }}>{currentRange.hpMin}–{currentRange.hpMax} (rolled on open)</span>
               </div>
             </div>
           </div>
 
           {/* Rare Exclusive */}
-          <div style={{ background: isRareExclusive ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.4)', border:`1.5px solid ${isRareExclusive ? 'rgba(245,158,11,0.3)' : 'rgba(180,160,220,0.2)'}`, borderRadius:12, padding:'10px 14px' }}>
+          <div style={{ background: isRareExclusive ? 'rgba(192,132,252,0.1)' : 'rgba(255,255,255,0.05)', border:`1px solid ${isRareExclusive ? 'rgba(192,132,252,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius:12, padding:'10px 14px' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: isRareExclusive ? 8 : 0 }}>
               <div>
-                <div style={{ fontSize:'0.8rem', fontWeight:800, color: isRareExclusive ? '#92400e' : '#6070b0' }}>🌟 Rare Exclusive</div>
-                <div style={{ fontSize:'0.65rem', color:'#8090b0', marginTop:2 }}>Limit how many students can own this card</div>
+                <div style={{ fontSize:'0.8rem', fontWeight:800, color: isRareExclusive ? '#c084fc' : 'rgba(180,210,255,0.6)' }}>🌟 Rare Exclusive</div>
+                <div style={{ fontSize:'0.65rem', color:'rgba(180,210,255,0.45)', marginTop:2 }}>Limit how many students can own this card</div>
               </div>
-              <button onClick={() => setIsRareExclusive(v => !v)} style={{ padding:'4px 14px', borderRadius:20, fontSize:'0.75rem', fontWeight:800, border:'none', cursor:'pointer', background: isRareExclusive ? 'rgba(245,158,11,0.2)' : 'rgba(180,160,220,0.15)', color: isRareExclusive ? '#92400e' : '#8090b0' }}>
+              <button onClick={() => setIsRareExclusive(v => !v)} style={{ padding:'4px 14px', borderRadius:20, fontSize:'0.75rem', fontWeight:800, border:'none', cursor:'pointer', background: isRareExclusive ? 'rgba(192,132,252,0.2)' : 'rgba(255,255,255,0.08)', color: isRareExclusive ? '#c084fc' : 'rgba(180,210,255,0.5)' }}>
                 {isRareExclusive ? 'ON' : 'OFF'}
               </button>
             </div>
@@ -1547,7 +1620,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
                 <label className="tp-label" style={{ margin:0, flexShrink:0 }}>Max copies:</label>
                 <input type="number" min={1} max={50} value={maxCopies} onChange={e => setMaxCopies(parseInt(e.target.value)||1)}
                   className="tp-input" style={{ width:70, textAlign:'center' }} />
-                <span style={{ fontSize:'0.7rem', color:'#9a7040' }}>students can own this</span>
+                <span style={{ fontSize:'0.7rem', color:'rgba(180,210,255,0.5)' }}>students can own this</span>
               </div>
             )}
           </div>
@@ -1579,12 +1652,12 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
           </div>
 
           {/* Sealed badge */}
-          <div style={{ background:'rgba(100,80,180,0.08)', border:'1.5px solid rgba(100,80,180,0.2)', borderRadius:12, padding:'10px 14px', textAlign:'center' }}>
-            <div style={{ fontSize:'0.8rem', fontWeight:800, color:'#4040a0' }}>🔒 Stats Sealed</div>
-            <div style={{ fontSize:'0.68rem', color:'#6070b0', marginTop:3, lineHeight:1.4 }}>
+          <div style={{ background:'rgba(192,132,252,0.08)', border:'1px solid rgba(192,132,252,0.2)', borderRadius:12, padding:'10px 14px', textAlign:'center' }}>
+            <div style={{ fontSize:'0.8rem', fontWeight:800, color:'#c084fc' }}>🔒 Stats Sealed</div>
+            <div style={{ fontSize:'0.68rem', color:'rgba(180,210,255,0.6)', marginTop:3, lineHeight:1.4 }}>
               HP, damage & skill points are rolled<br/>randomly when a student opens their pack
             </div>
-            <div style={{ display:'flex', justifyContent:'center', gap:12, marginTop:8, fontSize:'0.7rem', color:'#8090b0' }}>
+            <div style={{ display:'flex', justifyContent:'center', gap:12, marginTop:8, fontSize:'0.7rem', color:'rgba(180,210,255,0.5)' }}>
               <span>❤️ {currentRange.hpMin}–{currentRange.hpMax}</span>
               <span>⚡ {currentRange.weakMin}–{currentRange.weakMax}</span>
               <span>💥 {currentRange.strongMin}–{currentRange.strongMax}</span>
@@ -1601,7 +1674,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
             {saving ? 'Saving…' : '💾 Add to Card Database'}
           </button>
 
-          <p style={{ fontSize:'0.65rem', color:'#9090c0', textAlign:'center', margin:0, fontStyle:'italic' }}>
+          <p style={{ fontSize:'0.65rem', color:'rgba(180,210,255,0.45)', textAlign:'center', margin:0, fontStyle:'italic' }}>
             This card will appear in packs students buy with star points
           </p>
         </div>
@@ -1614,31 +1687,31 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
           <button onClick={loadDbCards} className="tp-btn-outline" style={{ fontSize:'0.72rem', padding:'5px 12px' }}>↺ Refresh</button>
         </div>
         {loadingDb ? (
-          <div style={{ textAlign:'center', color:'#9090c0', fontSize:'0.82rem', padding:20 }}>Loading…</div>
+          <div style={{ textAlign:'center', color:'rgba(180,210,255,0.45)', fontSize:'0.82rem', padding:20 }}>Loading…</div>
         ) : dbCards.length === 0 ? (
-          <div style={{ textAlign:'center', color:'#9090c0', fontSize:'0.82rem', padding:30, fontStyle:'italic' }}>No cards yet — create your first card above!</div>
+          <div style={{ textAlign:'center', color:'rgba(180,210,255,0.45)', fontSize:'0.82rem', padding:30, fontStyle:'italic' }}>No cards yet — create your first card above!</div>
         ) : (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:12 }}>
             {dbCards.map(c => {
               const dc = DB_DECK_OPTIONS.find(d => d.id === c.type)?.color || '#3b82f6';
               const rc = DB_RARITY_OPTIONS.find(r => r.id === c.rarity)?.color || '#9ca3af';
               return (
-                <div key={c.id} style={{ background:'rgba(255,255,255,0.6)', border:`1.5px solid ${rc}44`, borderRadius:14, overflow:'hidden', boxShadow:'0 2px 8px rgba(0,0,0,0.06)' }}>
+                <div key={c.id} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:14, overflow:'hidden', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', boxShadow:'0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
                   <div style={{ height:8, background:`linear-gradient(90deg,${dc},${rc})` }} />
                   {c.image_url && <img src={c.image_url} alt={c.card_name} style={{ width:'100%', height:100, objectFit:'cover' }} />}
                   <div style={{ padding:'8px 10px' }}>
-                    <div style={{ fontWeight:800, fontSize:'0.82rem', color:'#3040a0', marginBottom:2 }}>{c.card_name}</div>
-                    <div style={{ fontSize:'0.68rem', color:'#6070b0', marginBottom:4, fontStyle:'italic', lineHeight:1.35 }}>{c.description}</div>
+                    <div style={{ fontWeight:800, fontSize:'0.82rem', color:'rgba(210,230,255,0.95)', marginBottom:2 }}>{c.card_name}</div>
+                    <div style={{ fontSize:'0.68rem', color:'rgba(180,210,255,0.65)', marginBottom:4, fontStyle:'italic', lineHeight:1.35 }}>{c.description}</div>
                     <div style={{ display:'flex', gap:6, marginBottom:6, flexWrap:'wrap' }}>
                       <span style={{ fontSize:'0.62rem', padding:'2px 7px', borderRadius:10, background:`${dc}22`, color:dc, fontWeight:700 }}>{c.type}</span>
                       <span style={{ fontSize:'0.62rem', padding:'2px 7px', borderRadius:10, background:`${rc}22`, color:rc, fontWeight:700 }}>{c.rarity}</span>
-                      {c.is_rare_exclusive && <span style={{ fontSize:'0.62rem', padding:'2px 7px', borderRadius:10, background:'rgba(245,158,11,0.15)', color:'#92400e', fontWeight:700 }}>🌟 ×{c.max_copies}</span>}
+                      {c.is_rare_exclusive && <span style={{ fontSize:'0.62rem', padding:'2px 7px', borderRadius:10, background:'rgba(245,158,11,0.15)', color:'#c084fc', fontWeight:700 }}>🌟 ×{c.max_copies}</span>}
                     </div>
-                    <div style={{ fontSize:'0.68rem', color:'#8090b0', marginBottom:6 }}>
+                    <div style={{ fontSize:'0.68rem', color:'rgba(180,210,255,0.5)', marginBottom:6 }}>
                       ❤️ {c.hp} &nbsp;⚡ {c.move1_dmg} &nbsp;💥 {c.move2_dmg}
                     </div>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                      <span style={{ fontSize:'0.7rem', color:'#b45309', fontWeight:800 }}>⭐ {c.skill_points} pts</span>
+                      <span style={{ fontSize:'0.7rem', color:'rgba(180,210,255,0.55)', fontWeight:800 }}>⭐ {c.skill_points} pts</span>
                       <button onClick={() => handleDeleteCard(c.id)} className="tp-btn-danger" style={{ fontSize:'0.68rem', padding:'3px 9px' }}>Delete</button>
                     </div>
                   </div>
@@ -1844,10 +1917,10 @@ function WeeklyProjectTab({
       {/* ── Header ── */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
-          <h2 className="font-display font-bold text-xs uppercase tracking-[0.15em] mb-1" style={{ color: '#c8a000' }}>
+          <div style={{ fontSize:'1rem', fontWeight:900, marginBottom:4, background:'linear-gradient(135deg,#f472b6,#c084fc,#818cf8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>
             📋 Weekly Project Card
-          </h2>
-          <p className="text-xs italic" style={{ color: '#9a7040' }}>
+          </div>
+          <p style={{ fontSize:'0.75rem', color:'rgba(180,210,255,0.6)', margin:0 }}>
             {weeklyProject?.week_label || getCurrentWeekLabel()}
             {weeklyProject?.end_date && ` · Due ${new Date(weeklyProject.end_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`}
             {!weeklyProject?.end_date && ' · Students see this task and earn the card for completing it'}
@@ -1856,101 +1929,85 @@ function WeeklyProjectTab({
         <div className="flex gap-2 flex-wrap">
           {hasProject && (
             <>
-              {/* View toggle */}
-              <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(90,50,10,0.2)' }}>
-                <button
-                  onClick={() => setWeeklyView('project')}
-                  style={{ padding: '5px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', border: 'none', background: weeklyView === 'project' ? 'rgba(200,160,0,0.15)' : 'transparent', color: weeklyView === 'project' ? '#8b6a00' : '#9a7040' }}
-                >📋 Project</button>
-                <button
-                  onClick={handleViewSubmissions}
-                  style={{ padding: '5px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', border: 'none', borderLeft: '1px solid rgba(90,50,10,0.2)', background: weeklyView === 'submissions' ? 'rgba(200,160,0,0.15)' : 'transparent', color: weeklyView === 'submissions' ? '#8b6a00' : '#9a7040' }}
-                >📥 Submissions {submissions.length > 0 && <span style={{ background: '#c8a000', color: 'white', borderRadius: '50%', padding: '1px 5px', fontSize: '0.62rem', marginLeft: 4 }}>{submissions.length}</span>}</button>
+              <div style={{ display:'flex', borderRadius:10, overflow:'hidden', border:'1px solid rgba(255,255,255,0.1)', backdropFilter:'blur(12px)' }}>
+                <button onClick={() => setWeeklyView('project')}
+                  style={{ padding:'6px 16px', fontSize:'0.72rem', fontWeight:700, cursor:'pointer', border:'none', background: weeklyView === 'project' ? 'rgba(192,132,252,0.2)' : 'transparent', color: weeklyView === 'project' ? '#c084fc' : 'rgba(180,210,255,0.5)' }}>
+                  📋 Project
+                </button>
+                <button onClick={handleViewSubmissions}
+                  style={{ padding:'6px 16px', fontSize:'0.72rem', fontWeight:700, cursor:'pointer', border:'none', borderLeft:'1px solid rgba(255,255,255,0.1)', background: weeklyView === 'submissions' ? 'rgba(192,132,252,0.2)' : 'transparent', color: weeklyView === 'submissions' ? '#c084fc' : 'rgba(180,210,255,0.5)' }}>
+                  📥 Submissions {submissions.length > 0 && <span style={{ background:'linear-gradient(135deg,#f472b6,#c084fc)', color:'white', borderRadius:'50%', padding:'1px 5px', fontSize:'0.62rem', marginLeft:4 }}>{submissions.length}</span>}
+                </button>
               </div>
-              <button onClick={handleOpenAward} className="tp-btn-gold" style={{ fontFamily: "'Cinzel',serif" }}>
-                🏅 Award Students
-              </button>
-              <button onClick={handleNewProject} className="tp-btn-outline" style={{ borderColor: 'rgba(90,40,10,0.3)', color: '#7a5a40' }}>
-                + New Project
-              </button>
+              <button onClick={handleOpenAward} className="tp-btn-gold">🏅 Award Students</button>
+              <button onClick={handleNewProject} className="tp-btn-outline">+ New Project</button>
             </>
           )}
         </div>
       </div>
 
-      {/* ══ SUBMISSIONS VIEW ═════════════════════════════════════════ */}
+      {/* ══ SUBMISSIONS VIEW ═══════════════════════════════════════════ */}
       {weeklyView === 'submissions' && hasProject && (
         <div>
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-bold" style={{ color: '#5a3a20' }}>
+            <h3 style={{ fontSize:'0.9rem', fontWeight:800, color:'rgba(210,230,255,0.9)', margin:0 }}>
               Student Submissions — {weeklyTitle}
             </h3>
-            <button onClick={() => loadSubmissions(weeklyProject.id)} className="tp-btn-outline" style={{ borderColor: 'rgba(90,40,10,0.2)', color: '#9a7040' }}>
-              ↻ Refresh
-            </button>
+            <button onClick={() => loadSubmissions(weeklyProject.id)} className="tp-btn-outline">↻ Refresh</button>
           </div>
 
           {submissionsLoading ? (
-            <div className="text-sm italic text-center py-8" style={{ color: '#9a7040' }}>Loading submissions…</div>
+            <div style={{ fontSize:'0.85rem', fontStyle:'italic', textAlign:'center', padding:'2rem', color:'rgba(180,210,255,0.5)' }}>Loading submissions…</div>
           ) : submissions.length === 0 ? (
-            <div className="text-center py-12" style={{ background: 'rgba(255,248,222,0.4)', borderRadius: 16, border: '2px dashed rgba(200,160,0,0.2)' }}>
-              <div style={{ fontSize: '2.5rem', opacity: 0.2, marginBottom: 8 }}>📭</div>
-              <p className="text-sm italic" style={{ color: '#9a7040' }}>No pending submissions yet</p>
+            <div style={{ textAlign:'center', padding:'3rem 2rem', background:'rgba(255,255,255,0.04)', borderRadius:16, border:'2px dashed rgba(192,132,252,0.2)', backdropFilter:'blur(12px)' }}>
+              <div style={{ fontSize:'2.5rem', opacity:0.25, marginBottom:8 }}>📭</div>
+              <p style={{ fontSize:'0.85rem', fontStyle:'italic', color:'rgba(180,210,255,0.45)', margin:0 }}>No pending submissions yet</p>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
               {submissions.map((sub: any) => (
-                <div key={sub.id} style={{ background: 'rgba(255,248,222,0.7)', border: '1px solid rgba(90,50,10,0.15)', borderRadius: 16, padding: '1.2rem 1.5rem' }}>
+                <div key={sub.id} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:16, padding:'1.2rem 1.5rem', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', boxShadow:'0 4px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
                   <div className="flex items-start justify-between gap-4 flex-wrap">
-                    {/* Student info */}
-                    <div style={{ flex: 1, minWidth: 180 }}>
-                      <div className="font-bold text-sm mb-1" style={{ color: '#3d2b1f' }}>
+                    <div style={{ flex:1, minWidth:180 }}>
+                      <div style={{ fontWeight:800, fontSize:'0.88rem', marginBottom:4, color:'rgba(210,230,255,0.95)' }}>
                         {sub.students?.name || 'Unknown student'}
                       </div>
-                      <div className="text-xs italic mb-3" style={{ color: '#9a7040' }}>
-                        Submitted {new Date(sub.submitted_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      <div style={{ fontSize:'0.72rem', fontStyle:'italic', marginBottom:12, color:'rgba(180,210,255,0.5)' }}>
+                        Submitted {new Date(sub.submitted_at).toLocaleDateString('en-NZ', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}
                       </div>
-                      {/* Photos */}
-                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
                         {sub.photo1_url && (
                           <a href={sub.photo1_url} target="_blank" rel="noopener noreferrer">
-                            <img src={sub.photo1_url} alt="Evidence 1"
-                              style={{ width: 110, height: 80, objectFit: 'cover', borderRadius: 10, border: '2px solid rgba(90,50,10,0.15)', cursor: 'pointer', transition: 'transform 0.15s' }}
+                            <img src={sub.photo1_url} alt="Evidence 1" style={{ width:110, height:80, objectFit:'cover', borderRadius:10, border:'1.5px solid rgba(192,132,252,0.3)', cursor:'pointer', transition:'transform 0.15s' }}
                               onMouseEnter={e => { (e.target as HTMLImageElement).style.transform = 'scale(1.05)'; }}
-                              onMouseLeave={e => { (e.target as HTMLImageElement).style.transform = 'scale(1)'; }}
-                            />
+                              onMouseLeave={e => { (e.target as HTMLImageElement).style.transform = 'scale(1)'; }} />
                           </a>
                         )}
                         {sub.photo2_url && (
                           <a href={sub.photo2_url} target="_blank" rel="noopener noreferrer">
-                            <img src={sub.photo2_url} alt="Evidence 2"
-                              style={{ width: 110, height: 80, objectFit: 'cover', borderRadius: 10, border: '2px solid rgba(90,50,10,0.15)', cursor: 'pointer', transition: 'transform 0.15s' }}
+                            <img src={sub.photo2_url} alt="Evidence 2" style={{ width:110, height:80, objectFit:'cover', borderRadius:10, border:'1.5px solid rgba(192,132,252,0.3)', cursor:'pointer', transition:'transform 0.15s' }}
                               onMouseEnter={e => { (e.target as HTMLImageElement).style.transform = 'scale(1.05)'; }}
-                              onMouseLeave={e => { (e.target as HTMLImageElement).style.transform = 'scale(1)'; }}
-                            />
+                              onMouseLeave={e => { (e.target as HTMLImageElement).style.transform = 'scale(1)'; }} />
                           </a>
                         )}
                         {!sub.photo1_url && !sub.photo2_url && (
-                          <span className="text-xs italic" style={{ color: '#b0906a' }}>No photos attached</span>
+                          <span style={{ fontSize:'0.75rem', fontStyle:'italic', color:'rgba(180,210,255,0.4)' }}>No photos attached</span>
                         )}
                       </div>
                     </div>
-
-                    {/* Award buttons */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                      <div className="text-xs font-bold mb-1 text-center" style={{ color: '#9a7040' }}>Award as:</div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:6, flexShrink:0 }}>
+                      <div style={{ fontSize:'0.72rem', fontWeight:700, marginBottom:4, textAlign:'center', color:'rgba(180,210,255,0.5)' }}>Award as:</div>
                       {([
-                        { rar: 'common'    as const, label: '⭐ Common',  color: '#8b6a00', bg: 'rgba(200,160,0,0.1)',   border: 'rgba(200,160,0,0.35)' },
-                        { rar: 'silver'    as const, label: '✦ Silver',   color: '#5a7a90', bg: 'rgba(120,160,190,0.1)', border: 'rgba(120,160,190,0.4)' },
-                        { rar: 'gold-rare' as const, label: '★ Gold',     color: '#c07800', bg: 'rgba(212,160,23,0.1)',  border: 'rgba(212,160,23,0.4)' },
+                        { rar:'common'    as const, label:'⭐ Common', color:'#a78bfa', bg:'rgba(167,139,250,0.12)', border:'rgba(167,139,250,0.3)'  },
+                        { rar:'silver'    as const, label:'✦ Silver',  color:'#38bdf8', bg:'rgba(56,189,248,0.1)',   border:'rgba(56,189,248,0.3)'   },
+                        { rar:'gold-rare' as const, label:'★ Gold',    color:'#f472b6', bg:'rgba(244,114,182,0.12)', border:'rgba(244,114,182,0.35)' },
                       ]).map(({ rar, label, color, bg, border }) => (
-                        <button
-                          key={rar}
-                          onClick={() => handleAwardSubmission(sub, rar)}
-                          style={{ padding: '6px 18px', borderRadius: 8, border: `1px solid ${border}`, background: bg, color, fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.15s', minWidth: 110, textAlign: 'center' }}
+                        <button key={rar} onClick={() => handleAwardSubmission(sub, rar)}
+                          style={{ padding:'6px 18px', borderRadius:8, border:`1px solid ${border}`, background:bg, color, fontSize:'0.75rem', fontWeight:800, cursor:'pointer', transition:'all 0.15s', minWidth:110, textAlign:'center' }}
                           onMouseEnter={e => { (e.currentTarget).style.opacity = '0.75'; }}
-                          onMouseLeave={e => { (e.currentTarget).style.opacity = '1'; }}
-                        >{label}</button>
+                          onMouseLeave={e => { (e.currentTarget).style.opacity = '1'; }}>
+                          {label}
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -1962,60 +2019,49 @@ function WeeklyProjectTab({
         </div>
       )}
 
-      {/* ══ PROJECT VIEW ═════════════════════════════════════════════ */}
+      {/* ══ PROJECT VIEW ══════════════════════════════════════════════ */}
       {weeklyView === 'project' && (
         <div className="grid gap-6" style={{ gridTemplateColumns: 'minmax(320px,420px) 1fr' }}>
 
           {/* Left: form */}
-          <div className="p-6 rounded-xs" style={{ background: 'rgba(255,248,222,0.65)', border: '1px solid rgba(90,50,10,0.18)', boxShadow: '2px 3px 12px rgba(0,0,0,0.09)' }}>
+          <div style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:20, padding:'24px', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', boxShadow:'0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
 
             <div className="mb-4">
               <label className="tp-label">Project Title</label>
-              <input type="text" className="tp-input"
-                placeholder="e.g. The Solar System Explorer"
+              <input type="text" className="tp-input" placeholder="e.g. The Solar System Explorer"
                 value={weeklyTitle} onChange={e => setWeeklyTitle(e.target.value)} />
             </div>
 
             <div className="mb-4">
               <label className="tp-label">What must students do to earn this card?</label>
-              <textarea className="tp-input" style={{ minHeight: 90 }}
+              <textarea className="tp-input" style={{ minHeight:90 }}
                 placeholder="e.g. Create a poster showing the 8 planets in our solar system..."
                 value={weeklyTask} onChange={e => setWeeklyTask(e.target.value)} />
-              <p className="text-xs mt-1 italic" style={{ color: '#9a7040' }}>This text appears as the task on the student's page.</p>
+              <p style={{ fontSize:'0.72rem', marginTop:4, fontStyle:'italic', color:'rgba(180,210,255,0.45)' }}>This text appears as the task on the student's page.</p>
             </div>
 
             <div className="mb-4">
-              <label className="tp-label">
-                Card Character Style <span className="text-xs" style={{ color: '#9a7040' }}>(optional)</span>
-              </label>
-              <input type="text" className="tp-input"
-                placeholder="e.g. space explorer robot, planet dragon, cosmic owl…"
+              <label className="tp-label">Card Character Style <span style={{ fontSize:'0.72rem', color:'rgba(180,210,255,0.4)', textTransform:'none', letterSpacing:0, fontWeight:400 }}>(optional)</span></label>
+              <input type="text" className="tp-input" placeholder="e.g. space explorer robot, planet dragon, cosmic owl…"
                 value={weeklyCharHint} onChange={e => setWeeklyCharHint(e.target.value)} />
             </div>
 
-            {/* End date */}
             <div className="mb-5">
-              <label className="tp-label">
-                Due Date <span className="text-xs" style={{ color: '#9a7040' }}>(optional — shown to students)</span>
-              </label>
-              <input type="date" className="tp-input"
-                value={weeklyEndDate} onChange={e => setWeeklyEndDate(e.target.value)}
-                min={new Date().toISOString().slice(0, 10)}
-              />
+              <label className="tp-label">Due Date <span style={{ fontSize:'0.72rem', color:'rgba(180,210,255,0.4)', textTransform:'none', letterSpacing:0, fontWeight:400 }}>(optional — shown to students)</span></label>
+              <input type="date" className="tp-input" value={weeklyEndDate} onChange={e => setWeeklyEndDate(e.target.value)} min={new Date().toISOString().slice(0,10)} />
               {weeklyEndDate && (
-                <button onClick={() => setWeeklyEndDate('')} className="text-xs mt-1" style={{ color: '#9a7040', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                <button onClick={() => setWeeklyEndDate('')} style={{ fontSize:'0.72rem', marginTop:4, color:'rgba(192,132,252,0.7)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline' }}>
                   Clear date
                 </button>
               )}
             </div>
 
             <button onClick={handleGenerate} disabled={weeklyGenerating} className="tp-btn-primary" style={{ width:'100%', marginBottom:10 }}>
-              {weeklyGenerating ? 'Generating…' : '✦ Generate Card ✦'}
+              🤖 {weeklyGenerating ? 'Generating…' : 'GENERATE CARD'}
             </button>
 
             {weeklyCard && !weeklyGenerating && (
-              <button onClick={handleSaveProject} className="w-full py-2 rounded-lg text-sm font-bold"
-                style={{ background: 'rgba(80,200,120,0.12)', border: '1px solid rgba(80,200,120,0.4)', color: '#1a6a3a', cursor: 'pointer' }}>
+              <button onClick={handleSaveProject} style={{ width:'100%', padding:'10px', borderRadius:12, fontSize:'0.88rem', fontWeight:800, background:'rgba(80,200,120,0.12)', border:'1px solid rgba(80,200,120,0.35)', color:'#4cba80', cursor:'pointer' }}>
                 {hasProject ? '💾 Update Project' : '🚀 Publish Project'}
               </button>
             )}
@@ -2030,55 +2076,58 @@ function WeeklyProjectTab({
                 <div className="flex justify-center">
                   <PokeCard card={weeklyCard as Card} showShimmerBtn />
                 </div>
-                <div className="p-5 rounded-xs" style={{ background:'rgba(255,255,255,0.72)', border:'1.5px solid rgba(255,255,255,0.9)', borderRadius:20 }}>
-                  <div className="text-xs uppercase tracking-widest mb-2" style={{ color: '#c8a000', fontFamily: "'Cinzel',serif" }}>📋 Student View Preview</div>
-                  <h3 className="font-display font-black text-base mb-2" style={{ color: '#3d2b1f' }}>{weeklyTitle || 'Project Title'}</h3>
-                  {weeklyEndDate && <p className="text-xs font-bold mb-2" style={{ color: '#c07800' }}>📅 Due: {new Date(weeklyEndDate).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' })}</p>}
-                  <p className="text-sm" style={{ color: '#5a3a20', lineHeight: 1.7 }}>{weeklyTask || 'Task description will appear here.'}</p>
-                  {hasProject && <div className="mt-3 text-xs" style={{ color: '#4a8a4a', fontWeight: 700 }}>✓ Published · Students can see this</div>}
+                <div style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:20, padding:'20px', backdropFilter:'blur(16px)', WebkitBackdropFilter:'blur(16px)', boxShadow:'inset 0 1px 0 rgba(255,255,255,0.08)' }}>
+                  <div style={{ fontSize:'0.65rem', textTransform:'uppercase', letterSpacing:'0.14em', marginBottom:8, background:'linear-gradient(135deg,#f472b6,#c084fc)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text', fontWeight:800 }}>📋 Student View Preview</div>
+                  <h3 style={{ fontWeight:900, fontSize:'1rem', marginBottom:8, color:'rgba(210,230,255,0.95)' }}>{weeklyTitle || 'Project Title'}</h3>
+                  {weeklyEndDate && <p style={{ fontSize:'0.75rem', fontWeight:700, marginBottom:8, color:'#c084fc' }}>📅 Due: {new Date(weeklyEndDate).toLocaleDateString('en-NZ', { weekday:'long', day:'numeric', month:'long' })}</p>}
+                  <p style={{ fontSize:'0.85rem', color:'rgba(180,210,255,0.75)', lineHeight:1.7 }}>{weeklyTask || 'Task description will appear here.'}</p>
+                  {hasProject && <div style={{ marginTop:12, fontSize:'0.75rem', color:'#4cba80', fontWeight:700 }}>✓ Published · Students can see this</div>}
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center rounded-xs" style={{ minHeight: 380, border: '2px dashed rgba(200,160,0,0.2)', background: 'rgba(255,248,222,0.3)' }}>
-                <span className="text-5xl mb-3" style={{ opacity: 0.2 }}>📋</span>
-                <span className="text-sm italic" style={{ color: '#9a7040' }}>Fill in the task and click Generate</span>
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:380, border:'2px dashed rgba(192,132,252,0.22)', borderRadius:18, background:'rgba(255,255,255,0.03)', backdropFilter:'blur(8px)', gap:12 }}>
+                <span style={{ fontSize:'3rem', opacity:0.3, filter:'drop-shadow(0 0 16px rgba(192,132,252,0.5))' }}>🤖</span>
+                <div style={{ fontWeight:800, fontSize:'1rem', color:'rgba(210,230,255,0.8)' }}>Ready to create!</div>
+                <div style={{ fontSize:'0.82rem', color:'rgba(180,210,255,0.5)', textAlign:'center', maxWidth:240, lineHeight:1.6 }}>
+                  Fill in the task details on the left and click <span style={{ color:'#f472b6', fontWeight:700 }}>Generate</span> to create your weekly project card.
+                </div>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* ══ Bulk Award Modal ═══════════════════════════════════════════ */}
+      {/* ══ Bulk Award Modal ══════════════════════════════════════════ */}
       {awardModal && (
         <div className="tp-modal-bg" onClick={() => { if (!awarding) setAwardModal(false); }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fffbf0', border: '2px solid rgba(90,50,10,0.25)', borderRadius: 20, padding: '2rem', width: '95%', maxWidth: 780, maxHeight: '90vh', overflowY: 'auto', position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
-            <button onClick={() => setAwardModal(false)} style={{ position: 'absolute', top: 14, right: 16, background: 'none', border: 'none', fontSize: '1.3rem', cursor: 'pointer', color: '#8a5520' }}>✕</button>
-            <h3 className="font-display font-black text-xl mb-1" style={{ color: '#3d2b1f' }}>🏅 Award "{weeklyTitle}"</h3>
-            <p className="text-xs mb-5 italic" style={{ color: '#9a7040' }}>Tick each student in the column matching their achievement level. Each student can only receive one rarity.</p>
+          <div onClick={e => e.stopPropagation()} style={{ background:'rgba(10,18,48,0.92)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:24, padding:'2rem', width:'95%', maxWidth:780, maxHeight:'90vh', overflowY:'auto', position:'relative', boxShadow:'0 32px 80px rgba(0,0,0,0.6)', backdropFilter:'blur(28px)', WebkitBackdropFilter:'blur(28px)' }}>
+            <button onClick={() => setAwardModal(false)} style={{ position:'absolute', top:14, right:16, background:'none', border:'none', fontSize:'1.3rem', cursor:'pointer', color:'rgba(180,210,255,0.6)' }}>✕</button>
+            <h3 style={{ fontWeight:900, fontSize:'1.1rem', marginBottom:4, background:'linear-gradient(135deg,#f472b6,#c084fc,#818cf8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>🏅 Award "{weeklyTitle}"</h3>
+            <p style={{ fontSize:'0.75rem', marginBottom:20, fontStyle:'italic', color:'rgba(180,210,255,0.5)' }}>Tick each student in the column matching their achievement level. Each student can only receive one rarity.</p>
             {awardError && <div className="tp-err mb-4 text-sm">{awardError}</div>}
-            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="grid gap-4" style={{ gridTemplateColumns:'repeat(3, 1fr)' }}>
               {([
-                { key: 'common', label: 'Common', icon: '⭐', desc: 'Completed the task', color: '#8b6a00', bg: 'rgba(200,160,0,0.07)', border: 'rgba(200,160,0,0.3)' },
-                { key: 'silver', label: 'Silver', icon: '✦', desc: 'Good effort & quality', color: '#5a7a90', bg: 'rgba(120,160,190,0.07)', border: 'rgba(120,160,190,0.35)' },
-                { key: 'gold-rare', label: 'Gold', icon: '★', desc: 'Outstanding work', color: '#c07800', bg: 'rgba(212,160,23,0.07)', border: 'rgba(212,160,23,0.35)' },
+                { key:'common',    label:'Common', icon:'⭐', desc:'Completed the task',    color:'#a78bfa', bg:'rgba(167,139,250,0.1)',  border:'rgba(167,139,250,0.3)'  },
+                { key:'silver',    label:'Silver', icon:'✦', desc:'Good effort & quality', color:'#38bdf8', bg:'rgba(56,189,248,0.08)',  border:'rgba(56,189,248,0.3)'   },
+                { key:'gold-rare', label:'Gold',   icon:'★', desc:'Outstanding work',      color:'#f472b6', bg:'rgba(244,114,182,0.1)', border:'rgba(244,114,182,0.35)' },
               ] as const).map(col => (
-                <div key={col.key} style={{ border: `1px solid ${col.border}`, borderRadius: 14, padding: '1rem', background: col.bg }}>
-                  <div className="text-center mb-3">
-                    <div className="text-2xl mb-1">{col.icon}</div>
-                    <div className="font-display font-black text-sm" style={{ color: col.color }}>{col.label}</div>
-                    <div className="text-xs italic" style={{ color: '#9a7040' }}>{col.desc}</div>
+                <div key={col.key} style={{ border:`1px solid ${col.border}`, borderRadius:14, padding:'1rem', background:col.bg, backdropFilter:'blur(12px)' }}>
+                  <div style={{ textAlign:'center', marginBottom:12 }}>
+                    <div style={{ fontSize:'1.5rem', marginBottom:4 }}>{col.icon}</div>
+                    <div style={{ fontWeight:800, fontSize:'0.85rem', color:col.color }}>{col.label}</div>
+                    <div style={{ fontSize:'0.72rem', fontStyle:'italic', color:'rgba(180,210,255,0.45)', marginTop:2 }}>{col.desc}</div>
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    {students.length === 0 && <span className="text-xs italic" style={{ color: '#9a7040' }}>No students</span>}
+                    {students.length === 0 && <span style={{ fontSize:'0.72rem', fontStyle:'italic', color:'rgba(180,210,255,0.4)' }}>No students</span>}
                     {students.map((s: any) => {
                       const selected = awardSelections[s.id] === col.key;
                       const selectedOther = awardSelections[s.id] && awardSelections[s.id] !== col.key;
                       return (
-                        <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, cursor: 'pointer', background: selected ? col.bg : 'transparent', border: selected ? `1.5px solid ${col.border}` : '1.5px solid transparent', opacity: selectedOther ? 0.4 : 1, transition: 'all 0.15s' }}>
-                          <input type="checkbox" checked={selected} onChange={() => handleToggleStudent(s.id, col.key)} style={{ accentColor: col.color, width: 16, height: 16, flexShrink: 0 }} />
-                          <span className="text-sm font-semibold" style={{ color: '#3d2b1f' }}>{s.name}</span>
-                          {selected && <span className="text-xs ml-auto" style={{ color: col.color }}>✓</span>}
-                          {selectedOther && <span className="text-xs ml-auto italic" style={{ color: '#9a7040' }}>→ {awardSelections[s.id]}</span>}
+                        <label key={s.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 10px', borderRadius:8, cursor:'pointer', background: selected ? col.bg : 'rgba(255,255,255,0.04)', border: selected ? `1.5px solid ${col.border}` : '1.5px solid transparent', opacity: selectedOther ? 0.35 : 1, transition:'all 0.15s' }}>
+                          <input type="checkbox" checked={selected} onChange={() => handleToggleStudent(s.id, col.key)} style={{ accentColor:col.color, width:16, height:16, flexShrink:0 }} />
+                          <span style={{ fontSize:'0.85rem', fontWeight:600, color:'rgba(210,230,255,0.9)' }}>{s.name}</span>
+                          {selected && <span style={{ fontSize:'0.72rem', marginLeft:'auto', color:col.color }}>✓</span>}
+                          {selectedOther && <span style={{ fontSize:'0.72rem', marginLeft:'auto', fontStyle:'italic', color:'rgba(180,210,255,0.4)' }}>→ {awardSelections[s.id]}</span>}
                         </label>
                       );
                     })}
@@ -2086,16 +2135,16 @@ function WeeklyProjectTab({
                 </div>
               ))}
             </div>
-            <div className="mt-5 pt-4" style={{ borderTop: '1px solid rgba(90,50,10,0.12)' }}>
+            <div style={{ marginTop:20, paddingTop:16, borderTop:'1px solid rgba(255,255,255,0.08)' }}>
               <div className="flex items-center justify-between flex-wrap gap-3">
-                <div className="text-sm" style={{ color: '#5a3a20' }}>
+                <div style={{ fontSize:'0.85rem', color:'rgba(180,210,255,0.7)' }}>
                   {awardCount > 0
-                    ? <>Awarding to <strong>{awardCount}</strong> student{awardCount !== 1 ? 's' : ''}: {Object.entries(awardSelections).map(([sid, rar]: any) => `${students.find((s: any) => s.id === sid)?.name || sid} (${rar})`).join(', ')}</>
-                    : <span className="italic" style={{ color: '#9a7040' }}>No students selected yet</span>}
+                    ? <>Awarding to <strong style={{ color:'rgba(210,230,255,0.95)' }}>{awardCount}</strong> student{awardCount !== 1 ? 's' : ''}: {Object.entries(awardSelections).map(([sid, rar]: any) => `${students.find((s: any) => s.id === sid)?.name || sid} (${rar})`).join(', ')}</>
+                    : <span style={{ fontStyle:'italic', color:'rgba(180,210,255,0.4)' }}>No students selected yet</span>}
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => setAwardModal(false)} className="tp-btn-outline" style={{ borderColor: 'rgba(90,40,10,0.3)', color: '#7a5a40' }}>Cancel</button>
-                  <button onClick={handleAward} disabled={awarding || awardCount === 0} className="tp-btn-gold" style={{ opacity: awardCount === 0 ? 0.4 : 1, fontFamily: "'Cinzel',serif" }}>
+                  <button onClick={() => setAwardModal(false)} className="tp-btn-outline">Cancel</button>
+                  <button onClick={handleAward} disabled={awarding || awardCount === 0} className="tp-btn-primary" style={{ opacity: awardCount === 0 ? 0.4 : 1 }}>
                     {awarding ? 'Awarding…' : `🏅 Award ${awardCount > 0 ? awardCount + ' Student' + (awardCount !== 1 ? 's' : '') : ''}`}
                   </button>
                 </div>
