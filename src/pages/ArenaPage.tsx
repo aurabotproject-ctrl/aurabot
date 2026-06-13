@@ -7,7 +7,7 @@ import type { Session } from '../lib/auth';
 import type { Card, Student } from '../lib/supabase';
 
 // ── Types ─────────────────────────────────────────────────────────────
-type GameScreen = 'setup' | 'battle' | 'gameover';
+type GameScreen = 'setup' | 'cardpick' | 'battle' | 'gameover';
 
 // Each turn goes through these phases in order:
 // roll → math → resolve → (next turn roll)
@@ -46,6 +46,16 @@ interface MathState {
   diceValue: number;
 }
 
+const RARITY_ORDER: Record<string, number> = {
+  common: 0, silver: 1, 'gold-rare': 2, prismatic: 3,
+};
+const RARITY_LABEL: Record<string, string> = {
+  common: 'Common', silver: 'Silver', 'gold-rare': 'Gold Rare', prismatic: 'Prismatic',
+};
+const RARITY_COLOR: Record<string, string> = {
+  common: '#9ca3af', silver: '#cbd5e1', 'gold-rare': '#f59e0b', prismatic: '#c084fc',
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────
 const STRENGTH_TABLE: Record<number, number> = {
   0: 0, 1: 0, 2: 0,
@@ -82,6 +92,209 @@ function genQuestion(): { num1: number; num2: number; answer: number } {
 
 function rollDice(): number {
   return Math.floor(Math.random() * 6) + 1;
+}
+
+// ── Transfer a card from loser to winner in DB ───────────────────────
+async function transferCard(cardId: string, newStudentId: string): Promise<void> {
+  const { error } = await sb.from('cards').update({ student_id: newStudentId }).eq('id', cardId);
+  if (error) throw error;
+}
+
+// ── Card Picker ───────────────────────────────────────────────────────
+function CardPicker({
+  playerName,
+  allCards,
+  onConfirm,
+  accentColor,
+  monoStyle,
+  panelStyle,
+}: {
+  playerName: string;
+  allCards: Card[];
+  onConfirm: (selected: Card[]) => void;
+  accentColor: string;
+  monoStyle: React.CSSProperties;
+  panelStyle: React.CSSProperties;
+}) {
+  const [selected, setSelected] = useState<Card[]>([]);
+  const [error, setError] = useState('');
+
+  const toggleCard = (card: Card) => {
+    setError('');
+    const alreadyIdx = selected.findIndex(c => c.id === card.id);
+
+    if (alreadyIdx >= 0) {
+      // Deselect
+      setSelected(prev => prev.filter(c => c.id !== card.id));
+      return;
+    }
+
+    if (selected.length >= 3) {
+      setError('You can only pick 3 cards. Deselect one first.');
+      return;
+    }
+
+    // Check rarity uniqueness
+    const rarityAlready = selected.find(c => c.rarity === card.rarity);
+    if (rarityAlready) {
+      setError(`You already have a ${RARITY_LABEL[card.rarity] ?? card.rarity} card selected. Each card must be a different rarity.`);
+      return;
+    }
+
+    setSelected(prev => [...prev, card]);
+  };
+
+  const canConfirm = selected.length === 3;
+
+  // Group cards by rarity for display
+  const grouped: Record<string, Card[]> = {};
+  for (const c of allCards) {
+    if (!grouped[c.rarity]) grouped[c.rarity] = [];
+    grouped[c.rarity].push(c);
+  }
+  const rarityKeys = Object.keys(grouped).sort(
+    (a, b) => (RARITY_ORDER[b] ?? 0) - (RARITY_ORDER[a] ?? 0)
+  );
+
+  const selectedRarities = new Set(selected.map(c => c.rarity));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: 900, margin: '0 auto', padding: '1rem' }}>
+      <h2 style={{
+        fontFamily: "'Cinzel',serif", fontWeight: 900, fontSize: 'clamp(1.2rem,3vw,1.8rem)',
+        color: accentColor, letterSpacing: '0.1em', marginBottom: '0.3rem', textAlign: 'center',
+      }}>
+        {playerName.toUpperCase()} — PICK YOUR 3 CARDS
+      </h2>
+      <p style={{ ...monoStyle, color: 'rgba(168,230,255,0.4)', fontSize: '0.72rem', letterSpacing: '0.15em', marginBottom: '1.2rem', textAlign: 'center' }}>
+        Each card must be a different rarity &nbsp;·&nbsp; Common · Silver · Gold · Prismatic
+      </p>
+
+      {/* Selected slots */}
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginBottom: '1.2rem', flexWrap: 'wrap' }}>
+        {[0, 1, 2].map(i => {
+          const card = selected[i];
+          return (
+            <div key={i} style={{
+              width: 140, height: 56, borderRadius: 10,
+              border: card
+                ? `1.5px solid ${RARITY_COLOR[card.rarity] ?? '#a8e6ff'}`
+                : '1.5px dashed rgba(168,230,255,0.2)',
+              background: card ? 'rgba(168,230,255,0.05)' : 'transparent',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              cursor: card ? 'pointer' : 'default',
+              transition: 'all 0.2s',
+            }}
+              onClick={() => card && toggleCard(card)}
+              title={card ? 'Click to deselect' : ''}
+            >
+              {card ? (
+                <>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: RARITY_COLOR[card.rarity], ...monoStyle }}>
+                    {card.card_name}
+                  </span>
+                  <span style={{ fontSize: '0.58rem', color: 'rgba(168,230,255,0.4)', ...monoStyle }}>
+                    {RARITY_LABEL[card.rarity]} · tap to remove
+                  </span>
+                </>
+              ) : (
+                <span style={{ fontSize: '0.65rem', color: 'rgba(168,230,255,0.2)', ...monoStyle }}>
+                  Slot {i + 1}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {error && (
+        <div style={{
+          background: 'rgba(255,80,80,0.08)', border: '1px solid rgba(255,80,80,0.3)',
+          color: '#ff8080', borderRadius: 8, padding: '8px 14px',
+          fontSize: '0.76rem', ...monoStyle, marginBottom: '0.8rem', textAlign: 'center',
+        }}>
+          ⚠ {error}
+        </div>
+      )}
+
+      {/* Cards grouped by rarity */}
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.2rem', maxHeight: '55vh', overflowY: 'auto', paddingBottom: '0.5rem' }}>
+        {rarityKeys.map(rarity => {
+          const isRarityTaken = selectedRarities.has(rarity);
+          return (
+            <div key={rarity}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: RARITY_COLOR[rarity] ?? '#fff', boxShadow: `0 0 6px ${RARITY_COLOR[rarity] ?? '#fff'}` }} />
+                <span style={{ ...monoStyle, fontSize: '0.7rem', fontWeight: 700, color: RARITY_COLOR[rarity] ?? '#fff', letterSpacing: '0.15em' }}>
+                  {RARITY_LABEL[rarity] ?? rarity.toUpperCase()} ({grouped[rarity].length})
+                </span>
+                {isRarityTaken && (
+                  <span style={{ ...monoStyle, fontSize: '0.58rem', color: 'rgba(168,230,255,0.3)' }}>✓ slot filled</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {grouped[rarity].map(card => {
+                  const isSelected = selected.some(c => c.id === card.id);
+                  const isDisabled = !isSelected && isRarityTaken;
+                  return (
+                    <button
+                      key={card.id}
+                      onClick={() => !isDisabled && toggleCard(card)}
+                      style={{
+                        padding: '8px 14px', borderRadius: 9,
+                        border: isSelected
+                          ? `1.5px solid ${RARITY_COLOR[rarity]}`
+                          : isDisabled
+                            ? '1.5px solid rgba(168,230,255,0.07)'
+                            : '1.5px solid rgba(168,230,255,0.18)',
+                        background: isSelected
+                          ? `${RARITY_COLOR[rarity]}22`
+                          : isDisabled
+                            ? 'rgba(168,230,255,0.01)'
+                            : 'rgba(168,230,255,0.04)',
+                        color: isSelected
+                          ? RARITY_COLOR[rarity]
+                          : isDisabled
+                            ? 'rgba(168,230,255,0.2)'
+                            : 'rgba(168,230,255,0.7)',
+                        cursor: isDisabled ? 'not-allowed' : 'pointer',
+                        ...monoStyle, fontSize: '0.75rem', fontWeight: isSelected ? 800 : 400,
+                        transition: 'all 0.15s',
+                        display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
+                        minWidth: 110,
+                        opacity: isDisabled ? 0.45 : 1,
+                      }}
+                    >
+                      <span>{isSelected ? '✓ ' : ''}{card.card_name}</span>
+                      <span style={{ fontSize: '0.58rem', opacity: 0.6 }}>HP {card.hp} · {card.type}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <button
+        onClick={() => canConfirm && onConfirm(selected)}
+        disabled={!canConfirm}
+        style={{
+          marginTop: '1.5rem', padding: '13px 48px', borderRadius: 12,
+          border: 'none', cursor: canConfirm ? 'pointer' : 'not-allowed',
+          background: canConfirm
+            ? `linear-gradient(135deg, ${accentColor}, ${accentColor}bb)`
+            : 'rgba(168,230,255,0.06)',
+          color: canConfirm ? '#0d1117' : 'rgba(168,230,255,0.25)',
+          fontFamily: "'Cinzel',serif", fontWeight: 900, fontSize: '1rem', letterSpacing: '0.12em',
+          boxShadow: canConfirm ? `0 4px 24px ${accentColor}55` : 'none',
+          transition: 'all 0.2s',
+        }}
+      >
+        {canConfirm ? `✓ LOCK IN ${playerName.toUpperCase()}'S DECK` : `SELECT ${3 - selected.length} MORE CARD${3 - selected.length !== 1 ? 'S' : ''}`}
+      </button>
+    </div>
+  );
 }
 
 // ── Dice SVG ──────────────────────────────────────────────────────────
@@ -166,10 +379,20 @@ function ScoreDots({ correct, total }: { correct: number; total: number }) {
 // ── Main component ────────────────────────────────────────────────────
 function ArenaPage({ session }: { session: NonNullable<Session> }) {
   const [screen, setScreen] = useState<GameScreen>('setup');
+  // 'p1pick' → p1 picks cards, 'p2pick' → p2 picks cards
+  const [cardPickStep, setCardPickStep] = useState<'p1pick' | 'p2pick'>('p1pick');
+
   const [p1Ready, setP1Ready] = useState(false);
   const [p2Ready, setP2Ready] = useState(false);
+
+  // All cards loaded from DB (full collections)
+  const [p1AllCards, setP1AllCards] = useState<Card[]>([]);
+  const [p2AllCards, setP2AllCards] = useState<Card[]>([]);
+
+  // The 3 battle cards each player chose
   const [p1Cards, setP1Cards] = useState<Card[]>([]);
   const [p2Cards, setP2Cards] = useState<Card[]>([]);
+
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [opponentId, setOpponentId] = useState('');
   const [opponentName, setOpponentName] = useState('');
@@ -180,6 +403,13 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
   const [myStudentId, setMyStudentId] = useState('');
   const [opponentStudentId, setOpponentStudentId] = useState('');
   const winRecordedRef = useRef(false);
+
+  // Card transfer state (shown on gameover screen)
+  const [transferredCard, setTransferredCard] = useState<Card | null>(null);
+  const [transferError, setTransferError] = useState('');
+  const [transferLoading, setTransferLoading] = useState(false);
+  // We need to know who won (p1 or p2) for transfer
+  const [winnerSide, setWinnerSide] = useState<'p1' | 'p2' | null>(null);
 
   const [battle, setBattle] = useState<BattleState>({
     p1Cards: [], p2Cards: [], p1Idx: 0, p2Idx: 0,
@@ -202,7 +432,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
   const mathTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mathInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Load cards ────────────────────────────────────────────────────
+  // ── Load P1's cards ────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       try {
@@ -214,7 +444,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
         }
         if (studentId) {
           const cards = await Dashboard.getStudentCards(studentId);
-          setP1Cards(cards);
+          setP1AllCards(cards);
           setP1Ready(true);
           setMyStudentId(studentId);
         }
@@ -231,7 +461,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
     if (!opp) return;
     setSetupError('');
     try {
-      // Check one-challenge-per-week rule
       if (myStudentId) {
         const played = await hasPlayedThisWeek(myStudentId, opp.id);
         if (played) {
@@ -241,12 +470,23 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
       }
       const cards = await Dashboard.getStudentCards(opp.id);
       if (cards.length === 0) { setSetupError('This student has no cards!'); return; }
-      setP2Cards(cards);
+      if (cards.length < 3) { setSetupError(`${opp.name} only has ${cards.length} card(s). They need at least 3 to battle.`); return; }
+      // Check p2 has at least 3 different rarities
+      const oppRarities = new Set(cards.map(c => c.rarity));
+      if (oppRarities.size < 3) {
+        setSetupError(`${opp.name} doesn't have cards of 3 different rarities yet.`);
+        return;
+      }
+      setP2AllCards(cards);
       setOpponentName(opp.name);
       setOpponentStudentId(opp.id);
       setVerifyPin('');
     } catch (e: any) { setSetupError(e.message); }
   };
+
+  // Check P1 eligibility
+  const p1Rarities = new Set(p1AllCards.map(c => c.rarity));
+  const p1CanBattle = p1AllCards.length >= 3 && p1Rarities.size >= 3;
 
   const [verifying, setVerifying] = useState(false);
 
@@ -265,7 +505,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
     }
     setVerifying(true);
     try {
-      // Verify by signing in on a separate client so P1's session is not replaced
       const { createClient } = await import('@supabase/supabase-js');
       const tempSb = createClient(
         'https://iunoahajcaaxmttdpgem.supabase.co',
@@ -288,7 +527,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
     setVerifying(false);
   };
 
-  // PIN keypad press
   const handlePinKey = (key: string) => {
     if (key === '⌫') {
       setVerifyPin(p => p.slice(0, -1));
@@ -297,14 +535,33 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
     }
   };
 
+  // ── Move to card picking ──────────────────────────────────────────
+  const handleGoToCardPick = () => {
+    setCardPickStep('p1pick');
+    setP1Cards([]);
+    setP2Cards([]);
+    setScreen('cardpick');
+  };
+
+  const handleP1CardsPicked = (cards: Card[]) => {
+    setP1Cards(cards);
+    setCardPickStep('p2pick');
+  };
+
+  const handleP2CardsPicked = (cards: Card[]) => {
+    setP2Cards(cards);
+    // Start battle immediately after p2 picks
+    startBattle(p1Cards, cards);
+  };
+
   // ── Start battle ─────────────────────────────────────────────────
-  const startBattle = () => {
-    if (!p1Cards.length || !p2Cards.length) return;
+  const startBattle = (p1: Card[], p2: Card[]) => {
+    if (!p1.length || !p2.length) return;
     const b: BattleState = {
-      p1Cards: [...p1Cards], p2Cards: [...p2Cards],
+      p1Cards: [...p1], p2Cards: [...p2],
       p1Idx: 0, p2Idx: 0,
-      p1HP: p1Cards[0].hp, p2HP: p2Cards[0].hp,
-      p1MaxHP: p1Cards[0].hp, p2MaxHP: p2Cards[0].hp,
+      p1HP: p1[0].hp, p2HP: p2[0].hp,
+      p1MaxHP: p1[0].hp, p2MaxHP: p2[0].hp,
       turn: 'p1', log: ['⚔ Battle started! Player 1 goes first.'],
       p1CorrectAnswers: 0, p2CorrectAnswers: 0,
       totalDamageP1: 0, totalDamageP2: 0,
@@ -319,7 +576,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
     if (diceRolling || turnPhase !== 'roll') return;
     setDiceRolling(true);
 
-    // Animate through random values
     let ticks = 0;
     const interval = setInterval(() => {
       setDiceValue(Math.floor(Math.random() * 6) + 1);
@@ -332,7 +588,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
 
         const statUsed: 1 | 2 = final % 2 === 1 ? 1 : 2;
 
-        // Build math state
         const questions = Array.from({ length: 12 }, genQuestion);
         const ms: MathState = {
           questions, currentQ: 0, correct: 0, answered: 0,
@@ -341,7 +596,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
         };
         setMathState(ms);
 
-        // Short delay so player sees the final dice, then start math
         setTimeout(() => {
           setTurnPhase('math');
         }, 800);
@@ -353,7 +607,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
   useEffect(() => {
     if (turnPhase !== 'math' || !mathState) return;
 
-    // Focus input
     setTimeout(() => mathInputRef.current?.focus(), 100);
 
     mathTimerRef.current = setInterval(() => {
@@ -361,7 +614,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
         if (!prev) return null;
         if (prev.timeLeft <= 1) {
           clearInterval(mathTimerRef.current!);
-          // Trigger resolve after state settles
           setTimeout(() => finishMath(prev.correct, prev.statUsed, prev.diceValue), 50);
           return { ...prev, timeLeft: 0 };
         }
@@ -386,7 +638,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
     const nextQ = mathState.currentQ + 1;
 
     if (nextQ >= 12) {
-      // All 12 answered
       clearInterval(mathTimerRef.current!);
       const final = { ...mathState, correct: newCorrect, answered: mathState.answered + 1, input: '', flash: correct ? 'correct' as const : 'wrong' as const };
       setMathState(final);
@@ -400,7 +651,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
         input: '',
         flash: correct ? 'correct' : 'wrong',
       } : null);
-      // Clear flash after 300ms
       setTimeout(() => setMathState(prev => prev ? { ...prev, flash: null } : null), 300);
     }
   }, [mathState, turnPhase]);
@@ -431,7 +681,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
         msg = `${attackerName} used ${statName} (${baseStat}) at ${strengthPct}% strength → ${damage} damage!`;
       }
 
-      // Shake + float
       setTimeout(() => {
         if (damage > 0) {
           setShakingCard(isP1 ? 'p2' : 'p1');
@@ -466,13 +715,15 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
           newState.log.push('', `🏆 ${attackerName} WINS!`);
           setTimeout(() => {
             setWinner(attackerName);
+            setWinnerSide('p1');
             setScreen('gameover');
             setShowConfetti(true);
             setTimeout(() => setShowConfetti(false), 4000);
-            // Record win in DB (P1 won)
             if (!winRecordedRef.current && myStudentId && opponentStudentId) {
               winRecordedRef.current = true;
               recordArenaWin(myStudentId, opponentStudentId).catch(console.warn);
+              // Transfer: p2 loses → pick random card from p2's battle cards
+              doCardTransfer(prev.p2Cards, myStudentId);
             }
           }, 1200);
           return newState;
@@ -487,13 +738,15 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
           newState.log.push('', `🏆 ${attackerName} WINS!`);
           setTimeout(() => {
             setWinner(attackerName);
+            setWinnerSide('p2');
             setScreen('gameover');
             setShowConfetti(true);
             setTimeout(() => setShowConfetti(false), 4000);
-            // Record win in DB (P2 won)
             if (!winRecordedRef.current && myStudentId && opponentStudentId) {
               winRecordedRef.current = true;
               recordArenaWin(opponentStudentId, myStudentId).catch(console.warn);
+              // Transfer: p1 loses → pick random card from p1's battle cards, give to p2
+              doCardTransfer(prev.p1Cards, opponentStudentId);
             }
           }, 1200);
           return newState;
@@ -504,7 +757,23 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
 
       return newState;
     });
-  }, [session, opponentName]);
+  }, [session, opponentName, myStudentId, opponentStudentId]);
+
+  // ── Card transfer after loss ──────────────────────────────────────
+  const doCardTransfer = async (loserBattleCards: Card[], winnerStudentId: string) => {
+    setTransferLoading(true);
+    setTransferError('');
+    try {
+      // Pick a random card from the loser's 3 battle cards
+      const idx = Math.floor(Math.random() * loserBattleCards.length);
+      const card = loserBattleCards[idx];
+      await transferCard(card.id, winnerStudentId);
+      setTransferredCard(card);
+    } catch (e: any) {
+      setTransferError(e.message || 'Card transfer failed.');
+    }
+    setTransferLoading(false);
+  };
 
   // ── Next turn ─────────────────────────────────────────────────────
   const handleNextTurn = () => {
@@ -562,11 +831,15 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                   <>
                     <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,#4a90d9,#6ab0f0)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', fontSize: '1.2rem', fontWeight: 900, color: 'white' }}>{p1Name[0].toUpperCase()}</div>
                     <div style={{ fontWeight: 800, color: '#a8e6ff', ...monoStyle, marginBottom: 4 }}>{p1Name}</div>
-                    <div style={{ fontSize: '0.72rem', color: 'rgba(168,230,255,0.4)', ...monoStyle }}>{p1Cards.length} cards loaded</div>
-                    <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 4, justifyContent: 'center' }}>
-                      {p1Cards.slice(0, 5).map(c => <span key={c.id} style={{ fontSize: '0.62rem', padding: '2px 8px', borderRadius: 10, background: 'rgba(168,230,255,0.06)', border: '1px solid rgba(168,230,255,0.12)', color: 'rgba(168,230,255,0.6)' }}>{c.card_name}</span>)}
-                    </div>
-                    <div style={{ marginTop: 10, color: '#4caf82', fontSize: '0.75rem', ...monoStyle }}>✓ Ready</div>
+                    <div style={{ fontSize: '0.72rem', color: 'rgba(168,230,255,0.4)', ...monoStyle }}>{p1AllCards.length} cards</div>
+                    {!p1CanBattle && (
+                      <div style={{ marginTop: 8, color: '#ff8080', fontSize: '0.68rem', ...monoStyle }}>
+                        ⚠ You need cards of at least 3 different rarities to battle.
+                      </div>
+                    )}
+                    {p1CanBattle && (
+                      <div style={{ marginTop: 10, color: '#4caf82', fontSize: '0.75rem', ...monoStyle }}>✓ Ready to pick deck</div>
+                    )}
                   </>
                 )}
               </div>
@@ -582,12 +855,12 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                       <option value="">Select a student…</option>
                       {allStudents.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
-                    {opponentId && !p2Cards.length && (
+                    {opponentId && !p2AllCards.length && (
                       <button onClick={handleChallengeOpponent} style={{ width: '100%', padding: '10px', borderRadius: 8, background: 'rgba(168,230,255,0.1)', border: '1px solid rgba(168,230,255,0.3)', color: '#a8e6ff', cursor: 'pointer', ...monoStyle, fontWeight: 700, fontSize: '0.8rem' }}>
                         Challenge →
                       </button>
                     )}
-                    {opponentId && p2Cards.length > 0 && (
+                    {opponentId && p2AllCards.length > 0 && (
                       <>
                         <p style={{ fontSize: '0.75rem', color: 'rgba(168,230,255,0.7)', ...monoStyle, marginBottom: 4 }}>
                           Hand the device to <strong style={{ color: '#a8e6ff' }}>{opponentName}</strong>
@@ -595,7 +868,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                         <p style={{ fontSize: '0.68rem', color: 'rgba(168,230,255,0.4)', ...monoStyle, marginBottom: 10 }}>
                           Enter your 6-digit login PIN to confirm
                         </p>
-                        {/* PIN display */}
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 12 }}>
                           {[0,1,2,3,4,5].map(i => (
                             <div key={i} style={{ width: 32, height: 44, borderRadius: 8, background: 'rgba(168,230,255,0.06)', border: `1.5px solid ${verifyPin.length > i ? '#a8e6ff' : 'rgba(168,230,255,0.18)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', fontWeight: 900, color: '#a8e6ff', ...monoStyle, transition: 'border-color 0.2s' }}>
@@ -603,7 +875,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                             </div>
                           ))}
                         </div>
-                        {/* Keypad grid */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, width: '100%', maxWidth: 200, margin: '0 auto 10px' }}>
                           {['1','2','3','4','5','6','7','8','9','⌫','0','✓'].map(key => (
                             <button key={key} onClick={() => key === '✓' ? handleVerifyOpponent() : handlePinKey(key)}
@@ -614,7 +885,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                           ))}
                         </div>
                         {verifyError && <div style={{ color: '#ff8080', fontSize: '0.72rem', ...monoStyle, marginBottom: 6 }}>{verifyError}</div>}
-                        <button onClick={() => { setP2Cards([]); setOpponentId(''); setVerifyPin(''); setVerifyError(''); }} style={{ width: '100%', padding: '8px', borderRadius: 8, background: 'transparent', border: '1px solid rgba(168,230,255,0.2)', color: 'rgba(168,230,255,0.5)', cursor: 'pointer', ...monoStyle, fontSize: '0.75rem' }}>← Back</button>
+                        <button onClick={() => { setP2AllCards([]); setOpponentId(''); setVerifyPin(''); setVerifyError(''); }} style={{ width: '100%', padding: '8px', borderRadius: 8, background: 'transparent', border: '1px solid rgba(168,230,255,0.2)', color: 'rgba(168,230,255,0.5)', cursor: 'pointer', ...monoStyle, fontSize: '0.75rem' }}>← Back</button>
                       </>
                     )}
                   </div>
@@ -622,28 +893,75 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                   <>
                     <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,#c8a000,#ff6b00)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', fontSize: '1.2rem', fontWeight: 900, color: 'white' }}>{p2Name[0].toUpperCase()}</div>
                     <div style={{ fontWeight: 800, color: '#ffe080', ...monoStyle, marginBottom: 4 }}>{p2Name}</div>
-                    <div style={{ fontSize: '0.72rem', color: 'rgba(168,230,255,0.4)', ...monoStyle }}>{p2Cards.length} cards loaded</div>
-                    <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 4, justifyContent: 'center' }}>
-                      {p2Cards.slice(0, 5).map(c => <span key={c.id} style={{ fontSize: '0.62rem', padding: '2px 8px', borderRadius: 10, background: 'rgba(255,152,0,0.06)', border: '1px solid rgba(255,152,0,0.15)', color: 'rgba(255,200,80,0.7)' }}>{c.card_name}</span>)}
-                    </div>
-                    <div style={{ marginTop: 10, color: '#ff9800', fontSize: '0.75rem', ...monoStyle }}>✓ Ready</div>
+                    <div style={{ fontSize: '0.72rem', color: 'rgba(168,230,255,0.4)', ...monoStyle }}>{p2AllCards.length} cards</div>
+                    <div style={{ marginTop: 10, color: '#ff9800', fontSize: '0.75rem', ...monoStyle }}>✓ Ready to pick deck</div>
                   </>
                 )}
               </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: '1.5rem' }}>
-              <button onClick={startBattle} disabled={!p1Ready || !p2Ready} style={{
-                padding: '14px 48px', borderRadius: 12, border: 'none', cursor: p1Ready && p2Ready ? 'pointer' : 'not-allowed',
-                background: p1Ready && p2Ready ? 'linear-gradient(135deg,#a8e6ff,#60b8e0)' : 'rgba(168,230,255,0.1)',
-                color: p1Ready && p2Ready ? '#0d1117' : 'rgba(168,230,255,0.3)',
+
+              {/* Rules reminder */}
+              <div style={{ ...monoStyle, fontSize: '0.68rem', color: 'rgba(168,230,255,0.35)', textAlign: 'center', lineHeight: 1.7, maxWidth: 480 }}>
+                ⚠ Each player must choose <strong style={{ color: 'rgba(168,230,255,0.55)' }}>3 cards of 3 different rarities</strong> before the battle.
+                <br />The loser forfeits one random card to the winner.
+              </div>
+
+              <button onClick={handleGoToCardPick} disabled={!p1Ready || !p2Ready || !p1CanBattle} style={{
+                padding: '14px 48px', borderRadius: 12, border: 'none', cursor: p1Ready && p2Ready && p1CanBattle ? 'pointer' : 'not-allowed',
+                background: p1Ready && p2Ready && p1CanBattle ? 'linear-gradient(135deg,#a8e6ff,#60b8e0)' : 'rgba(168,230,255,0.1)',
+                color: p1Ready && p2Ready && p1CanBattle ? '#0d1117' : 'rgba(168,230,255,0.3)',
                 fontFamily: "'Cinzel',serif", fontWeight: 900, fontSize: '1.1rem', letterSpacing: '0.12em',
-                boxShadow: p1Ready && p2Ready ? '0 4px 24px rgba(168,230,255,0.3)' : 'none',
+                boxShadow: p1Ready && p2Ready && p1CanBattle ? '0 4px 24px rgba(168,230,255,0.3)' : 'none',
                 transition: 'all 0.2s',
-              }}>⚔ START BATTLE ⚔</button>
+              }}>⚔ PICK YOUR DECKS ⚔</button>
               <button onClick={() => { window.location.hash = '/student'; }}
                 style={{ background: 'transparent', border: '1px solid rgba(168,230,255,0.15)', borderRadius: 8, color: 'rgba(168,230,255,0.4)', padding: '8px 20px', cursor: 'pointer', ...monoStyle, fontSize: '0.75rem' }}>
                 ← Back to Collection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CARD PICK ─────────────────────────────────────────────── */}
+      {screen === 'cardpick' && (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '2rem 1rem' }}>
+          <div style={{ ...panelStyle, width: '100%', maxWidth: 900, padding: '2rem' }}>
+            {cardPickStep === 'p1pick' && (
+              <CardPicker
+                playerName={p1Name}
+                allCards={p1AllCards}
+                onConfirm={handleP1CardsPicked}
+                accentColor="#a8e6ff"
+                monoStyle={monoStyle}
+                panelStyle={panelStyle}
+              />
+            )}
+            {cardPickStep === 'p2pick' && (
+              <>
+                <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                  <div style={{ ...monoStyle, fontSize: '0.7rem', color: 'rgba(168,230,255,0.35)', letterSpacing: '0.2em' }}>
+                    ✓ {p1Name} locked in their deck. Hand device to {p2Name}.
+                  </div>
+                </div>
+                <CardPicker
+                  playerName={p2Name}
+                  allCards={p2AllCards}
+                  onConfirm={handleP2CardsPicked}
+                  accentColor="#ffe080"
+                  monoStyle={monoStyle}
+                  panelStyle={panelStyle}
+                />
+              </>
+            )}
+            <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+              <button onClick={() => {
+                if (cardPickStep === 'p2pick') { setCardPickStep('p1pick'); setP1Cards([]); }
+                else { setScreen('setup'); }
+              }} style={{ background: 'transparent', border: '1px solid rgba(168,230,255,0.15)', borderRadius: 8, color: 'rgba(168,230,255,0.4)', padding: '8px 20px', cursor: 'pointer', ...monoStyle, fontSize: '0.75rem' }}>
+                ← Back
               </button>
             </div>
           </div>
@@ -703,7 +1021,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                   Odd = Stat 1 &nbsp;·&nbsp; Even = Stat 2
                 </p>
 
-                {/* Dice */}
                 <div onClick={handleRoll} style={{
                   cursor: diceRolling ? 'default' : 'pointer',
                   transition: 'transform 0.15s',
@@ -725,7 +1042,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                   {diceRolling ? 'ROLLING…' : '🎲 ROLL DICE'}
                 </button>
 
-                {/* Card stat preview */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%', marginTop: 4 }}>
                   {[1, 2].map(s => {
                     const card = battle.turn === 'p1' ? p1Card : p2Card;
@@ -748,12 +1064,10 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
               const q = mathState.questions[mathState.currentQ];
               return (
                 <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.8rem' }}>
-                  {/* Header row */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                     <div style={{ fontSize: '0.6rem', color: 'rgba(168,230,255,0.4)', ...monoStyle, letterSpacing: '0.2em' }}>
                       STAT {mathState.statUsed} (DICE: {mathState.diceValue})
                     </div>
-                    {/* Timer */}
                     <div style={{
                       fontSize: '1.4rem', fontWeight: 900, ...monoStyle,
                       color: mathState.timeLeft <= 5 ? '#f44336' : mathState.timeLeft <= 10 ? '#ff9800' : '#a8e6ff',
@@ -764,16 +1078,13 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                     </div>
                   </div>
 
-                  {/* Timer bar */}
                   <div style={{ width: '100%', height: 4, borderRadius: 2, background: 'rgba(168,230,255,0.07)', overflow: 'hidden' }}>
                     <div style={{ height: '100%', borderRadius: 2, width: `${(mathState.timeLeft / 20) * 100}%`, background: mathState.timeLeft <= 5 ? '#f44336' : mathState.timeLeft <= 10 ? '#ff9800' : '#a8e6ff', transition: 'width 0.9s linear, background 0.3s' }} />
                   </div>
 
-                  {/* Score dots */}
                   <ScoreDots correct={mathState.correct} total={mathState.answered} />
                   <StrengthMeter correct={mathState.correct} />
 
-                  {/* Question */}
                   <div style={{
                     fontSize: 'clamp(1.8rem,5vw,2.8rem)', fontWeight: 900, fontFamily: "'Cinzel',serif",
                     color: mathState.flash === 'correct' ? '#4caf82' : mathState.flash === 'wrong' ? '#f44336' : '#a8e6ff',
@@ -784,7 +1095,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                     {q.num1} × {q.num2} = ?
                   </div>
 
-                  {/* Input */}
                   <input
                     ref={mathInputRef}
                     type="number"
@@ -821,10 +1131,8 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
               <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ fontSize: '0.6rem', letterSpacing: '0.3em', color: 'rgba(168,230,255,0.4)', ...monoStyle }}>◈ RESULT</div>
 
-                {/* Final scoreboard */}
                 <ScoreDots correct={mathState.correct} total={mathState.answered} />
 
-                {/* Damage readout */}
                 <div style={{
                   padding: '1.2rem 2rem', borderRadius: 14,
                   border: `1px solid ${resolveDamage > 0 ? 'rgba(244,67,54,0.3)' : 'rgba(168,230,255,0.15)'}`,
@@ -885,6 +1193,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
           }}>{winner} WINS!</h1>
           <p style={{ color: 'rgba(168,230,255,0.4)', ...monoStyle, letterSpacing: '0.2em', fontSize: '0.72rem', marginBottom: '2rem' }}>BATTLE COMPLETE</p>
 
+          {/* Stats */}
           <div style={{ ...panelStyle, maxWidth: 360, width: '100%', padding: '1.5rem', marginBottom: '1.5rem' }}>
             {[
               { l: 'TOTAL DAMAGE', v: battle.totalDamageP1 + battle.totalDamageP2 },
@@ -899,8 +1208,68 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
             ))}
           </div>
 
+          {/* ── Card transfer result ── */}
+          <div style={{ ...panelStyle, maxWidth: 400, width: '100%', padding: '1.5rem', marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: '0.6rem', letterSpacing: '0.25em', color: 'rgba(168,230,255,0.3)', ...monoStyle, marginBottom: 12 }}>◈ CARD TRANSFER</div>
+
+            {transferLoading && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+                <div className="spinner" style={{ width: 20, height: 20 }} />
+                <span style={{ ...monoStyle, fontSize: '0.75rem', color: 'rgba(168,230,255,0.4)' }}>Transferring card…</span>
+              </div>
+            )}
+
+            {!transferLoading && transferError && (
+              <div style={{ color: '#ff8080', fontSize: '0.75rem', ...monoStyle }}>{transferError}</div>
+            )}
+
+            {!transferLoading && transferredCard && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                <div style={{ fontSize: '1.8rem' }}>💸</div>
+                <p style={{ ...monoStyle, fontSize: '0.8rem', color: 'rgba(168,230,255,0.7)', lineHeight: 1.6 }}>
+                  <strong style={{ color: winnerSide === 'p1' ? '#a8e6ff' : '#ffe080' }}>{winner}</strong> won{' '}
+                  <strong style={{ color: RARITY_COLOR[transferredCard.rarity] ?? '#fff' }}>
+                    {transferredCard.card_name}
+                  </strong>{' '}
+                  <span style={{ color: RARITY_COLOR[transferredCard.rarity] ?? '#aaa', fontSize: '0.68rem' }}>
+                    ({RARITY_LABEL[transferredCard.rarity] ?? transferredCard.rarity})
+                  </span>
+                  {' '}from the loser's deck!
+                </p>
+                <div style={{
+                  padding: '8px 18px', borderRadius: 8,
+                  border: `1px solid ${RARITY_COLOR[transferredCard.rarity] ?? 'rgba(168,230,255,0.2)'}`,
+                  background: `${RARITY_COLOR[transferredCard.rarity] ?? '#a8e6ff'}11`,
+                  ...monoStyle, fontSize: '0.72rem', color: RARITY_COLOR[transferredCard.rarity],
+                }}>
+                  {RARITY_LABEL[transferredCard.rarity]} · {transferredCard.type} · HP {transferredCard.hp}
+                </div>
+              </div>
+            )}
+
+            {!transferLoading && !transferredCard && !transferError && (
+              <p style={{ ...monoStyle, fontSize: '0.72rem', color: 'rgba(168,230,255,0.3)' }}>Processing…</p>
+            )}
+          </div>
+
           <div style={{ display: 'flex', gap: 12 }}>
-            <button onClick={() => { setScreen('setup'); setP2Ready(false); setP2Cards([]); setOpponentId(''); setOpponentStudentId(''); setTurnPhase('roll'); setMathState(null); setVerifyPin(''); setVerifyError(''); }}
+            <button onClick={() => {
+              setScreen('setup');
+              setP2Ready(false);
+              setP2AllCards([]);
+              setP1Cards([]);
+              setP2Cards([]);
+              setOpponentId('');
+              setOpponentStudentId('');
+              setTurnPhase('roll');
+              setMathState(null);
+              setVerifyPin('');
+              setVerifyError('');
+              setTransferredCard(null);
+              setTransferError('');
+              setWinnerSide(null);
+              winRecordedRef.current = false;
+            }}
               style={{ padding: '12px 28px', borderRadius: 10, background: 'rgba(168,230,255,0.1)', border: '1px solid rgba(168,230,255,0.3)', color: '#a8e6ff', fontFamily: "'Cinzel',serif", fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem', letterSpacing: '0.1em' }}>
               ⚔ PLAY AGAIN
             </button>
