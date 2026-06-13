@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Auth } from '../lib/auth';
 import { sb } from '../lib/supabase';
 import type { Session } from '../lib/auth';
+import { fileToWebP } from '../lib/imageUtils';
 
 type TabKey = 'teachers' | 'design';
 
@@ -546,13 +547,8 @@ function PackImagesManager() {
     if (file.size > 5 * 1024 * 1024) { showMsg('Image must be under 5MB', 'err'); return; }
     setUploading(packId);
     try {
-      // Convert to base64 data URL for storage (no Supabase Storage bucket needed)
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = e => resolve(e.target?.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      // Convert to WebP before storage — much smaller than PNG/JPEG
+      const dataUrl = await fileToWebP(file, 1200, 1200, 0.88);
 
       // Upsert into pack_images table
       const { error } = await sb.from('pack_images').upsert({

@@ -3,6 +3,7 @@ import './TeacherPage.css';
 import PokeCard from '../components/PokeCard';
 import { TeacherBotThumbnail } from '../components/BotAvatar';
 import { Auth } from '../lib/auth';
+import { fileToWebP } from '../lib/imageUtils';
 import { Dashboard } from '../lib/dashboard';
 import { AI } from '../lib/ai';
 import { sb } from '../lib/supabase';
@@ -229,17 +230,12 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
   const handlePbPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPbUploading(true); setPbStatus('Uploading photo…');
+    setPbUploading(true); setPbStatus('Converting photo…');
     try {
-      // Convert to base64 data URL for storage (no separate storage bucket needed)
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const dataUrl = reader.result as string;
-        setPbPhotoUrl(dataUrl);
-        setPbUploading(false); setPbStatus('');
-      };
-      reader.onerror = () => { setPbUploading(false); setPbStatus('Error reading file.'); };
-      reader.readAsDataURL(file);
+      // Convert to WebP before storing — significantly smaller than PNG/JPEG
+      const webpUrl = await fileToWebP(file, 1200, 1200, 0.88);
+      setPbPhotoUrl(webpUrl);
+      setPbUploading(false); setPbStatus('');
     } catch (err: any) { setPbUploading(false); setPbStatus('Upload error: ' + err.message); }
   };
 
@@ -1268,7 +1264,8 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
         const drawH = img.naturalHeight * coverScale;
         ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
         ctx.restore();
-        resolve(canvas.toDataURL('image/jpeg', 0.92));
+        const webpUrl = canvas.toDataURL('image/webp', 0.88);
+        resolve(webpUrl.startsWith('data:image/webp') ? webpUrl : canvas.toDataURL('image/jpeg', 0.92));
       };
       img.onerror = () => reject(new Error('Image load error'));
       img.crossOrigin = 'anonymous';
