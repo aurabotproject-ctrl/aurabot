@@ -219,7 +219,7 @@ function CardPicker({
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.2rem', maxHeight: '55vh', overflowY: 'auto', paddingBottom: '0.5rem' }}>
         {rarityKeys.map(rarity => {
           const rarityKey = rarity as 'common' | 'silver' | 'gold-rare' | 'prismatic';
-          const isRarityTaken = selectedRarities.has(rarity);
+          const isRarityTaken = selectedRarities.has(rarityKey);
           return (
             <div key={rarity}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
