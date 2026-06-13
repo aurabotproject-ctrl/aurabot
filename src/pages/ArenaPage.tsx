@@ -107,14 +107,12 @@ function CardPicker({
   onConfirm,
   accentColor,
   monoStyle,
-  panelStyle,
 }: {
   playerName: string;
   allCards: Card[];
   onConfirm: (selected: Card[]) => void;
   accentColor: string;
   monoStyle: React.CSSProperties;
-  panelStyle: React.CSSProperties;
 }) {
   const [selected, setSelected] = useState<Card[]>([]);
   const [error, setError] = useState('');
@@ -220,13 +218,14 @@ function CardPicker({
       {/* Cards grouped by rarity */}
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.2rem', maxHeight: '55vh', overflowY: 'auto', paddingBottom: '0.5rem' }}>
         {rarityKeys.map(rarity => {
+          const rarityKey = rarity as 'common' | 'silver' | 'gold-rare' | 'prismatic';
           const isRarityTaken = selectedRarities.has(rarity);
           return (
             <div key={rarity}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: RARITY_COLOR[rarity] ?? '#fff', boxShadow: `0 0 6px ${RARITY_COLOR[rarity] ?? '#fff'}` }} />
-                <span style={{ ...monoStyle, fontSize: '0.7rem', fontWeight: 700, color: RARITY_COLOR[rarity] ?? '#fff', letterSpacing: '0.15em' }}>
-                  {RARITY_LABEL[rarity] ?? rarity.toUpperCase()} ({grouped[rarity].length})
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: RARITY_COLOR[rarityKey] ?? '#fff', boxShadow: `0 0 6px ${RARITY_COLOR[rarityKey] ?? '#fff'}` }} />
+                <span style={{ ...monoStyle, fontSize: '0.7rem', fontWeight: 700, color: RARITY_COLOR[rarityKey] ?? '#fff', letterSpacing: '0.15em' }}>
+                  {RARITY_LABEL[rarityKey] ?? rarity.toUpperCase()} ({grouped[rarity].length})
                 </span>
                 {isRarityTaken && (
                   <span style={{ ...monoStyle, fontSize: '0.58rem', color: 'rgba(168,230,255,0.3)' }}>✓ slot filled</span>
@@ -243,17 +242,17 @@ function CardPicker({
                       style={{
                         padding: '8px 14px', borderRadius: 9,
                         border: isSelected
-                          ? `1.5px solid ${RARITY_COLOR[rarity]}`
+                          ? `1.5px solid ${RARITY_COLOR[rarityKey]}`
                           : isDisabled
                             ? '1.5px solid rgba(168,230,255,0.07)'
                             : '1.5px solid rgba(168,230,255,0.18)',
                         background: isSelected
-                          ? `${RARITY_COLOR[rarity]}22`
+                          ? `${RARITY_COLOR[rarityKey]}22`
                           : isDisabled
                             ? 'rgba(168,230,255,0.01)'
                             : 'rgba(168,230,255,0.04)',
                         color: isSelected
-                          ? RARITY_COLOR[rarity]
+                          ? RARITY_COLOR[rarityKey]
                           : isDisabled
                             ? 'rgba(168,230,255,0.2)'
                             : 'rgba(168,230,255,0.7)',
@@ -391,7 +390,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
 
   // The 3 battle cards each player chose
   const [p1Cards, setP1Cards] = useState<Card[]>([]);
-  const [p2Cards, setP2Cards] = useState<Card[]>([]);
 
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [opponentId, setOpponentId] = useState('');
@@ -539,7 +537,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
   const handleGoToCardPick = () => {
     setCardPickStep('p1pick');
     setP1Cards([]);
-    setP2Cards([]);
     setScreen('cardpick');
   };
 
@@ -549,8 +546,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
   };
 
   const handleP2CardsPicked = (cards: Card[]) => {
-    setP2Cards(cards);
-    // Start battle immediately after p2 picks
     startBattle(p1Cards, cards);
   };
 
@@ -936,7 +931,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                 onConfirm={handleP1CardsPicked}
                 accentColor="#a8e6ff"
                 monoStyle={monoStyle}
-                panelStyle={panelStyle}
               />
             )}
             {cardPickStep === 'p2pick' && (
@@ -952,7 +946,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                   onConfirm={handleP2CardsPicked}
                   accentColor="#ffe080"
                   monoStyle={monoStyle}
-                  panelStyle={panelStyle}
                 />
               </>
             )}
@@ -1258,7 +1251,6 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
               setP2Ready(false);
               setP2AllCards([]);
               setP1Cards([]);
-              setP2Cards([]);
               setOpponentId('');
               setOpponentStudentId('');
               setTurnPhase('roll');
