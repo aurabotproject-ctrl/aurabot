@@ -18,7 +18,7 @@ const TYPES = [
   { id: 'creatures', label: 'Creatures', emoji: '👾', color: '#0369a1' },
   { id: 'humanoids', label: 'Humanoids', emoji: '🧑', color: '#b45309' },
   { id: 'robots',    label: 'Robots',    emoji: '🤖', color: '#374151' },
-  { id: 'luckydip',  label: 'Lucky Dip', emoji: '🎲', color: '#be123c' },
+  { id: 'special',   label: 'Special',   emoji: '✨', color: '#be123c' },
 ];
 
 export default function MyCardsPage({ session, onBack }: { session: NonNullable<Session>; onBack: () => void }) {

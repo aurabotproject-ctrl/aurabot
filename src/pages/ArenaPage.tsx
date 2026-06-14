@@ -493,8 +493,8 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
     setVerifyError('');
     const opp = allStudents.find(s => s.id === opponentId);
     if (!opp) return;
-    if (verifyPin.length !== 6) {
-      setVerifyError('Please enter the full 6-digit PIN.');
+    if (verifyPin.length !== 8) {
+      setVerifyError('Please enter the full 8-digit PIN.');
       return;
     }
     if (!opp.login_email) {
@@ -528,7 +528,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
   const handlePinKey = (key: string) => {
     if (key === '⌫') {
       setVerifyPin(p => p.slice(0, -1));
-    } else if (verifyPin.length < 6) {
+    } else if (verifyPin.length < 8) {
       setVerifyPin(p => p + key);
     }
   };
@@ -864,7 +864,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                           Enter your 6-digit login PIN to confirm
                         </p>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 12 }}>
-                          {[0,1,2,3,4,5].map(i => (
+                          {[0,1,2,3,4,5,6,7].map(i => (
                             <div key={i} style={{ width: 32, height: 44, borderRadius: 8, background: 'rgba(168,230,255,0.06)', border: `1.5px solid ${verifyPin.length > i ? '#a8e6ff' : 'rgba(168,230,255,0.18)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', fontWeight: 900, color: '#a8e6ff', ...monoStyle, transition: 'border-color 0.2s' }}>
                               {verifyPin[i] ? '●' : ''}
                             </div>
