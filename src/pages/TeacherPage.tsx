@@ -1545,32 +1545,85 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
 // CHARACTER POOL TAB — Card Database page
 // ══════════════════════════════════════════════════════════════════════
 
-function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/auth').Session> }) {
-  const [cards, setCards]     = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [filter, setFilter]   = React.useState<string>('all');
+const CARDS_PER_PAGE = 10;
 
-  const loadCards = async () => {
+function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/auth').Session> }) {
+  const [cards, setCards]       = React.useState<any[]>([]);
+  const [loading, setLoading]   = React.useState(true);
+  const [filter, setFilter]     = React.useState<string>('all');
+  const [page, setPage]         = React.useState(0); // 0-indexed
+  const [totalCount, setTotalCount] = React.useState(0);
+  // Cache deck counts separately so filter pills don't need a full reload
+  const [deckCounts, setDeckCounts] = React.useState<Record<string, number>>({});
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / CARDS_PER_PAGE));
+
+  const loadCards = React.useCallback(async (pageIdx: number, currentFilter: string) => {
     setLoading(true);
     try {
-      const { data } = await sb.from('card_database')
-        .select('*')
+      const from = pageIdx * CARDS_PER_PAGE;
+      const to   = from + CARDS_PER_PAGE - 1;
+      let query = sb.from('card_database')
+        .select('*', { count: 'exact' })
         .eq('teacher_id', session.user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
+      if (currentFilter !== 'all') query = query.eq('type', currentFilter);
+      const { data, count } = await query;
       setCards(data || []);
-    } catch { setCards([]); }
+      setTotalCount(count ?? 0);
+    } catch { setCards([]); setTotalCount(0); }
     setLoading(false);
-  };
+  }, [session.user.id]);
 
-  React.useEffect(() => { loadCards(); }, []);
+  // Load deck counts once for the filter pills
+  const loadDeckCounts = React.useCallback(async () => {
+    try {
+      const { data } = await sb.from('card_database')
+        .select('type')
+        .eq('teacher_id', session.user.id);
+      const counts: Record<string, number> = {};
+      let total = 0;
+      for (const row of data || []) {
+        counts[row.type] = (counts[row.type] || 0) + 1;
+        total++;
+      }
+      counts['all'] = total;
+      setDeckCounts(counts);
+    } catch {}
+  }, [session.user.id]);
+
+  React.useEffect(() => {
+    loadDeckCounts();
+  }, [loadDeckCounts]);
+
+  React.useEffect(() => {
+    loadCards(page, filter);
+  }, [page, filter, loadCards]);
+
+  const handleFilterChange = (newFilter: string) => {
+    setFilter(newFilter);
+    setPage(0); // reset to first page on filter change
+  };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this character from the database?')) return;
     await sb.from('card_database').delete().eq('id', id);
-    setCards(prev => prev.filter(c => c.id !== id));
+    // Refresh current page; if it's now empty go back one page
+    const newTotal = totalCount - 1;
+    const newTotalPages = Math.max(1, Math.ceil(newTotal / CARDS_PER_PAGE));
+    const newPage = page >= newTotalPages ? Math.max(0, page - 1) : page;
+    setPage(newPage);
+    loadDeckCounts();
+    loadCards(newPage, filter);
   };
 
-  const filtered = filter === 'all' ? cards : cards.filter(c => c.type === filter);
+  // Page number labels like "1–10", "11–20" etc.
+  const pageLabel = (idx: number) => {
+    const start = idx * CARDS_PER_PAGE + 1;
+    const end   = Math.min((idx + 1) * CARDS_PER_PAGE, totalCount);
+    return `${start}–${end}`;
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -1580,40 +1633,41 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
           All characters available in student card packs. Use <strong style={{ color: 'rgba(192,132,252,0.9)' }}>Card Creation</strong> to add new characters.
         </div>
       </div>
+
+      {/* Filter pills + refresh */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button onClick={() => setFilter('all')} style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === 'all' ? '2px solid rgba(192,132,252,0.7)' : '1px solid rgba(255,255,255,0.1)', background: filter === 'all' ? 'rgba(192,132,252,0.18)' : 'rgba(255,255,255,0.05)', color: filter === 'all' ? '#c084fc' : 'rgba(180,210,255,0.5)' }}>
-            ✦ All <span style={{ opacity: 0.6 }}>({cards.length})</span>
+          <button onClick={() => handleFilterChange('all')} style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === 'all' ? '2px solid rgba(192,132,252,0.7)' : '1px solid rgba(255,255,255,0.1)', background: filter === 'all' ? 'rgba(192,132,252,0.18)' : 'rgba(255,255,255,0.05)', color: filter === 'all' ? '#c084fc' : 'rgba(180,210,255,0.5)' }}>
+            ✦ All <span style={{ opacity: 0.6 }}>({deckCounts['all'] ?? 0})</span>
           </button>
-          {DB_DECK_OPTIONS.map(d => {
-            const count = cards.filter(c => c.type === d.id).length;
-            return (
-              <button key={d.id} onClick={() => setFilter(d.id)} style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === d.id ? `2px solid ${d.color}` : '1px solid rgba(255,255,255,0.1)', background: filter === d.id ? `${d.color}22` : 'rgba(255,255,255,0.05)', color: filter === d.id ? d.color : 'rgba(180,210,255,0.5)' }}>
-                {d.label} <span style={{ opacity: 0.6 }}>({count})</span>
-              </button>
-            );
-          })}
+          {DB_DECK_OPTIONS.map(d => (
+            <button key={d.id} onClick={() => handleFilterChange(d.id)} style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === d.id ? `2px solid ${d.color}` : '1px solid rgba(255,255,255,0.1)', background: filter === d.id ? `${d.color}22` : 'rgba(255,255,255,0.05)', color: filter === d.id ? d.color : 'rgba(180,210,255,0.5)' }}>
+              {d.label} <span style={{ opacity: 0.6 }}>({deckCounts[d.id] ?? 0})</span>
+            </button>
+          ))}
         </div>
-        <button onClick={loadCards} className="tp-btn-outline" style={{ fontSize: '0.72rem', padding: '5px 12px' }}>↺ Refresh</button>
+        <button onClick={() => { loadDeckCounts(); loadCards(page, filter); }} className="tp-btn-outline" style={{ fontSize: '0.72rem', padding: '5px 12px' }}>↺ Refresh</button>
       </div>
+
+      {/* Cards grid */}
       {loading ? (
         <div style={{ textAlign: 'center', color: 'rgba(180,210,255,0.5)', fontSize: '0.85rem', padding: 48 }}>Loading…</div>
-      ) : filtered.length === 0 ? (
+      ) : cards.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '4rem 2rem', border: '2px dashed rgba(192,132,252,0.15)', borderRadius: 20 }}>
           <div style={{ fontSize: '3rem', marginBottom: 12, opacity: 0.2 }}>🃏</div>
           <p style={{ fontSize: '0.85rem', color: 'rgba(180,210,255,0.4)', fontStyle: 'italic', margin: 0 }}>
-            {cards.length === 0 ? 'No characters yet — go to Card Creation to add some!' : `No ${filter} characters yet.`}
+            {totalCount === 0 ? 'No characters yet — go to Card Creation to add some!' : `No ${filter} characters on this page.`}
           </p>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 16 }}>
-          {filtered.map(c => {
+          {cards.map(c => {
             const dc = DB_DECK_OPTIONS.find(d => d.id === c.type)?.color || '#818cf8';
             return (
               <div key={c.id} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, overflow: 'hidden', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
                 <div style={{ height: 3, background: `linear-gradient(90deg,${dc},${dc}66)` }} />
                 {c.image_url ? (
-                  <img src={c.image_url} alt={c.card_name} style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }} />
+                  <img src={c.image_url} alt={c.card_name} style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }} loading="lazy" />
                 ) : (
                   <div style={{ width: '100%', height: 130, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', opacity: 0.2 }}>🃏</div>
                 )}
@@ -1632,6 +1686,47 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, flexWrap: 'wrap', paddingTop: 8 }}>
+          <button
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            disabled={page === 0 || loading}
+            style={{ padding: '5px 12px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 700, cursor: page === 0 ? 'not-allowed' : 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: page === 0 ? 'rgba(180,210,255,0.2)' : 'rgba(180,210,255,0.6)', opacity: page === 0 ? 0.4 : 1 }}
+          >← Prev</button>
+
+          {Array.from({ length: totalPages }, (_, i) => (
+            <button
+              key={i}
+              onClick={() => setPage(i)}
+              disabled={loading}
+              style={{
+                padding: '5px 12px', borderRadius: 8, fontSize: '0.72rem', fontWeight: i === page ? 800 : 500,
+                cursor: 'pointer', transition: 'all 0.15s',
+                border: i === page ? '2px solid rgba(192,132,252,0.7)' : '1px solid rgba(255,255,255,0.1)',
+                background: i === page ? 'rgba(192,132,252,0.18)' : 'rgba(255,255,255,0.05)',
+                color: i === page ? '#c084fc' : 'rgba(180,210,255,0.5)',
+              }}
+            >
+              {pageLabel(i)}
+            </button>
+          ))}
+
+          <button
+            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+            disabled={page === totalPages - 1 || loading}
+            style={{ padding: '5px 12px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 700, cursor: page === totalPages - 1 ? 'not-allowed' : 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: page === totalPages - 1 ? 'rgba(180,210,255,0.2)' : 'rgba(180,210,255,0.6)', opacity: page === totalPages - 1 ? 0.4 : 1 }}
+          >Next →</button>
+        </div>
+      )}
+
+      {/* Record count */}
+      {totalCount > 0 && (
+        <div style={{ textAlign: 'center', fontSize: '0.68rem', color: 'rgba(180,210,255,0.3)', marginTop: -12 }}>
+          Showing {page * CARDS_PER_PAGE + 1}–{Math.min((page + 1) * CARDS_PER_PAGE, totalCount)} of {totalCount} cards
         </div>
       )}
     </div>
