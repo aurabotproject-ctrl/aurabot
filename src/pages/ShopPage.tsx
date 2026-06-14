@@ -13,16 +13,26 @@ export const PACK_TYPES = [
 ];
 
 const PACK_TIERS = [
-  { id: 'basic',   label: 'Basic Pack',   stars: 5,  color: '#6366f1', desc: 'Mostly common cards' },
-  { id: 'mod',     label: 'Mod Pack',     stars: 10, color: '#8b5cf6', desc: 'Better odds, more fun!' },
-  { id: 'premium', label: 'Premium Pack', stars: 20, color: '#f59e0b', desc: 'Best odds for rare cards' },
+  { id: 'basic',   label: 'Basic Pack',   stars: 5,  color: '#6366f1',
+    desc: '2 Commons + 50/50 Common or Silver',
+    guarantee: ['common','common'] as const,
+    bonus: ['common','silver'] as const },
+  { id: 'mod',     label: 'Mod Pack',     stars: 10, color: '#8b5cf6',
+    desc: '2 Silvers + 50/50 Silver or Gold',
+    guarantee: ['silver','silver'] as const,
+    bonus: ['silver','gold-rare'] as const },
+  { id: 'premium', label: 'Premium Pack', stars: 20, color: '#f59e0b',
+    desc: '2 Golds + 50/50 Gold or Rainbow',
+    guarantee: ['gold-rare','gold-rare'] as const,
+    bonus: ['gold-rare','prismatic'] as const },
 ];
 
-const RARITY_ODDS: Record<string, { common: number; silver: number; 'gold-rare': number; prismatic: number }> = {
-  basic:   { common: 0.70, silver: 0.22, 'gold-rare': 0.07, prismatic: 0.01 },
-  mod:     { common: 0.45, silver: 0.35, 'gold-rare': 0.16, prismatic: 0.04 },
-  premium: { common: 0.20, silver: 0.40, 'gold-rare': 0.30, prismatic: 0.10 },
-};
+/** Returns exactly 3 rarities matching the guaranteed pack contents */
+function rollPackRarities(tierId: string): ['common'|'silver'|'gold-rare'|'prismatic', 'common'|'silver'|'gold-rare'|'prismatic', 'common'|'silver'|'gold-rare'|'prismatic'] {
+  const tier = PACK_TIERS.find(t => t.id === tierId) || PACK_TIERS[0];
+  const bonusRarity = tier.bonus[Math.random() < 0.5 ? 0 : 1];
+  return [tier.guarantee[0], tier.guarantee[1], bonusRarity];
+}
 
 const STAT_RANGES: Record<string, { hpMin: number; hpMax: number; weakMin: number; weakMax: number; strongMin: number; strongMax: number; skillPts: number }> = {
   common:      { hpMin: 80,  hpMax: 100, weakMin: 40, weakMax: 50,  strongMin: 50,  strongMax: 70,  skillPts: 1 },
@@ -40,15 +50,6 @@ const UNLOCK_ITEMS = [
   { id: 'face',      label: 'Face Colour Pack',         desc: 'Unlock a new face pixel colour palette',            emoji: '✨', cost: 5 },
   { id: 'buildabot', label: 'Build-a-Bot',              desc: 'Unlock the full bot customisation studio',          emoji: '🔧', cost: 5 },
 ];
-
-function rollRarity(tier: string): 'common' | 'silver' | 'gold-rare' | 'prismatic' {
-  const odds = RARITY_ODDS[tier] || RARITY_ODDS.basic;
-  const r = Math.random();
-  if (r < odds.prismatic) return 'prismatic';
-  if (r < odds.prismatic + odds['gold-rare']) return 'gold-rare';
-  if (r < odds.prismatic + odds['gold-rare'] + odds.silver) return 'silver';
-  return 'common';
-}
 
 function rollStats(rarity: string) {
   const r = STAT_RANGES[rarity] || STAT_RANGES.common;
@@ -329,13 +330,30 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
     } catch {
       dbCards = [];
     }
-    const pool = dbCards.length >= 3 ? dbCards : dbCards;
-    const src = pool as any[];
-    const shuffled = [...src].sort(() => Math.random() - 0.5);
-    const picked = shuffled.slice(0, 3);
+
+    // Fisher-Yates shuffle — far better randomness than sort(() => Math.random() - 0.5)
+    const fisherYates = (arr: any[]) => {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+
+    // Shuffle the full pool and pick 3 distinct cards
+    const shuffled = fisherYates(dbCards);
+    // Extra entropy: do a second shuffle pass on the top portion
+    const topSlice = shuffled.slice(0, Math.min(20, shuffled.length));
+    const reshuffled = [...fisherYates(topSlice), ...shuffled.slice(topSlice.length)];
+    const picked = reshuffled.slice(0, 3);
+
+    // Roll the 3 guaranteed rarities for this tier
+    const rarities = rollPackRarities(selectedTier.id);
+
     const rolled: OpenedCard[] = [];
     for (let i = 0; i < 3; i++) {
-      const rarity = rollRarity(selectedTier.id);
+      const rarity = rarities[i];
       const stats = rollStats(rarity);
       const card = picked[i] || null;
       rolled.push({
@@ -444,18 +462,31 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
           </div>
           {PACK_TIERS.map((tier, i) => {
             const canBuy = isTestAccount || starPoints >= tier.stars;
+            const rarityColor = (r: string) =>
+              r === 'prismatic' ? '#c084fc' : r === 'gold-rare' ? '#fbbf24' : r === 'silver' ? '#94a3b8' : '#9ca3af';
+            const rarityLabel = (r: string) =>
+              r === 'gold-rare' ? 'Gold' : r.charAt(0).toUpperCase() + r.slice(1);
             return (
               <div key={tier.id} onClick={() => canBuy && (setSelectedTier(tier), setPhase('confirm'))}
                 style={{ background: canBuy ? `${tier.color}18` : 'rgba(255,255,255,0.02)', border: `2px solid ${canBuy ? tier.color + '66' : 'rgba(255,255,255,0.06)'}`, borderRadius: 16, padding: '16px 20px', cursor: canBuy ? 'pointer' : 'not-allowed', opacity: canBuy ? 1 : 0.45, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
                   <div style={{ fontWeight: 900, color: 'white', fontSize: '0.9rem', marginBottom: 4 }}>{['⭐','⭐⭐','⭐⭐⭐'][i]} {tier.label}</div>
-                  <div style={{ fontSize: '0.7rem', color: '#7080a0' }}>{tier.desc}</div>
-                  <div style={{ display: 'flex', gap: 5, marginTop: 5, flexWrap: 'wrap' }}>
-                    {Object.entries(RARITY_ODDS[tier.id]).map(([r, v]) => (
-                      <span key={r} style={{ fontSize: '0.58rem', padding: '2px 6px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', color: r === 'prismatic' ? '#c084fc' : r === 'gold-rare' ? '#fbbf24' : r === 'silver' ? '#94a3b8' : '#9ca3af', fontWeight: 700 }}>
-                        {r === 'gold-rare' ? 'Gold' : r.charAt(0).toUpperCase() + r.slice(1)}: {(v * 100).toFixed(0)}%
+                  <div style={{ fontSize: '0.7rem', color: '#7080a0', marginBottom: 6 }}>{tier.desc}</div>
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {tier.guarantee.map((r, gi) => (
+                      <span key={gi} style={{ fontSize: '0.58rem', padding: '2px 7px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', color: rarityColor(r), fontWeight: 700, border: `1px solid ${rarityColor(r)}44` }}>
+                        {rarityLabel(r)}
                       </span>
                     ))}
+                    <span style={{ fontSize: '0.58rem', color: '#5060a0' }}>+</span>
+                    <span style={{ fontSize: '0.58rem', padding: '2px 7px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', color: rarityColor(tier.bonus[0]), fontWeight: 700, border: `1px solid ${rarityColor(tier.bonus[0])}44` }}>
+                      {rarityLabel(tier.bonus[0])}
+                    </span>
+                    <span style={{ fontSize: '0.55rem', color: '#5060a0' }}>or</span>
+                    <span style={{ fontSize: '0.58rem', padding: '2px 7px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', color: rarityColor(tier.bonus[1]), fontWeight: 700, border: `1px solid ${rarityColor(tier.bonus[1])}44` }}>
+                      {rarityLabel(tier.bonus[1])}
+                    </span>
+                    <span style={{ fontSize: '0.55rem', color: '#5060a0' }}>50/50</span>
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
