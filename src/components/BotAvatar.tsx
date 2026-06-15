@@ -270,8 +270,7 @@ interface BotCanvasProps {
   animClass?: string;
 }
 
-export function BotCanvas({ botElements, robotColor, facePixels, faceColorPalettes, starPoints, width = CONTAINER_W, height = CONTAINER_H, animClass = 'saved-bot-body' }: BotCanvasProps) {
-  const isGold        = robotColor.label === '✨ Gold';
+export function BotCanvas({ botElements, robotColor, facePixels, faceColorPalettes, starPoints, width = CONTAINER_W, height = CONTAINER_H, animClass = 'saved-bot-body' }: BotCanvasProps) {  const isGold        = robotColor.label === '✨ Gold';
   const isSilver      = robotColor.label === '✨ Silver';
   const isRainbow     = !!(robotColor as any).rainbow;
   const isBlackChrome = !!(robotColor as any).blackChrome;
@@ -319,6 +318,29 @@ export function BotCanvas({ botElements, robotColor, facePixels, faceColorPalett
 
   return (
     <div style={{ width, height, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <style>{`
+        @keyframes savedBotBounce { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } }
+        @keyframes sheenSweep     { 0% { left:-120%; } 100% { left:150%; } }
+        @keyframes sheenSweepSlow { 0% { left:-120%; } 100% { left:150%; } }
+        @keyframes sheenBCSweep   { 0% { left:-120%; } 100% { left:150%; } }
+        @keyframes sheenGoldSharp  { 0% { left:-120%; } 100% { left:150%; } }
+        @keyframes sheenSilverSharp{ 0% { left:-120%; } 100% { left:150%; } }
+        @keyframes goldPulse    { 0%,100%{filter:brightness(1) saturate(1.1);}   50%{filter:brightness(1.12) saturate(1.3);} }
+        @keyframes silverPulse  { 0%,100%{filter:brightness(1) saturate(0.9);}   50%{filter:brightness(1.12) saturate(1.1);} }
+        @keyframes bcPulse      { 0%,100%{filter:brightness(1) saturate(1.6);} 50%{filter:brightness(1.1) saturate(2.2);} }
+        @keyframes rainbowPulse { 0%,100%{filter:brightness(1.05) saturate(1.2);} 50%{filter:brightness(1.2) saturate(1.5);} }
+        .saved-bot-body        { animation: savedBotBounce 3s ease-in-out infinite; }
+        .sheen-gold            { animation: sheenSweep 2.2s ease-in-out infinite; }
+        .sheen-gold-sharp      { animation: sheenGoldSharp 2.2s ease-in-out infinite; animation-delay: 0.15s; }
+        .sheen-silver          { animation: sheenSweepSlow 2.8s ease-in-out infinite; }
+        .sheen-silver-sharp    { animation: sheenSilverSharp 2.8s ease-in-out infinite; animation-delay: 0.2s; }
+        .sheen-chrome          { animation: sheenSweep 1.6s ease-in-out infinite; }
+        .sheen-black-chrome    { animation: sheenBCSweep 2s ease-in-out infinite; }
+        .bot-gold              { animation: savedBotBounce 3s ease-in-out infinite, goldPulse 2.2s ease-in-out infinite; }
+        .bot-silver            { animation: savedBotBounce 3s ease-in-out infinite, silverPulse 2.8s ease-in-out infinite; }
+        .bot-rainbow           { animation: savedBotBounce 3s ease-in-out infinite, rainbowPulse 3s ease-in-out infinite; }
+        .bot-black-chrome      { animation: savedBotBounce 3s ease-in-out infinite, bcPulse 5s ease-in-out infinite; }
+      `}</style>
       <div className={`${animClass}${botAnimClass}`} style={{ position: 'relative', width: displayW, height: displayH }}>
         <div style={{
           position: 'absolute', width: 800, height: 850,
@@ -446,29 +468,6 @@ export function TeacherBotThumbnail({ colorIndex, botElements, facePixels, starP
 
   return (
     <div style={{ position: 'relative', width: size, flexShrink: 0 }}>
-      <style>{`
-        @keyframes savedBotBounce { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } }
-        @keyframes sheenSweep     { 0% { left:-120%; } 100% { left:150%; } }
-        @keyframes sheenSweepSlow { 0% { left:-120%; } 100% { left:150%; } }
-        @keyframes sheenBCSweep   { 0% { left:-120%; } 100% { left:150%; } }
-        @keyframes sheenGoldSharp  { 0%   { left:-120%; } 100% { left:150%; } }
-        @keyframes sheenSilverSharp{ 0%   { left:-120%; } 100% { left:150%; } }
-        @keyframes goldPulse    { 0%,100%{filter:brightness(1) saturate(1.1);}   50%{filter:brightness(1.12) saturate(1.3);} }
-        @keyframes silverPulse  { 0%,100%{filter:brightness(1) saturate(0.9);}   50%{filter:brightness(1.12) saturate(1.1);} }
-        @keyframes bcPulse      { 0%,100%{filter:brightness(1) saturate(1.6);} 50%{filter:brightness(1.1) saturate(2.2);} }
-        @keyframes rainbowPulse { 0%,100%{filter:brightness(1.05) saturate(1.2);} 50%{filter:brightness(1.2) saturate(1.5);} }
-        .saved-bot-body        { animation: savedBotBounce 3s ease-in-out infinite; }
-        .sheen-gold            { animation: sheenSweep 2.2s ease-in-out infinite; }
-        .sheen-gold-sharp      { animation: sheenGoldSharp 2.2s ease-in-out infinite; animation-delay: 0.15s; }
-        .sheen-silver          { animation: sheenSweepSlow 2.8s ease-in-out infinite; }
-        .sheen-silver-sharp    { animation: sheenSilverSharp 2.8s ease-in-out infinite; animation-delay: 0.2s; }
-        .sheen-chrome          { animation: sheenSweep 1.6s ease-in-out infinite; }
-        .sheen-black-chrome    { animation: sheenBCSweep 2s ease-in-out infinite; }
-        .bot-gold              { animation: savedBotBounce 3s ease-in-out infinite, goldPulse 2.2s ease-in-out infinite; }
-        .bot-silver            { animation: savedBotBounce 3s ease-in-out infinite, silverPulse 2.8s ease-in-out infinite; }
-        .bot-rainbow           { animation: savedBotBounce 3s ease-in-out infinite, rainbowPulse 3s ease-in-out infinite; }
-        .bot-black-chrome      { animation: savedBotBounce 3s ease-in-out infinite, bcPulse 5s ease-in-out infinite; }
-      `}</style>
       <BotCanvas
         botElements={elements}
         robotColor={theme}
