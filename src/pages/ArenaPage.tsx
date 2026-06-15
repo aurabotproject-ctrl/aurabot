@@ -664,10 +664,9 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
       const baseStat = statUsed === 1 ? attacker.stat1_val : attacker.stat2_val;
       const statName = statUsed === 1 ? attacker.stat1_name : attacker.stat2_name;
       const strengthPct = getStrengthPct(correct);
-      const rarityMult = getRarityMultiplier(attacker.rarity);
       const damage = strengthPct === 0
         ? 0
-        : Math.max(1, Math.floor(baseStat * (strengthPct / 100) * rarityMult));
+        : Math.max(1, Math.floor(baseStat * (strengthPct / 100)));
 
       const attackerName = isP1 ? (session.profile.name || 'Player 1') : (opponentName || 'Player 2');
       let msg = '';
