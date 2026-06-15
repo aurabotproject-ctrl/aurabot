@@ -1625,9 +1625,9 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
       stat2_name: c.stat2_name || '',
       stat2_val: c.stat2_val ?? '',
       move1_name: c.move1_name || '',
-      move1_desc: c.move1_desc || '',
+      move1_dmg: c.move1_dmg ?? '',
       move2_name: c.move2_name || '',
-      move2_desc: c.move2_desc || '',
+      move2_dmg: c.move2_dmg ?? '',
     });
     setEditError('');
   };
@@ -1647,9 +1647,9 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
         stat2_name:  editForm.stat2_name,
         stat2_val:   Number(editForm.stat2_val),
         move1_name:  editForm.move1_name,
-        move1_desc:  editForm.move1_desc,
+        move1_dmg:   Number(editForm.move1_dmg),
         move2_name:  editForm.move2_name,
-        move2_desc:  editForm.move2_desc,
+        move2_dmg:   Number(editForm.move2_dmg),
       }).eq('id', editCard.id);
       if (error) throw error;
       setEditCard(null);
@@ -1749,14 +1749,14 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <label style={labelStyle}>Move 1 Name</label>
                   <input style={inputStyle} value={editForm.move1_name} onChange={ef('move1_name')} />
-                  <label style={labelStyle}>Move 1 Description</label>
-                  <input style={inputStyle} value={editForm.move1_desc} onChange={ef('move1_desc')} />
+                  <label style={labelStyle}>Move 1 Damage</label>
+                  <input style={inputStyle} type="number" value={editForm.move1_dmg} onChange={ef('move1_dmg')} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <label style={labelStyle}>Move 2 Name</label>
                   <input style={inputStyle} value={editForm.move2_name} onChange={ef('move2_name')} />
-                  <label style={labelStyle}>Move 2 Description</label>
-                  <input style={inputStyle} value={editForm.move2_desc} onChange={ef('move2_desc')} />
+                  <label style={labelStyle}>Move 2 Damage</label>
+                  <input style={inputStyle} type="number" value={editForm.move2_dmg} onChange={ef('move2_dmg')} />
                 </div>
               </div>
 
