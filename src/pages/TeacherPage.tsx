@@ -1551,10 +1551,15 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
   const [cards, setCards]       = React.useState<any[]>([]);
   const [loading, setLoading]   = React.useState(true);
   const [filter, setFilter]     = React.useState<string>('all');
-  const [page, setPage]         = React.useState(0); // 0-indexed
+  const [page, setPage]         = React.useState(0);
   const [totalCount, setTotalCount] = React.useState(0);
-  // Cache deck counts separately so filter pills don't need a full reload
   const [deckCounts, setDeckCounts] = React.useState<Record<string, number>>({});
+
+  // Edit modal state
+  const [editCard, setEditCard] = React.useState<any | null>(null);
+  const [editForm, setEditForm] = React.useState<any>({});
+  const [editSaving, setEditSaving] = React.useState(false);
+  const [editError, setEditError] = React.useState('');
 
   const totalPages = Math.max(1, Math.ceil(totalCount / CARDS_PER_PAGE));
 
@@ -1576,7 +1581,6 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
     setLoading(false);
   }, [session.user.id]);
 
-  // Load deck counts once for the filter pills
   const loadDeckCounts = React.useCallback(async () => {
     try {
       const { data } = await sb.from('card_database')
@@ -1593,23 +1597,14 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
     } catch {}
   }, [session.user.id]);
 
-  React.useEffect(() => {
-    loadDeckCounts();
-  }, [loadDeckCounts]);
+  React.useEffect(() => { loadDeckCounts(); }, [loadDeckCounts]);
+  React.useEffect(() => { loadCards(page, filter); }, [page, filter, loadCards]);
 
-  React.useEffect(() => {
-    loadCards(page, filter);
-  }, [page, filter, loadCards]);
-
-  const handleFilterChange = (newFilter: string) => {
-    setFilter(newFilter);
-    setPage(0); // reset to first page on filter change
-  };
+  const handleFilterChange = (newFilter: string) => { setFilter(newFilter); setPage(0); };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this character from the database?')) return;
     await sb.from('card_database').delete().eq('id', id);
-    // Refresh current page; if it's now empty go back one page
     const newTotal = totalCount - 1;
     const newTotalPages = Math.max(1, Math.ceil(newTotal / CARDS_PER_PAGE));
     const newPage = page >= newTotalPages ? Math.max(0, page - 1) : page;
@@ -1618,15 +1613,166 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
     loadCards(newPage, filter);
   };
 
-  // Page number labels like "1–10", "11–20" etc.
+  const openEdit = (c: any) => {
+    setEditCard(c);
+    setEditForm({
+      card_name: c.card_name || '',
+      description: c.description || '',
+      type: c.type || DB_DECK_OPTIONS[0].id,
+      hp: c.hp ?? '',
+      stat1_name: c.stat1_name || '',
+      stat1_val: c.stat1_val ?? '',
+      stat2_name: c.stat2_name || '',
+      stat2_val: c.stat2_val ?? '',
+      move1_name: c.move1_name || '',
+      move1_desc: c.move1_desc || '',
+      move2_name: c.move2_name || '',
+      move2_desc: c.move2_desc || '',
+    });
+    setEditError('');
+  };
+
+  const handleEditSave = async () => {
+    if (!editCard) return;
+    setEditSaving(true);
+    setEditError('');
+    try {
+      const { error } = await sb.from('card_database').update({
+        card_name:   editForm.card_name,
+        description: editForm.description,
+        type:        editForm.type,
+        hp:          Number(editForm.hp),
+        stat1_name:  editForm.stat1_name,
+        stat1_val:   Number(editForm.stat1_val),
+        stat2_name:  editForm.stat2_name,
+        stat2_val:   Number(editForm.stat2_val),
+        move1_name:  editForm.move1_name,
+        move1_desc:  editForm.move1_desc,
+        move2_name:  editForm.move2_name,
+        move2_desc:  editForm.move2_desc,
+      }).eq('id', editCard.id);
+      if (error) throw error;
+      setEditCard(null);
+      loadDeckCounts();
+      loadCards(page, filter);
+    } catch (e: any) {
+      setEditError(e.message || 'Save failed.');
+    }
+    setEditSaving(false);
+  };
+
+  const ef = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setEditForm((prev: any) => ({ ...prev, [field]: e.target.value }));
+
   const pageLabel = (idx: number) => {
     const start = idx * CARDS_PER_PAGE + 1;
     const end   = Math.min((idx + 1) * CARDS_PER_PAGE, totalCount);
     return `${start}–${end}`;
   };
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 8,
+    border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)',
+    color: 'rgba(210,230,255,0.9)', fontSize: '0.8rem', outline: 'none',
+  };
+  const labelStyle: React.CSSProperties = {
+    fontSize: '0.65rem', color: 'rgba(180,210,255,0.45)', letterSpacing: '0.1em',
+    textTransform: 'uppercase', marginBottom: 4, display: 'block',
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      {/* ── Edit Modal ── */}
+      {editCard && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', padding: '1rem' }}
+          onClick={e => e.target === e.currentTarget && setEditCard(null)}>
+          <div style={{ background: '#131929', border: '1px solid rgba(192,132,252,0.25)', borderRadius: 20, padding: '1.8rem', width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.4rem' }}>
+              <div style={{ fontWeight: 900, fontSize: '1rem', background: 'linear-gradient(135deg,#c084fc,#818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                ✏️ Edit Card
+              </div>
+              <button onClick={() => setEditCard(null)} style={{ background: 'none', border: 'none', color: 'rgba(180,210,255,0.4)', fontSize: '1.2rem', cursor: 'pointer', lineHeight: 1 }}>✕</button>
+            </div>
+
+            <div style={{ display: 'grid', gap: '1rem' }}>
+
+              {/* Name + Type row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Card Name</label>
+                  <input style={inputStyle} value={editForm.card_name} onChange={ef('card_name')} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Category</label>
+                  <select style={{ ...inputStyle, cursor: 'pointer' }} value={editForm.type} onChange={ef('type')}>
+                    {DB_DECK_OPTIONS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label style={labelStyle}>Description</label>
+                <textarea style={{ ...inputStyle, minHeight: 72, resize: 'vertical', fontFamily: 'inherit' }} value={editForm.description} onChange={ef('description')} />
+              </div>
+
+              {/* HP */}
+              <div style={{ maxWidth: 140 }}>
+                <label style={labelStyle}>HP</label>
+                <input style={inputStyle} type="number" value={editForm.hp} onChange={ef('hp')} />
+              </div>
+
+              {/* Stats */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr auto', gap: 8, alignItems: 'end' }}>
+                <div>
+                  <label style={labelStyle}>Stat 1 Name</label>
+                  <input style={inputStyle} value={editForm.stat1_name} onChange={ef('stat1_name')} />
+                </div>
+                <div style={{ minWidth: 64 }}>
+                  <label style={labelStyle}>Value</label>
+                  <input style={inputStyle} type="number" value={editForm.stat1_val} onChange={ef('stat1_val')} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Stat 2 Name</label>
+                  <input style={inputStyle} value={editForm.stat2_name} onChange={ef('stat2_name')} />
+                </div>
+                <div style={{ minWidth: 64 }}>
+                  <label style={labelStyle}>Value</label>
+                  <input style={inputStyle} type="number" value={editForm.stat2_val} onChange={ef('stat2_val')} />
+                </div>
+              </div>
+
+              {/* Moves */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={labelStyle}>Move 1 Name</label>
+                  <input style={inputStyle} value={editForm.move1_name} onChange={ef('move1_name')} />
+                  <label style={labelStyle}>Move 1 Description</label>
+                  <input style={inputStyle} value={editForm.move1_desc} onChange={ef('move1_desc')} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={labelStyle}>Move 2 Name</label>
+                  <input style={inputStyle} value={editForm.move2_name} onChange={ef('move2_name')} />
+                  <label style={labelStyle}>Move 2 Description</label>
+                  <input style={inputStyle} value={editForm.move2_desc} onChange={ef('move2_desc')} />
+                </div>
+              </div>
+
+              {editError && <div style={{ fontSize: '0.75rem', color: '#f87171', background: 'rgba(248,113,113,0.08)', borderRadius: 8, padding: '8px 12px' }}>{editError}</div>}
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
+                <button onClick={() => setEditCard(null)} className="tp-btn-outline" style={{ fontSize: '0.78rem' }}>Cancel</button>
+                <button onClick={handleEditSave} disabled={editSaving} className="tp-btn-primary" style={{ fontSize: '0.78rem', minWidth: 100 }}>
+                  {editSaving ? 'Saving…' : '✓ Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: '18px 24px', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
         <div style={{ fontSize: '1rem', fontWeight: 900, marginBottom: 4, background: 'linear-gradient(135deg,#c084fc,#818cf8,#38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>🃏 Card Database</div>
         <div style={{ fontSize: '0.8rem', color: 'rgba(180,210,255,0.7)', lineHeight: 1.5 }}>
@@ -1681,7 +1827,10 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
                   <div style={{ fontSize: '0.62rem', color: 'rgba(180,210,255,0.45)', marginBottom: 8, display: 'flex', gap: 6 }}>
                     <span>⚡ {c.move1_name || '—'}</span><span style={{ opacity: 0.4 }}>·</span><span>💥 {c.move2_name || '—'}</span>
                   </div>
-                  <button onClick={() => handleDelete(c.id)} className="tp-btn-danger" style={{ fontSize: '0.65rem', padding: '3px 10px', width: '100%' }}>Delete</button>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => openEdit(c)} className="tp-btn-outline" style={{ fontSize: '0.65rem', padding: '3px 10px', flex: 1 }}>✏️ Edit</button>
+                    <button onClick={() => handleDelete(c.id)} className="tp-btn-danger" style={{ fontSize: '0.65rem', padding: '3px 10px', flex: 1 }}>Delete</button>
+                  </div>
                 </div>
               </div>
             );
