@@ -50,33 +50,8 @@ exports.handler = async (event) => {
   }
   const caller = await verifyRes.json();
 
-  // Role can be in user_metadata or app_metadata depending on how the account was created
-  const role =
-    caller?.user_metadata?.role ||
-    caller?.app_metadata?.role ||
-    caller?.role; // some Supabase versions put it here
-
-  // If role isn't in JWT metadata, fall back to checking the profiles table
-  let confirmedRole = role;
-  if (!confirmedRole || (confirmedRole !== 'teacher' && confirmedRole !== 'admin')) {
-    const profileRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/profiles?select=role&id=eq.${caller.id}&limit=1`,
-      {
-        headers: {
-          'Authorization': `Bearer ${SERVICE_KEY}`,
-          'apikey': SERVICE_KEY,
-        },
-      }
-    );
-    if (profileRes.ok) {
-      const profiles = await profileRes.json();
-      confirmedRole = profiles?.[0]?.role;
-    }
-  }
-
-  if (confirmedRole !== 'teacher' && confirmedRole !== 'admin') {
-    return { statusCode: 403, headers, body: JSON.stringify({ error: 'Only teachers can reset PINs', debug_role: role, debug_confirmed: confirmedRole }) };
-  }
+  // Return full caller object so we can see exactly where role is stored
+  return { statusCode: 200, headers, body: JSON.stringify({ debug_caller: caller }) };
 
   // Parse request body
   let body;
