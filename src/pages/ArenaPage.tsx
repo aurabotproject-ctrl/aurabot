@@ -893,7 +893,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                           style={{
                             position: 'absolute', opacity: 0, pointerEvents: 'none', width: 1, height: 1,
                           }}
-                          ref={el => el && document.activeElement !== el && el.focus()}
+                          ref={el => { if (el && document.activeElement !== el) el.focus(); }}
                         />
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, width: '100%', maxWidth: 200, margin: '0 auto 10px' }}>
                           {['1','2','3','4','5','6','7','8','9','⌫','0','✓'].map(key => (
