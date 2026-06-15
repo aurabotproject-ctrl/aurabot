@@ -57,15 +57,9 @@ const RARITY_COLOR: Record<string, string> = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────
-const STRENGTH_TABLE: Record<number, number> = {
-  0: 0, 1: 0, 2: 0,
-  3: 10, 4: 20, 5: 30, 6: 40, 7: 50,
-  8: 60, 9: 70, 10: 80, 11: 90, 12: 100,
-};
-
+/** Each correct answer = 10% strength, 0 correct = 0%, 12 correct = 120% */
 function getStrengthPct(correct: number): number {
-  const clamped = Math.max(0, Math.min(12, correct));
-  return STRENGTH_TABLE[clamped] ?? 100;
+  return Math.max(0, Math.min(correct, 12)) * 10;
 }
 
 function getRarityMultiplier(rarity: string): number {
@@ -352,7 +346,7 @@ function StrengthMeter({ correct }: { correct: number }) {
         <div style={{ height: '100%', borderRadius: 5, width: `${pct}%`, background: color, transition: 'width 0.3s ease', boxShadow: `0 0 8px ${color}88` }} />
       </div>
       <div style={{ fontSize: '0.58rem', color: 'rgba(168,230,255,0.3)', fontFamily: 'monospace', marginTop: 3, textAlign: 'right' }}>
-        {correct < 3 ? 'Answer 3+ correctly to deal damage' : `${correct} correct → ${pct}% strength`}
+        {correct === 0 ? '0 correct = 0% — answer questions to deal damage!' : `${correct} correct → ${pct}% strength`}
       </div>
     </div>
   );
@@ -678,7 +672,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
       const attackerName = isP1 ? (session.profile.name || 'Player 1') : (opponentName || 'Player 2');
       let msg = '';
       if (strengthPct === 0) {
-        msg = `💀 ${attackerName} got fewer than 3 correct — 0% strength, no damage!`;
+        msg = `💀 ${attackerName} got 0 correct — no damage dealt!`;
       } else {
         msg = `${attackerName} used ${statName} (${baseStat}) at ${strengthPct}% strength → ${damage} damage!`;
       }
@@ -1164,7 +1158,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                   }}>
                     {resolveDamage > 0 ? `-${resolveDamage} HP` : '0 DAMAGE'}
                   </div>
-                  {resolveDamage === 0 && <div style={{ fontSize: '0.72rem', color: 'rgba(168,230,255,0.4)', ...monoStyle, marginTop: 4 }}>Need 3+ correct to deal damage</div>}
+                  {resolveDamage === 0 && <div style={{ fontSize: '0.72rem', color: 'rgba(168,230,255,0.4)', ...monoStyle, marginTop: 4 }}>0 correct = 0% strength, no damage</div>}
                 </div>
 
                 <p style={{ fontSize: '0.78rem', color: 'rgba(168,230,255,0.55)', ...monoStyle, maxWidth: 340, lineHeight: 1.6 }}>{resolveMsg}</p>
