@@ -572,7 +572,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                 if (!modal.data.auth_user_id) { setModalError('Student has no linked account.'); return; }
                 try {
                   const { data: { session: s } } = await sb.auth.getSession();
-                  const res = await fetch('/api/reset-pin', {
+                  const res = await fetch('/.netlify/functions/reset-pin', {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
