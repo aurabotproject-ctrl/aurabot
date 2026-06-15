@@ -30,7 +30,11 @@ const PACK_TIERS = [
 /** Returns exactly 3 rarities matching the guaranteed pack contents */
 function rollPackRarities(tierId: string): ['common'|'silver'|'gold-rare'|'prismatic', 'common'|'silver'|'gold-rare'|'prismatic', 'common'|'silver'|'gold-rare'|'prismatic'] {
   const tier = PACK_TIERS.find(t => t.id === tierId) || PACK_TIERS[0];
-  const bonusRarity = tier.bonus[Math.random() < 0.5 ? 0 : 1];
+  // Use two separate Math.random() calls combined for better entropy
+  const r1 = Math.random();
+  const r2 = Math.random();
+  const coinFlip = ((r1 + r2) / 2) < 0.5; // true = lower rarity (index 0), false = higher (index 1)
+  const bonusRarity = tier.bonus[coinFlip ? 0 : 1];
   return [tier.guarantee[0], tier.guarantee[1], bonusRarity];
 }
 
@@ -350,6 +354,7 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
 
     // Roll the 3 guaranteed rarities for this tier
     const rarities = rollPackRarities(selectedTier.id);
+    console.log('[Pack Roll] tier:', selectedTier.id, '| rarities:', rarities);
 
     const rolled: OpenedCard[] = [];
     for (let i = 0; i < 3; i++) {
@@ -368,6 +373,13 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
         skill_points: stats.skillPts,
       });
     }
+
+    // Shuffle the presentation order so the bonus card isn't always last
+    for (let i = rolled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [rolled[i], rolled[j]] = [rolled[j], rolled[i]];
+    }
+
     setOpenedCards(rolled);
     setLoadingCards(false);
     setPhase('zoom');
