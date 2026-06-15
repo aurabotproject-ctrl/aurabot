@@ -62,15 +62,6 @@ function getStrengthPct(correct: number): number {
   return Math.max(0, Math.min(correct, 12)) * 10;
 }
 
-function getRarityMultiplier(rarity: string): number {
-  switch (rarity) {
-    case 'prismatic': return 2;
-    case 'gold-rare': return 1.5;
-    case 'silver': return 1.25;
-    default: return 1;
-  }
-}
-
 function getHPColor(hp: number, max: number): string {
   const pct = hp / max;
   if (pct > 0.5) return 'linear-gradient(90deg,#4caf82,#8bc34a)';
