@@ -48,9 +48,9 @@ export function knobToRobotColor(k: number, themes: ColorTheme[]): ColorTheme {
 }
 export function countUnlockedColors(choices: string[]): number {
   let count = 0;
-  if (choices.includes('color'))  count += 2;
-  if (choices.includes('color2')) count += 2;
-  if (choices.includes('color3')) count += 2;
+  if (choices.includes('color'))  count += 2; // unlocks Grape, Ocean        (indices 0,1)
+  if (choices.includes('color2')) count += 2; // unlocks Tangerine, Crimson  (indices 2,3)
+  if (choices.includes('color3')) count += 4; // unlocks Gold, Silver, 🌈 Chrome, 🖤 Black Chrome (indices 4,5,6,7)
   return count;
 }
 export function countUnlockedFaceColors(choices: string[]): number {
