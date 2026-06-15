@@ -556,7 +556,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
               Must be exactly 8 digits. Cannot be 8 of the same number (e.g. 11111111).
             </p>
             <div className="mb-3">
-              <label className="tp-label">New 6-Digit PIN</label>
+              <label className="tp-label">New 8-Digit PIN</label>
               <input type="password" inputMode="numeric" maxLength={8} className="tp-input" placeholder="e.g. 48295123" value={pw} onChange={e => setPw(e.target.value.replace(/\D/g, '').slice(0, 8))} />
             </div>
             <div className="mb-3">
@@ -571,18 +571,16 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                 if (pw !== pw2) { setModalError('PINs do not match.'); return; }
                 if (!modal.data.auth_user_id) { setModalError('Student has no linked account.'); return; }
                 try {
-                  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
                   const { data: { session: s } } = await sb.auth.getSession();
-                  const res = await fetch(`${supabaseUrl}/auth/v1/admin/users/${modal.data.auth_user_id}`, {
-                    method: 'PUT',
+                  const res = await fetch('/api/reset-pin', {
+                    method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
                       'Authorization': `Bearer ${s?.access_token}`,
-                      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
                     },
-                    body: JSON.stringify({ password: pw }),
+                    body: JSON.stringify({ auth_user_id: modal.data.auth_user_id, new_password: pw }),
                   });
-                  if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed'); }
+                  if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
                   setModal(null);
                   setModalError('');
                 } catch (err: any) { setModalError(err.message || 'Reset failed'); }
