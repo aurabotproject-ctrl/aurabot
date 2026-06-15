@@ -410,9 +410,9 @@ function LevelUpModal({ level, unlockedChoices, onChoose }: LevelUpModalProps) {
 
   const nextColorLabel = () => {
     const next = unlockedColorCount;
-    if (next >= 10) return '🖤 Black Chrome';
-    if (next >= 8) return '✨ Shiny Gold & Silver';
-    if (next >= 6) return 'Tangerine & Crimson';
+    if (next >= 8) return '🌈 Chrome & 🖤 Black Chrome';
+    if (next >= 6) return '✨ Gold & Silver';
+    if (next >= 4) return 'Tangerine & Crimson';
     return 'Grape & Ocean';
   };
   const nextFaceLabel = () => {
