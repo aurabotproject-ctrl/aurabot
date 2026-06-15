@@ -503,21 +503,28 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
     }
     setVerifying(true);
     try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const tempSb = createClient(
-        'https://iunoahajcaaxmttdpgem.supabase.co',
-        'sb_publishable_rUgPdjSjCcQfaEY0uc1mZw_vKqC_itL'
-      );
-      const { error } = await tempSb.auth.signInWithPassword({
+      // Save P1's current session so we can restore it after verifying P2
+      const { data: { session: p1Session } } = await sb.auth.getSession();
+
+      const { error } = await sb.auth.signInWithPassword({
         email: opp.login_email,
         password: verifyPin,
       });
+
       if (error) {
+        // Restore P1's session on failure too
+        if (p1Session) await sb.auth.setSession({ access_token: p1Session.access_token, refresh_token: p1Session.refresh_token });
         setVerifyError('Incorrect PIN. Try again.');
         setVerifyPin('');
         setVerifying(false);
         return;
       }
+
+      // Restore P1's session — P2 is verified, we don't need their session active
+      if (p1Session) {
+        await sb.auth.setSession({ access_token: p1Session.access_token, refresh_token: p1Session.refresh_token });
+      }
+
       setP2Ready(true);
     } catch {
       setVerifyError('Verification failed. Try again.');
@@ -861,7 +868,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                           Hand the device to <strong style={{ color: '#a8e6ff' }}>{opponentName}</strong>
                         </p>
                         <p style={{ fontSize: '0.68rem', color: 'rgba(168,230,255,0.4)', ...monoStyle, marginBottom: 10 }}>
-                          Enter your 6-digit login PIN to confirm
+                          Enter your 8-digit login PIN to confirm
                         </p>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 12 }}>
                           {[0,1,2,3,4,5,6,7].map(i => (
@@ -870,6 +877,24 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                             </div>
                           ))}
                         </div>
+                        {/* Hidden input to capture keyboard typing */}
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          maxLength={8}
+                          value={verifyPin}
+                          onChange={e => {
+                            const val = e.target.value.replace(/\D/g, '').slice(0, 8);
+                            setVerifyPin(val);
+                            setVerifyError('');
+                          }}
+                          onKeyDown={e => e.key === 'Enter' && handleVerifyOpponent()}
+                          autoComplete="off"
+                          style={{
+                            position: 'absolute', opacity: 0, pointerEvents: 'none', width: 1, height: 1,
+                          }}
+                          ref={el => el && document.activeElement !== el && el.focus()}
+                        />
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, width: '100%', maxWidth: 200, margin: '0 auto 10px' }}>
                           {['1','2','3','4','5','6','7','8','9','⌫','0','✓'].map(key => (
                             <button key={key} onClick={() => key === '✓' ? handleVerifyOpponent() : handlePinKey(key)}
