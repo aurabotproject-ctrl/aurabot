@@ -1626,6 +1626,7 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
       move1_dmg: c.move1_dmg ?? '',
       move2_name: c.move2_name || '',
       move2_dmg: c.move2_dmg ?? '',
+      image_url: c.image_url || '',
     });
     setEditError('');
   };
@@ -1648,6 +1649,7 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
         move1_dmg:   Number(editForm.move1_dmg),
         move2_name:  editForm.move2_name,
         move2_dmg:   Number(editForm.move2_dmg),
+        image_url:   editForm.image_url || null,
       }).eq('id', editCard.id);
       if (error) throw error;
       setEditCard(null);
@@ -1714,6 +1716,46 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
               <div>
                 <label style={labelStyle}>Description</label>
                 <textarea style={{ ...inputStyle, minHeight: 72, resize: 'vertical', fontFamily: 'inherit' }} value={editForm.description} onChange={ef('description')} />
+              </div>
+
+              {/* Image */}
+              <div>
+                <label style={labelStyle}>Card Image</label>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  {/* Preview */}
+                  <div style={{ width: 90, height: 90, borderRadius: 10, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.03)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {editForm.image_url
+                      ? <img src={editForm.image_url} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <span style={{ fontSize: '1.8rem', opacity: 0.2 }}>🖼</span>
+                    }
+                  </div>
+                  {/* Upload + clear controls */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                    <label style={{ display: 'inline-block', padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(192,132,252,0.4)', background: 'rgba(192,132,252,0.08)', color: '#c084fc', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}>
+                      📁 Choose Image
+                      <input type="file" accept="image/*" style={{ display: 'none' }}
+                        onChange={async e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const webpUrl = await fileToWebP(file, 512, 512, 0.88);
+                            setEditForm((prev: any) => ({ ...prev, image_url: webpUrl }));
+                          } catch { setEditError('Image conversion failed.'); }
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    {editForm.image_url && (
+                      <button onClick={() => setEditForm((prev: any) => ({ ...prev, image_url: '' }))}
+                        style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)', color: '#f87171', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 700 }}>
+                        ✕ Remove Image
+                      </button>
+                    )}
+                    <div style={{ fontSize: '0.62rem', color: 'rgba(180,210,255,0.3)', lineHeight: 1.4 }}>
+                      PNG, JPG or WebP · auto-converted to WebP · max 5MB
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* HP */}
