@@ -511,13 +511,177 @@ function ResetPasswordForm({ teacher, onSuccess, onCancel, error, setError }: {
 // ══════════════════════════════════════════════════════════════════════
 
 const PACK_SLOTS = [
-  { id: 'xanimals',  label: 'Xanimals Pack',  subtitle: 'Crossed Animals!',         color: '#7c3aed', emoji: '🧬' },
-  { id: 'animals',   label: 'Animals Pack',   subtitle: 'Real World Animals!',      color: '#16a34a', emoji: '🐾' },
-  { id: 'creatures', label: 'Creatures Pack', subtitle: 'Magical & Mythical!',      color: '#0369a1', emoji: '👾' },
-  { id: 'humanoids', label: 'Humanoids Pack', subtitle: 'People & Warriors!',       color: '#b45309', emoji: '🧑' },
-  { id: 'robots',    label: 'Robots Pack',    subtitle: 'Mechanical & Futuristic!', color: '#374151', emoji: '🤖' },
-  { id: 'luckydip',  label: 'Lucky Dip Pack', subtitle: 'Mix of All Themes!',      color: '#be123c', emoji: '🎲' },
+  { id: 'xanimals',  label: 'Xanimals',  color: '#7c3aed', emoji: '🧬' },
+  { id: 'animals',   label: 'Animals',   color: '#16a34a', emoji: '🐾' },
+  { id: 'creatures', label: 'Creatures', color: '#0369a1', emoji: '👾' },
+  { id: 'humanoids', label: 'Humanoids', color: '#b45309', emoji: '🧑' },
+  { id: 'robots',    label: 'Robots',    color: '#374151', emoji: '🤖' },
 ];
+
+const TIER_SLOTS = [
+  { id: 'basic',   label: 'Basic',   stars: 5,  starColor: '#818cf8' },
+  { id: 'mod',     label: 'Mod',     stars: 10, starColor: '#a78bfa' },
+  { id: 'premium', label: 'Premium', stars: 20, starColor: '#fbbf24' },
+];
+
+function PackImagesManager() {
+  const [packImages, setPackImages] = useState<Record<string, string>>({});
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [msg, setMsg] = useState('');
+  const [msgType, setMsgType] = useState<'ok'|'err'>('ok');
+  const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  useEffect(() => { loadPackImages(); }, []);
+
+  const loadPackImages = async () => {
+    try {
+      const { data } = await sb.from('pack_images').select('pack_id, image_url');
+      const map: Record<string, string> = {};
+      (data || []).forEach((r: any) => { map[r.pack_id] = r.image_url; });
+      setPackImages(map);
+    } catch { /* table may not exist yet */ }
+  };
+
+  const showMsg = (m: string, type: 'ok'|'err' = 'ok') => {
+    setMsg(m); setMsgType(type);
+    setTimeout(() => setMsg(''), 4000);
+  };
+
+  const handleUpload = async (slotKey: string, file: File) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { showMsg('Image must be under 5MB', 'err'); return; }
+    setUploading(slotKey);
+    try {
+      const dataUrl = await fileToWebP(file, 1200, 1200, 0.88);
+      const { error } = await sb.from('pack_images').upsert({
+        pack_id: slotKey,
+        image_url: dataUrl,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'pack_id' });
+      if (error) throw error;
+      setPackImages(prev => ({ ...prev, [slotKey]: dataUrl }));
+      showMsg(`✓ Image updated!`);
+    } catch (err: any) {
+      showMsg(err.message || 'Upload failed', 'err');
+    }
+    setUploading(null);
+  };
+
+  const handleRemove = async (slotKey: string) => {
+    if (!confirm('Remove this pack image?')) return;
+    await sb.from('pack_images').delete().eq('pack_id', slotKey);
+    setPackImages(prev => { const n = { ...prev }; delete n[slotKey]; return n; });
+    showMsg('Image removed');
+  };
+
+  return (
+    <div>
+      <div className="adm-section-title">🎨 Design Settings</div>
+
+      {/* Pack Images Section */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+          <div>
+            <div style={{ fontWeight: 800, color: '#c4b5fd', fontSize: '0.9rem', marginBottom: 4 }}>🃏 Card Pack Images</div>
+            <div style={{ fontSize: '0.76rem', color: '#5060a0', lineHeight: 1.5, maxWidth: 500 }}>
+              Upload images for each pack tier. Each theme has 3 packs — Basic (⭐5), Mod (⭐10) and Premium (⭐20). Portrait orientation recommended, min 400×530px, under 5MB.
+            </div>
+          </div>
+          <button onClick={loadPackImages} className="adm-btn-outline" style={{ fontSize: '0.72rem' }}>↺ Refresh</button>
+        </div>
+
+        {msg && (
+          <div style={{ background: msgType === 'ok' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${msgType === 'ok' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`, color: msgType === 'ok' ? '#4ade80' : '#f87171', borderRadius: 10, padding: '10px 16px', fontSize: '0.82rem', fontWeight: 700, marginBottom: 16 }}>
+            {msg}
+          </div>
+        )}
+
+        {/* One row per theme, 3 tier columns each */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+          {PACK_SLOTS.map(pack => (
+            <div key={pack.id}>
+              {/* Theme header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <span style={{ fontSize: '1.2rem' }}>{pack.emoji}</span>
+                <span style={{ fontWeight: 800, color: pack.color, fontSize: '0.9rem', letterSpacing: '0.05em' }}>{pack.label}</span>
+                <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg,${pack.color}44,transparent)` }} />
+              </div>
+
+              {/* 3 tier cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                {TIER_SLOTS.map(tier => {
+                  const slotKey = `${pack.id}_${tier.id}`;
+                  const hasImage = !!packImages[slotKey];
+                  const isUploading = uploading === slotKey;
+                  return (
+                    <div key={tier.id} style={{ background: 'rgba(255,255,255,0.03)', border: `1.5px solid ${hasImage ? pack.color + '55' : 'rgba(255,255,255,0.08)'}`, borderRadius: 14, overflow: 'hidden' }}>
+                      {/* Tier badge */}
+                      <div style={{ background: `${pack.color}22`, borderBottom: `1px solid ${pack.color}33`, padding: '6px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 800, fontSize: '0.72rem', color: pack.color }}>{tier.label}</span>
+                        <span style={{ fontSize: '0.65rem', color: tier.starColor, fontWeight: 700 }}>⭐{tier.stars}</span>
+                      </div>
+
+                      {/* Image preview */}
+                      <div style={{ aspectRatio: '3/4', background: hasImage ? 'transparent' : `linear-gradient(160deg,${pack.color}22,${pack.color}0a)`, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {hasImage ? (
+                          <img src={packImages[slotKey]} alt={`${pack.label} ${tier.label}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ textAlign: 'center', padding: 10 }}>
+                            <div style={{ fontSize: '2rem', marginBottom: 4, opacity: 0.35 }}>{pack.emoji}</div>
+                            <div style={{ fontSize: '0.58rem', color: '#4050a0' }}>No image</div>
+                          </div>
+                        )}
+                        {isUploading && (
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.72rem', color: 'white', fontWeight: 700 }}>
+                            Converting…
+                          </div>
+                        )}
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: pack.color }} />
+                      </div>
+
+                      {/* Controls */}
+                      <div style={{ padding: '8px 10px', display: 'flex', gap: 6 }}>
+                        <input
+                          type="file" accept="image/*"
+                          ref={el => { fileRefs.current[slotKey] = el; }}
+                          onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(slotKey, f); e.target.value = ''; }}
+                          style={{ display: 'none' }}
+                        />
+                        <button
+                          onClick={() => fileRefs.current[slotKey]?.click()}
+                          disabled={isUploading}
+                          className="adm-btn-primary"
+                          style={{ flex: 1, fontSize: '0.65rem', padding: '5px 6px' }}
+                        >
+                          {hasImage ? '↺ Replace' : '↑ Upload'}
+                        </button>
+                        {hasImage && (
+                          <button onClick={() => handleRemove(slotKey)} className="adm-btn-danger" style={{ fontSize: '0.65rem', padding: '5px 8px' }}>
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Future design settings placeholder */}
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 24 }}>
+        <div style={{ fontWeight: 800, color: '#c4b5fd', fontSize: '0.9rem', marginBottom: 8 }}>🎨 More Design Settings</div>
+        <div className="adm-coming-soon" style={{ padding: 32 }}>
+          <div style={{ fontSize: '0.82rem', color: '#5060a0', lineHeight: 1.6 }}>
+            Colours, logos, and branding customisation will be added here.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function PackImagesManager() {
   const [packImages, setPackImages] = useState<Record<string, string>>({});

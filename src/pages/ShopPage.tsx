@@ -271,7 +271,7 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
       {openingPack && (
         <PackOpeningOverlay
           pack={openingPack}
-          packImage={packImages[openingPack.id] || null}
+          packImages={packImages}
           starPoints={starPoints || 0}
           isTestAccount={isTestAccount}
           studentId={studentId}
@@ -288,8 +288,8 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
 // ── Pack Opening Overlay (self-contained) ─────────────────────────────
 type OpenPhase = 'tiers' | 'confirm' | 'zoom' | 'tear' | 'reveal';
 
-function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studentId, teacherId, onClose, onComplete, onStarsSpent }: {
-  pack: typeof PACK_TYPES[0]; packImage: string | null;
+function PackOpeningOverlay({ pack, packImages, starPoints, isTestAccount, studentId, teacherId, onClose, onComplete, onStarsSpent }: {
+  pack: typeof PACK_TYPES[0]; packImages: Record<string, string>;
   starPoints: number; isTestAccount: boolean;
   studentId: string; teacherId: string;
   onClose: () => void; onComplete: (cards: OpenedCard[]) => void;
@@ -297,6 +297,11 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
 }) {
   const [phase, setPhase] = useState<OpenPhase>('tiers');
   const [selectedTier, setSelectedTier] = useState<typeof PACK_TIERS[0] | null>(null);
+
+  // Resolve image: try tier-specific first, fall back to generic pack image
+  const packImage = selectedTier
+    ? (packImages[`${pack.id}_${selectedTier.id}`] || packImages[pack.id] || null)
+    : (packImages[pack.id] || null);
   const [openedCards, setOpenedCards] = useState<OpenedCard[]>([]);
   const [slottedCards, setSlottedCards] = useState<(OpenedCard | null)[]>([null, null, null]);
   const [saving, setSaving] = useState(false);
@@ -474,14 +479,18 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
           </div>
           {PACK_TIERS.map((tier, i) => {
             const canBuy = isTestAccount || starPoints >= tier.stars;
+            const tierImage = packImages[`${pack.id}_${tier.id}`] || packImages[pack.id] || null;
             const rarityColor = (r: string) =>
               r === 'prismatic' ? '#c084fc' : r === 'gold-rare' ? '#fbbf24' : r === 'silver' ? '#94a3b8' : '#9ca3af';
             const rarityLabel = (r: string) =>
               r === 'gold-rare' ? 'Gold' : r.charAt(0).toUpperCase() + r.slice(1);
             return (
               <div key={tier.id} onClick={() => canBuy && (setSelectedTier(tier), setPhase('confirm'))}
-                style={{ background: canBuy ? `${tier.color}18` : 'rgba(255,255,255,0.02)', border: `2px solid ${canBuy ? tier.color + '66' : 'rgba(255,255,255,0.06)'}`, borderRadius: 16, padding: '16px 20px', cursor: canBuy ? 'pointer' : 'not-allowed', opacity: canBuy ? 1 : 0.45, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
+                style={{ background: canBuy ? `${tier.color}18` : 'rgba(255,255,255,0.02)', border: `2px solid ${canBuy ? tier.color + '66' : 'rgba(255,255,255,0.06)'}`, borderRadius: 16, padding: '16px 20px', cursor: canBuy ? 'pointer' : 'not-allowed', opacity: canBuy ? 1 : 0.45, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                {tierImage && (
+                  <img src={tierImage} alt={tier.label} style={{ width: 44, height: 58, objectFit: 'cover', borderRadius: 6, flexShrink: 0, border: `1px solid ${tier.color}44` }} />
+                )}
+                <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 900, color: 'white', fontSize: '0.9rem', marginBottom: 4 }}>{['⭐','⭐⭐','⭐⭐⭐'][i]} {tier.label}</div>
                   <div style={{ fontSize: '0.7rem', color: '#7080a0', marginBottom: 6 }}>{tier.desc}</div>
                   <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -501,7 +510,7 @@ function PackOpeningOverlay({ pack, packImage, starPoints, isTestAccount, studen
                     <span style={{ fontSize: '0.55rem', color: '#5060a0' }}>50/50</span>
                   </div>
                 </div>
-                <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontSize: '1.3rem', fontWeight: 900, color: tier.color }}>⭐{tier.stars}</div>
                   <div style={{ fontSize: '0.6rem', color: '#5060a0' }}>star pts</div>
                 </div>
