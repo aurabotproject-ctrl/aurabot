@@ -193,9 +193,9 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
                 <div key={pack.id} className="pack-card">
                   <div style={{ borderRadius: 14, overflow: 'hidden', border: `2.5px solid ${pack.color}`, boxShadow: `0 8px 24px ${pack.glow}44`, background: `linear-gradient(160deg, ${pack.color}ee, ${pack.color}99)`, position: 'relative', aspectRatio: '3/4', cursor: 'pointer' }}
                     onClick={() => setOpeningPack(pack)}>
-                    {packImages[pack.id] ? (
+                    {(packImages[`${pack.id}_mod`] || packImages[`${pack.id}_basic`] || packImages[pack.id]) ? (
                       <>
-                        <img src={packImages[pack.id]} alt={pack.label} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={packImages[`${pack.id}_mod`] || packImages[`${pack.id}_basic`] || packImages[pack.id]} alt={pack.label} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.7))' }} />
                         <div style={{ position: 'absolute', bottom: 28, left: 0, right: 0, textAlign: 'center' }}>
                           <div style={{ fontSize: '0.62rem', fontWeight: 900, color: 'white', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>{pack.label}</div>
@@ -298,10 +298,10 @@ function PackOpeningOverlay({ pack, packImages, starPoints, isTestAccount, stude
   const [phase, setPhase] = useState<OpenPhase>('tiers');
   const [selectedTier, setSelectedTier] = useState<typeof PACK_TIERS[0] | null>(null);
 
-  // Resolve image: try tier-specific first, fall back to generic pack image
+  // Resolve image: try tier-specific first, fall back to mod, then basic, then generic
   const packImage = selectedTier
     ? (packImages[`${pack.id}_${selectedTier.id}`] || packImages[pack.id] || null)
-    : (packImages[pack.id] || null);
+    : (packImages[`${pack.id}_mod`] || packImages[`${pack.id}_basic`] || packImages[pack.id] || null);
   const [openedCards, setOpenedCards] = useState<OpenedCard[]>([]);
   const [slottedCards, setSlottedCards] = useState<(OpenedCard | null)[]>([null, null, null]);
   const [saving, setSaving] = useState(false);
