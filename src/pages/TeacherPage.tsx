@@ -357,7 +357,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
       case 'deleteStudent':
         return (
           <ModalWrapper title="🗑 Delete Student" onClose={() => setModal(null)} danger>
-            <p className="text-sm mb-2" style={{ color: 'rgba(210,230,255,0.95)' }}>Delete <strong>{modal.data.name}</strong>?</p>
+            <p className="text-sm mb-2" style={{ color: 'var(--tp-text)' }}>Delete <strong>{modal.data.name}</strong>?</p>
             <p className="text-sm mb-4" style={{ color: '#c82020' }}>This will also delete all their cards and cannot be undone.</p>
             <div className="flex gap-3">
               <button onClick={async () => { await Dashboard.deleteStudent(modal.data.id); loadData(); setModal(null); }} className="tp-btn-danger">Yes, Delete Everything</button>
@@ -479,10 +479,10 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         return (
           <ModalWrapper title="⬇ Download Cards" onClose={() => setModal(null)}>
             <div style={{ padding: '8px 0' }}>
-              <p style={{ color: 'rgba(180,210,255,0.7)', fontSize: '0.9rem', marginBottom: 16 }}>
+              <p style={{ color: 'var(--tp-text2)', fontSize: '0.9rem', marginBottom: 16 }}>
                 Download <strong>{modal.data.name}</strong>'s cards as an HTML file.
               </p>
-              <p style={{ color: 'rgba(180,210,255,0.5)', fontSize: '0.8rem', marginBottom: 24 }}>
+              <p style={{ color: 'var(--tp-muted)', fontSize: '0.8rem', marginBottom: 24 }}>
                 {studentCards.length === 0
                   ? 'This student has no cards yet.'
                   : `${studentCards.length} card${studentCards.length !== 1 ? 's' : ''} will be included.`}
@@ -534,7 +534,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
       case 'deleteCard':
         return (
           <ModalWrapper title="🗑 Delete Card" onClose={() => setModal(null)} danger>
-            <p className="text-sm mb-2" style={{ color: 'rgba(210,230,255,0.95)' }}>Delete <strong>{modal.data.card_name}</strong>?</p>
+            <p className="text-sm mb-2" style={{ color: 'var(--tp-text)' }}>Delete <strong>{modal.data.card_name}</strong>?</p>
             <p className="text-sm mb-4" style={{ color: '#c82020' }}>This cannot be undone.</p>
             <div className="flex gap-3">
               <button onClick={async () => { await Dashboard.deleteCard(modal.data.id); loadData(); setModal(null); }} className="tp-btn-danger">Yes, Delete Card</button>
@@ -549,7 +549,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         const setPw2 = (v: string) => setModal((m: any) => ({ ...m, data: { ...m.data, _pw2: v } }));
         return (
           <ModalWrapper title="🔑 Reset PIN" onClose={() => setModal(null)}>
-            <p className="text-sm mb-1" style={{ color: 'rgba(180,210,255,0.6)' }}>
+            <p className="text-sm mb-1" style={{ color: 'var(--tp-text2)' }}>
               Setting new keypad PIN for <strong>{modal.data.name}</strong>
             </p>
             <p className="text-xs mb-4" style={{ color: '#9a7a60' }}>
@@ -606,7 +606,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         <div style={{ maxWidth:1240, margin:'0 auto', padding:'0 28px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60 }}>
           <span style={{ fontSize:'1.1rem', fontWeight:900, background:'linear-gradient(135deg,#f4a8c8,#a8d8ff,#c8b0ff)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', letterSpacing:'0.04em' }}>✦ ClassCard ✦</span>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <span style={{ fontSize:'0.72rem', padding:'4px 12px', borderRadius:20, background:'rgba(160,140,220,0.1)', border:'1px solid rgba(160,140,220,0.25)', color:'rgba(180,210,255,0.65)', fontWeight:600 }}>{session.user.email}</span>
+            <span style={{ fontSize:'0.72rem', padding:'4px 12px', borderRadius:20, background:'rgba(160,140,220,0.1)', border:'1px solid rgba(160,140,220,0.25)', color:'var(--tp-text2)', fontWeight:600 }}>{session.user.email}</span>
             <span style={{ fontSize:'0.65rem', padding:'4px 10px', borderRadius:20, background:'linear-gradient(135deg,rgba(200,160,255,0.2),rgba(160,200,255,0.2))', border:'1px solid rgba(160,140,220,0.3)', color:'#6060b0', fontWeight:800, letterSpacing:'0.1em', textTransform:'uppercase' }}>Teacher</span>
             <button onClick={toggleTheme} style={{ width:34, height:34, borderRadius:'50%', border:'1.5px solid var(--tp-border,rgba(60,100,200,0.22))', background:'var(--tp-input-bg,rgba(255,255,255,0.06))', cursor:'pointer', fontSize:'0.9rem', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.2s' }} title={isDark ? 'Light mode' : 'Dark mode'}>{isDark ? '☀️' : '🌙'}</button>
             <button onClick={onSignOut} className="tp-btn-outline" style={{ fontSize:'0.72rem', padding:'6px 14px' }}>Sign Out</button>
@@ -700,7 +700,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                   {students.map(s => (
                     <tr key={s.id}>
                       <td style={{ fontWeight:700 }}>{s.name}</td>
-                      <td style={{ fontSize:'0.78rem', color:'rgba(180,210,255,0.5)' }}>{s.login_email || '—'}</td>
+                      <td style={{ fontSize:'0.78rem', color:'var(--tp-muted)' }}>{s.login_email || '—'}</td>
                       <td>{cards.filter(c => c.student_id === s.id).length}</td>
                       <td>
                         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
@@ -727,12 +727,12 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         {tab === 'homecomms' && (
           <div style={{ maxWidth: 760 }}>
             <div className="tp-section" style={{ marginBottom: 16 }}>📣 Home Communication</div>
-            <p style={{ fontSize: '0.78rem', color: 'rgba(180,210,255,0.5)', marginBottom: 22, lineHeight: 1.6 }}>
+            <p style={{ fontSize: '0.78rem', color: 'var(--tp-muted)', marginBottom: 22, lineHeight: 1.6 }}>
               Manage what parents and students see on the Home Communication board. The pinboard message and photo appear at the top; dated events appear below.
             </p>
 
             {/* ── PINBOARD SECTION ── */}
-            <div style={{ marginBottom: 8, fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.5)' }}>📌 Pinboard Message &amp; Photo</div>
+            <div style={{ marginBottom: 8, fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--tp-muted)' }}>📌 Pinboard Message &amp; Photo</div>
             <div className="tp-panel" style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
 
@@ -760,7 +760,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                         style={{ width: '100%', height: 130, objectFit: 'cover', borderRadius: 12, border: '2px solid rgba(160,140,220,0.3)', display: 'block' }}
                       />
                       <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                        <label style={{ flex: 1, padding: '5px 0', background: 'rgba(160,140,220,0.1)', border: '1.5px solid rgba(160,140,220,0.3)', borderRadius: 8, cursor: 'pointer', textAlign: 'center', fontSize: '0.65rem', fontWeight: 700, color: 'rgba(180,210,255,0.65)' }}>
+                        <label style={{ flex: 1, padding: '5px 0', background: 'rgba(160,140,220,0.1)', border: '1.5px solid rgba(160,140,220,0.3)', borderRadius: 8, cursor: 'pointer', textAlign: 'center', fontSize: '0.65rem', fontWeight: 700, color: 'var(--tp-text2)' }}>
                           🔄 Change
                           <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePbPhotoUpload} disabled={pbUploading} />
                         </label>
@@ -770,7 +770,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                   ) : (
                     <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: 130, background: 'rgba(240,236,255,0.5)', border: '2px dashed rgba(160,140,220,0.4)', borderRadius: 12, cursor: pbUploading ? 'wait' : 'pointer', gap: 6 }}>
                       <span style={{ fontSize: '1.6rem' }}>{pbUploading ? '⏳' : '📷'}</span>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(180,210,255,0.5)' }}>{pbUploading ? 'Uploading…' : 'Click to add photo'}</span>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--tp-muted)' }}>{pbUploading ? 'Uploading…' : 'Click to add photo'}</span>
                       <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePbPhotoUpload} disabled={pbUploading} />
                     </label>
                   )}
@@ -794,11 +794,11 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
             </div>
 
             {/* ── DATED EVENTS SECTION ── */}
-            <div style={{ marginBottom: 8, fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.5)' }}>📅 Dates &amp; Events</div>
+            <div style={{ marginBottom: 8, fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--tp-muted)' }}>📅 Dates &amp; Events</div>
 
             {/* Add new post */}
             <div className="tp-panel" style={{ marginBottom: 16 }}>
-              <div className="tp-label" style={{ marginBottom: 10, fontSize: '0.72rem', color: 'rgba(180,210,255,0.65)' }}>📝 New Event</div>
+              <div className="tp-label" style={{ marginBottom: 10, fontSize: '0.72rem', color: 'var(--tp-text2)' }}>📝 New Event</div>
               <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'flex-start' }}>
                 <div style={{ flex: '0 0 170px' }}>
                   <label className="tp-label">Date</label>
@@ -834,7 +834,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
             {/* Events list */}
             {homeComms.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '32px 20px', color: 'rgba(180,210,255,0.5)', fontSize: '0.85rem', background: 'rgba(240,236,255,0.3)', borderRadius: 16, border: '1.5px dashed rgba(180,160,220,0.3)' }}>
+              <div style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--tp-muted)', fontSize: '0.85rem', background: 'rgba(240,236,255,0.3)', borderRadius: 16, border: '1.5px dashed rgba(180,160,220,0.3)' }}>
                 No events yet. Add your first dated event above.
               </div>
             ) : (
@@ -878,7 +878,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                           </div>
                         </div>
                         <div style={{ flex: 1 }}>
-                          <p style={{ margin: 0, fontSize: '0.88rem', color: 'rgba(210,230,255,0.95)', lineHeight: 1.6, fontWeight: 600 }}>{hc.comment}</p>
+                          <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--tp-text)', lineHeight: 1.6, fontWeight: 600 }}>{hc.comment}</p>
                           <div style={{ fontSize: '0.65rem', color: '#b0b8d0', marginTop: 6 }}>
                             Posted {new Date(hc.created_at).toLocaleDateString('en-NZ')}
                           </div>
@@ -926,7 +926,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                 <PokeCard card={detailCard} />
               </div>
               <div style={{ flex:1, minWidth:200 }}>
-                <h2 style={{ fontSize:'1.4rem', fontWeight:900, color:'rgba(210,230,255,0.95)', marginBottom:4 }}>{detailCard.card_name}</h2>
+                <h2 style={{ fontSize:'1.4rem', fontWeight:900, color:'var(--tp-text)', marginBottom:4 }}>{detailCard.card_name}</h2>
                 <div style={{ display:'inline-block', padding:'3px 12px', borderRadius:20, background:'rgba(100,120,220,0.08)', border:'1px solid rgba(100,120,220,0.2)', fontSize:'0.65rem', fontWeight:700, color:'#6070c0', marginBottom:16, textTransform:'uppercase', letterSpacing:'0.1em' }}>{detailCard.rarity}</div>
                 <p style={{ fontSize:'0.88rem', color:'#7080b0', fontStyle:'italic', marginBottom:20, lineHeight:1.5 }}>"{detailCard.description}"</p>
 
@@ -942,12 +942,12 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                     { label: 'Awarded', value: new Date(detailCard.created_at).toLocaleDateString() },
                   ].map((row, i) => (
                     <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid rgba(100,120,220,0.08)' }}>
-                      <span style={{ fontSize:'0.72rem', color:'rgba(180,210,255,0.45)', textTransform:'uppercase', letterSpacing:'0.08em' }}>{row.label}</span>
-                      <span style={{ fontSize:'0.82rem', fontWeight:700, color:'rgba(210,230,255,0.95)' }}>{row.value}</span>
+                      <span style={{ fontSize:'0.72rem', color:'var(--tp-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>{row.label}</span>
+                      <span style={{ fontSize:'0.82rem', fontWeight:700, color:'var(--tp-text)' }}>{row.value}</span>
                     </div>
                   ))}
                 </div>
-                <p style={{ fontSize:'0.8rem', marginTop:14, color:'rgba(180,210,255,0.5)', fontStyle:'italic' }}>Awarded to: {detailCard.students?.name || 'Unknown'}</p>
+                <p style={{ fontSize:'0.8rem', marginTop:14, color:'var(--tp-muted)', fontStyle:'italic' }}>Awarded to: {detailCard.students?.name || 'Unknown'}</p>
               </div>
             </div>
           </div>
@@ -999,7 +999,7 @@ function ModalForm({ fields, onSubmit, submitLabel, error, onCancel }: {
     <form onSubmit={handleSubmit}>
       {fields.map(f => (
         <div key={f.name} className="mb-3">
-          <label className="tp-label">{f.label} {f.optional && <span className="text-xs" style={{ color: 'rgba(180,210,255,0.5)' }}>(optional)</span>}</label>
+          <label className="tp-label">{f.label} {f.optional && <span className="text-xs" style={{ color: 'var(--tp-muted)' }}>(optional)</span>}</label>
           {f.type === 'textarea' ? (
             <textarea className="tp-input" style={{ resize:'none' }} rows={2} placeholder={f.placeholder} value={vals[f.name] || ''} onChange={e => setVals(p => ({ ...p, [f.name]: e.target.value }))} />
           ) : (
@@ -1110,20 +1110,20 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
       <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: '18px 24px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <div style={{ fontSize: '1rem', fontWeight: 900, color: '#c084fc', marginBottom: 4 }}>⭐ Star Points</div>
-          <div style={{ fontSize: '0.8rem', color: 'rgba(180,210,255,0.55)', lineHeight: 1.5 }}>
+          <div style={{ fontSize: '0.8rem', color: 'var(--tp-text2)', lineHeight: 1.5 }}>
             Tap a star to award points — students spend them on card packs.&nbsp;
             <span style={{ background: '#f59e0b22', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#c084fc' }}>⭐ = 1pt</span>&nbsp;
             <span style={{ background: '#94a3b822', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#38bdf8' }}>🌟 = 2pts</span>&nbsp;
             <span style={{ background: '#fbbf2422', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#f472b6' }}>✨ = 3pts</span>
           </div>
         </div>
-        <div style={{ fontSize: '0.75rem', color: 'rgba(180,210,255,0.55)', fontWeight: 700 }}>{students.length} students</div>
+        <div style={{ fontSize: '0.75rem', color: 'var(--tp-text2)', fontWeight: 700 }}>{students.length} students</div>
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'rgba(180,210,255,0.45)', fontSize: '0.85rem' }}>Loading…</div>
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--tp-muted)', fontSize: '0.85rem' }}>Loading…</div>
       ) : students.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'rgba(180,210,255,0.45)', fontSize: '0.85rem', fontStyle: 'italic' }}>No students yet — add some in the Students tab first.</div>
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--tp-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>No students yet — add some in the Students tab first.</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 18 }}>
           {students.map(student => {
@@ -1146,7 +1146,7 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
                 <MiniBotAvatar colorIndex={colorIdx} size={90} facePixels={facePixelMap[student.id]} botElements={botElementMap[student.id]} starPoints={pts} />
 
                 {/* Name */}
-                <div style={{ fontWeight: 800, fontSize: '0.82rem', color: 'rgba(210,230,255,0.95)', textAlign: 'center', lineHeight: 1.2 }}>{student.name}</div>
+                <div style={{ fontWeight: 800, fontSize: '0.82rem', color: 'var(--tp-text)', textAlign: 'center', lineHeight: 1.2 }}>{student.name}</div>
 
                 {/* Star buttons */}
                 <div style={{ display: 'flex', gap: 5, width: '100%', marginTop: 2 }}>
@@ -1163,7 +1163,7 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
                 {/* pt labels under buttons */}
                 <div style={{ display: 'flex', gap: 5, width: '100%' }}>
                   {(Object.entries(starColors) as [string, typeof starColors.bronze][]).map(([type, cfg]) => (
-                    <div key={type} style={{ flex: 1, textAlign: 'center', fontSize: '0.58rem', fontWeight: 700, color: 'rgba(180,210,255,0.5)', letterSpacing: '0.04em' }}>+{cfg.pts}pt</div>
+                    <div key={type} style={{ flex: 1, textAlign: 'center', fontSize: '0.58rem', fontWeight: 700, color: 'var(--tp-muted)', letterSpacing: '0.04em' }}>+{cfg.pts}pt</div>
                   ))}
                 </div>
               </div>
@@ -1325,8 +1325,8 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
 
       {/* Header */}
       <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: '18px 24px', border: '1.5px solid rgba(160,140,220,0.2)' }}>
-        <div style={{ fontSize: '1rem', fontWeight: 900, color: 'rgba(210,230,255,0.95)', marginBottom: 4 }}>🃏 Card Database</div>
-        <div style={{ fontSize: '0.8rem', color: 'rgba(180,210,255,0.65)', lineHeight: 1.5 }}>
+        <div style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--tp-text)', marginBottom: 4 }}>🃏 Card Database</div>
+        <div style={{ fontSize: '0.8rem', color: 'var(--tp-text2)', lineHeight: 1.5 }}>
           Create cards for the pack pool. Students spend ⭐ star points on packs — each pack pulls random cards from this database. Higher rarity cards appear less often.
         </div>
       </div>
@@ -1347,26 +1347,26 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
                   style={{ width: '100%', height: '100%', objectFit: 'cover', transform: `translate(${dbPosition.x}%, ${dbPosition.y}%) scale(${dbScale}) rotate(${dbRotation}deg)`, cursor: dbCroppedImage ? 'default' : (dbIsDragging ? 'grabbing' : 'grab'), userSelect: 'none', minHeight: 130 }}
                 />
               ) : (
-                <div style={{ textAlign: 'center', color: 'rgba(180,210,255,0.65)', fontSize: '0.75rem', padding: 16 }}><div style={{ fontSize: '2rem', marginBottom: 4 }}>🖼</div>No image</div>
+                <div style={{ textAlign: 'center', color: 'var(--tp-text2)', fontSize: '0.75rem', padding: 16 }}><div style={{ fontSize: '2rem', marginBottom: 4 }}>🖼</div>No image</div>
               )}
             </div>
             {dbImage && (
               <div style={{ display: 'flex', gap: 4, marginBottom: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
                 {[['↺', () => setDbRotation(r => r - 90)], ['↻', () => setDbRotation(r => r + 90)], ['⟳', () => { setDbScale(1); setDbRotation(0); setDbPosition({ x:0,y:0 }); setDbCroppedImage(null); }]].map(([l, fn]: any) => (
-                  <button key={l} onClick={fn} style={{ fontSize:'0.68rem', padding:'3px 9px', border:'1px solid rgba(160,140,220,0.25)', borderRadius:4, background:'rgba(255,255,255,0.07)', cursor:'pointer', color:'rgba(180,210,255,0.65)' }}>{l}</button>
+                  <button key={l} onClick={fn} style={{ fontSize:'0.68rem', padding:'3px 9px', border:'1px solid rgba(160,140,220,0.25)', borderRadius:4, background:'rgba(255,255,255,0.07)', cursor:'pointer', color:'var(--tp-text2)' }}>{l}</button>
                 ))}
               </div>
             )}
             {dbImage && (
               <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
-                <span style={{ fontSize:'0.65rem', color:'rgba(180,210,255,0.5)', flexShrink:0 }}>🔍</span>
+                <span style={{ fontSize:'0.65rem', color:'var(--tp-muted)', flexShrink:0 }}>🔍</span>
                 <input type="range" min="0.3" max="5" step="0.05" value={dbScale}
                   onChange={e => setDbScale(parseFloat(e.target.value))} style={{ flex:1, accentColor:'#c084fc' }} />
-                <span style={{ fontSize:'0.68rem', color:'rgba(180,210,255,0.5)', width:28, textAlign:'right' }}>{dbScale.toFixed(1)}×</span>
+                <span style={{ fontSize:'0.68rem', color:'var(--tp-muted)', width:28, textAlign:'right' }}>{dbScale.toFixed(1)}×</span>
               </div>
             )}
             <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} style={{ display:'none' }} />
-            <button onClick={() => fileInputRef.current?.click()} style={{ width:'100%', padding:'0.5rem', border:'1.5px dashed rgba(160,140,220,0.35)', borderRadius:8, background:'rgba(192,132,252,0.1)', color:'rgba(180,210,255,0.65)', fontSize:'0.8rem', cursor:'pointer', fontWeight:700 }}>
+            <button onClick={() => fileInputRef.current?.click()} style={{ width:'100%', padding:'0.5rem', border:'1.5px dashed rgba(160,140,220,0.35)', borderRadius:8, background:'rgba(192,132,252,0.1)', color:'var(--tp-text2)', fontSize:'0.8rem', cursor:'pointer', fontWeight:700 }}>
               📁 Upload Image
             </button>
             {dbImage && (
@@ -1431,13 +1431,13 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
             <label className="tp-label">Action Names</label>
             <div style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, padding:'12px 14px', display:'flex', flexDirection:'column', gap:10 }}>
 
-              <div style={{ background:'rgba(192,132,252,0.1)', border:'1px solid rgba(160,140,220,0.15)', borderRadius:8, padding:'8px 10px', fontSize:'0.72rem', color:'rgba(180,210,255,0.65)', lineHeight:1.5 }}>
+              <div style={{ background:'rgba(192,132,252,0.1)', border:'1px solid rgba(160,140,220,0.15)', borderRadius:8, padding:'8px 10px', fontSize:'0.72rem', color:'var(--tp-text2)', lineHeight:1.5 }}>
                 🔒 <strong>Stats are sealed</strong> — HP and damage values are rolled randomly when a student opens their pack. Only name the actions here.
               </div>
 
               {/* Weak action */}
               <div>
-                <div style={{ fontSize:'0.72rem', color:'rgba(180,210,255,0.5)', fontWeight:700, marginBottom:4 }}>⚡ Weak Action <span style={{ fontWeight:400, color:'rgba(180,210,255,0.4)' }}>({currentRange.weakMin}–{currentRange.weakMax} dmg when opened)</span></div>
+                <div style={{ fontSize:'0.72rem', color:'var(--tp-muted)', fontWeight:700, marginBottom:4 }}>⚡ Weak Action <span style={{ fontWeight:400, color:'var(--tp-muted)' }}>({currentRange.weakMin}–{currentRange.weakMax} dmg when opened)</span></div>
                 <input type="text" className="tp-input"
                   placeholder="e.g. Quick Scratch" value={weakActionName}
                   onChange={e => setWeakActionName(e.target.value)} />
@@ -1445,16 +1445,16 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
 
               {/* Strong action */}
               <div>
-                <div style={{ fontSize:'0.72rem', color:'rgba(180,210,255,0.5)', fontWeight:700, marginBottom:4 }}>💥 Strong Action <span style={{ fontWeight:400, color:'rgba(180,210,255,0.4)' }}>({currentRange.strongMin}–{currentRange.strongMax} dmg when opened)</span></div>
+                <div style={{ fontSize:'0.72rem', color:'var(--tp-muted)', fontWeight:700, marginBottom:4 }}>💥 Strong Action <span style={{ fontWeight:400, color:'var(--tp-muted)' }}>({currentRange.strongMin}–{currentRange.strongMax} dmg when opened)</span></div>
                 <input type="text" className="tp-input"
                   placeholder="e.g. Thunder Strike" value={strongActionName}
                   onChange={e => setStrongActionName(e.target.value)} />
               </div>
 
               {/* HP range info */}
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:6, borderTop:'1px solid rgba(255,255,255,0.08)', fontSize:'0.72rem', color:'rgba(180,210,255,0.5)' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:6, borderTop:'1px solid rgba(255,255,255,0.08)', fontSize:'0.72rem', color:'var(--tp-muted)' }}>
                 <span>❤️ Hit Points</span>
-                <span style={{ fontWeight:700, color:'rgba(180,210,255,0.7)' }}>{currentRange.hpMin}–{currentRange.hpMax} (rolled on open)</span>
+                <span style={{ fontWeight:700, color:'var(--tp-text2)' }}>{currentRange.hpMin}–{currentRange.hpMax} (rolled on open)</span>
               </div>
             </div>
           </div>
@@ -1463,8 +1463,8 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
           <div style={{ background: isRareExclusive ? 'rgba(192,132,252,0.1)' : 'rgba(255,255,255,0.4)', border:`1.5px solid ${isRareExclusive ? 'rgba(245,158,11,0.3)' : 'rgba(180,160,220,0.2)'}`, borderRadius:12, padding:'10px 14px' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: isRareExclusive ? 8 : 0 }}>
               <div>
-                <div style={{ fontSize:'0.8rem', fontWeight:800, color: isRareExclusive ? '#c084fc' : 'rgba(180,210,255,0.6)' }}>🌟 Rare Exclusive</div>
-                <div style={{ fontSize:'0.65rem', color:'rgba(180,210,255,0.5)', marginTop:2 }}>Limit how many students can own this card</div>
+                <div style={{ fontSize:'0.8rem', fontWeight:800, color: isRareExclusive ? '#c084fc' : 'var(--tp-text2)' }}>🌟 Rare Exclusive</div>
+                <div style={{ fontSize:'0.65rem', color:'var(--tp-muted)', marginTop:2 }}>Limit how many students can own this card</div>
               </div>
               <button onClick={() => setIsRareExclusive(v => !v)} style={{ padding:'4px 14px', borderRadius:20, fontSize:'0.75rem', fontWeight:800, border:'none', cursor:'pointer', background: isRareExclusive ? 'rgba(192,132,252,0.2)' : 'rgba(255,255,255,0.08)', color: isRareExclusive ? '#92400e' : '#8090b0' }}>
                 {isRareExclusive ? 'ON' : 'OFF'}
@@ -1475,7 +1475,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
                 <label className="tp-label" style={{ margin:0, flexShrink:0 }}>Max copies:</label>
                 <input type="number" min={1} max={50} value={maxCopies} onChange={e => setMaxCopies(parseInt(e.target.value)||1)}
                   className="tp-input" style={{ width:70, textAlign:'center' }} />
-                <span style={{ fontSize:'0.7rem', color:'rgba(180,210,255,0.5)' }}>students can own this</span>
+                <span style={{ fontSize:'0.7rem', color:'var(--tp-muted)' }}>students can own this</span>
               </div>
             )}
           </div>
@@ -1509,10 +1509,10 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
           {/* Sealed badge */}
           <div style={{ background:'rgba(192,132,252,0.08)', border:'1px solid rgba(192,132,252,0.2)', borderRadius:12, padding:'10px 14px', textAlign:'center' }}>
             <div style={{ fontSize:'0.8rem', fontWeight:800, color:'#c084fc' }}>🔒 Stats Sealed</div>
-            <div style={{ fontSize:'0.68rem', color:'rgba(180,210,255,0.65)', marginTop:3, lineHeight:1.4 }}>
+            <div style={{ fontSize:'0.68rem', color:'var(--tp-text2)', marginTop:3, lineHeight:1.4 }}>
               HP, damage & skill points are rolled<br/>randomly when a student opens their pack
             </div>
-            <div style={{ display:'flex', justifyContent:'center', gap:12, marginTop:8, fontSize:'0.7rem', color:'rgba(180,210,255,0.5)' }}>
+            <div style={{ display:'flex', justifyContent:'center', gap:12, marginTop:8, fontSize:'0.7rem', color:'var(--tp-muted)' }}>
               <span>❤️ {currentRange.hpMin}–{currentRange.hpMax}</span>
               <span>⚡ {currentRange.weakMin}–{currentRange.weakMax}</span>
               <span>💥 {currentRange.strongMin}–{currentRange.strongMax}</span>
@@ -1529,7 +1529,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
             {saving ? 'Saving…' : '💾 Add to Card Database'}
           </button>
 
-          <p style={{ fontSize:'0.65rem', color:'rgba(180,210,255,0.45)', textAlign:'center', margin:0, fontStyle:'italic' }}>
+          <p style={{ fontSize:'0.65rem', color:'var(--tp-muted)', textAlign:'center', margin:0, fontStyle:'italic' }}>
             This card will appear in packs students buy with star points
           </p>
         </div>
@@ -1673,10 +1673,10 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
   const inputStyle: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 8,
     border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)',
-    color: 'rgba(210,230,255,0.9)', fontSize: '0.8rem', outline: 'none',
+    color: 'var(--tp-text)', fontSize: '0.8rem', outline: 'none',
   };
   const labelStyle: React.CSSProperties = {
-    fontSize: '0.65rem', color: 'rgba(180,210,255,0.45)', letterSpacing: '0.1em',
+    fontSize: '0.65rem', color: 'var(--tp-muted)', letterSpacing: '0.1em',
     textTransform: 'uppercase', marginBottom: 4, display: 'block',
   };
 
@@ -1693,7 +1693,7 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
               <div style={{ fontWeight: 900, fontSize: '1rem', background: 'linear-gradient(135deg,#c084fc,#818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
                 ✏️ Edit Card
               </div>
-              <button onClick={() => setEditCard(null)} style={{ background: 'none', border: 'none', color: 'rgba(180,210,255,0.4)', fontSize: '1.2rem', cursor: 'pointer', lineHeight: 1 }}>✕</button>
+              <button onClick={() => setEditCard(null)} style={{ background: 'none', border: 'none', color: 'var(--tp-muted)', fontSize: '1.2rem', cursor: 'pointer', lineHeight: 1 }}>✕</button>
             </div>
 
             <div style={{ display: 'grid', gap: '1rem' }}>
@@ -1751,7 +1751,7 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
                         ✕ Remove Image
                       </button>
                     )}
-                    <div style={{ fontSize: '0.62rem', color: 'rgba(180,210,255,0.3)', lineHeight: 1.4 }}>
+                    <div style={{ fontSize: '0.62rem', color: 'var(--tp-muted)', lineHeight: 1.4 }}>
                       PNG, JPG or WebP · auto-converted to WebP · max 5MB
                     </div>
                   </div>
@@ -1815,7 +1815,7 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
 
       <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: '18px 24px', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
         <div style={{ fontSize: '1rem', fontWeight: 900, marginBottom: 4, background: 'linear-gradient(135deg,#c084fc,#818cf8,#38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>🃏 Card Database</div>
-        <div style={{ fontSize: '0.8rem', color: 'rgba(180,210,255,0.7)', lineHeight: 1.5 }}>
+        <div style={{ fontSize: '0.8rem', color: 'var(--tp-text2)', lineHeight: 1.5 }}>
           All characters available in student card packs. Use <strong style={{ color: 'rgba(192,132,252,0.9)' }}>Card Creation</strong> to add new characters.
         </div>
       </div>
@@ -1823,11 +1823,11 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
       {/* Filter pills + refresh */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button onClick={() => handleFilterChange('all')} style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === 'all' ? '2px solid rgba(192,132,252,0.7)' : '1px solid rgba(255,255,255,0.1)', background: filter === 'all' ? 'rgba(192,132,252,0.18)' : 'rgba(255,255,255,0.05)', color: filter === 'all' ? '#c084fc' : 'rgba(180,210,255,0.5)' }}>
+          <button onClick={() => handleFilterChange('all')} style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === 'all' ? '2px solid rgba(192,132,252,0.7)' : '1px solid rgba(255,255,255,0.1)', background: filter === 'all' ? 'rgba(192,132,252,0.18)' : 'rgba(255,255,255,0.05)', color: filter === 'all' ? '#c084fc' : 'var(--tp-muted)' }}>
             ✦ All <span style={{ opacity: 0.6 }}>({deckCounts['all'] ?? 0})</span>
           </button>
           {DB_DECK_OPTIONS.map(d => (
-            <button key={d.id} onClick={() => handleFilterChange(d.id)} style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === d.id ? `2px solid ${d.color}` : '1px solid rgba(255,255,255,0.1)', background: filter === d.id ? `${d.color}22` : 'rgba(255,255,255,0.05)', color: filter === d.id ? d.color : 'rgba(180,210,255,0.5)' }}>
+            <button key={d.id} onClick={() => handleFilterChange(d.id)} style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === d.id ? `2px solid ${d.color}` : '1px solid rgba(255,255,255,0.1)', background: filter === d.id ? `${d.color}22` : 'rgba(255,255,255,0.05)', color: filter === d.id ? d.color : 'var(--tp-muted)' }}>
               {d.label} <span style={{ opacity: 0.6 }}>({deckCounts[d.id] ?? 0})</span>
             </button>
           ))}
@@ -1837,11 +1837,11 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
 
       {/* Cards grid */}
       {loading ? (
-        <div style={{ textAlign: 'center', color: 'rgba(180,210,255,0.5)', fontSize: '0.85rem', padding: 48 }}>Loading…</div>
+        <div style={{ textAlign: 'center', color: 'var(--tp-muted)', fontSize: '0.85rem', padding: 48 }}>Loading…</div>
       ) : cards.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '4rem 2rem', border: '2px dashed rgba(192,132,252,0.15)', borderRadius: 20 }}>
           <div style={{ fontSize: '3rem', marginBottom: 12, opacity: 0.2 }}>🃏</div>
-          <p style={{ fontSize: '0.85rem', color: 'rgba(180,210,255,0.4)', fontStyle: 'italic', margin: 0 }}>
+          <p style={{ fontSize: '0.85rem', color: 'var(--tp-muted)', fontStyle: 'italic', margin: 0 }}>
             {totalCount === 0 ? 'No characters yet — go to Card Creation to add some!' : `No ${filter} characters on this page.`}
           </p>
         </div>
@@ -1858,13 +1858,13 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
                   <div style={{ width: '100%', height: 130, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', opacity: 0.2 }}>🃏</div>
                 )}
                 <div style={{ padding: '10px 12px' }}>
-                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'rgba(210,230,255,0.95)', marginBottom: 3 }}>{c.card_name}</div>
-                  <div style={{ fontSize: '0.65rem', color: 'rgba(180,210,255,0.5)', marginBottom: 8, fontStyle: 'italic', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{c.description}</div>
+                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--tp-text)', marginBottom: 3 }}>{c.card_name}</div>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--tp-muted)', marginBottom: 8, fontStyle: 'italic', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{c.description}</div>
                   <div style={{ display: 'flex', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.6rem', padding: '2px 8px', borderRadius: 20, background: `${dc}22`, color: dc, fontWeight: 700, border: `1px solid ${dc}44` }}>{c.type}</span>
                     {c.is_rare_exclusive && <span style={{ fontSize: '0.6rem', padding: '2px 8px', borderRadius: 20, background: 'rgba(192,132,252,0.15)', color: '#c084fc', fontWeight: 700, border: '1px solid rgba(192,132,252,0.3)' }}>🌟 ×{c.max_copies}</span>}
                   </div>
-                  <div style={{ fontSize: '0.62rem', color: 'rgba(180,210,255,0.45)', marginBottom: 8, display: 'flex', gap: 6 }}>
+                  <div style={{ fontSize: '0.62rem', color: 'var(--tp-muted)', marginBottom: 8, display: 'flex', gap: 6 }}>
                     <span>⚡ {c.move1_name || '—'}</span><span style={{ opacity: 0.4 }}>·</span><span>💥 {c.move2_name || '—'}</span>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -1884,7 +1884,7 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
           <button
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0 || loading}
-            style={{ padding: '5px 12px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 700, cursor: page === 0 ? 'not-allowed' : 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: page === 0 ? 'rgba(180,210,255,0.2)' : 'rgba(180,210,255,0.6)', opacity: page === 0 ? 0.4 : 1 }}
+            style={{ padding: '5px 12px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 700, cursor: page === 0 ? 'not-allowed' : 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: page === 0 ? 'rgba(180,210,255,0.2)' : 'var(--tp-text2)', opacity: page === 0 ? 0.4 : 1 }}
           >← Prev</button>
 
           {Array.from({ length: totalPages }, (_, i) => (
@@ -1897,7 +1897,7 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
                 cursor: 'pointer', transition: 'all 0.15s',
                 border: i === page ? '2px solid rgba(192,132,252,0.7)' : '1px solid rgba(255,255,255,0.1)',
                 background: i === page ? 'rgba(192,132,252,0.18)' : 'rgba(255,255,255,0.05)',
-                color: i === page ? '#c084fc' : 'rgba(180,210,255,0.5)',
+                color: i === page ? '#c084fc' : 'var(--tp-muted)',
               }}
             >
               {pageLabel(i)}
@@ -1907,14 +1907,14 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
           <button
             onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
             disabled={page === totalPages - 1 || loading}
-            style={{ padding: '5px 12px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 700, cursor: page === totalPages - 1 ? 'not-allowed' : 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: page === totalPages - 1 ? 'rgba(180,210,255,0.2)' : 'rgba(180,210,255,0.6)', opacity: page === totalPages - 1 ? 0.4 : 1 }}
+            style={{ padding: '5px 12px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 700, cursor: page === totalPages - 1 ? 'not-allowed' : 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: page === totalPages - 1 ? 'rgba(180,210,255,0.2)' : 'var(--tp-text2)', opacity: page === totalPages - 1 ? 0.4 : 1 }}
           >Next →</button>
         </div>
       )}
 
       {/* Record count */}
       {totalCount > 0 && (
-        <div style={{ textAlign: 'center', fontSize: '0.68rem', color: 'rgba(180,210,255,0.3)', marginTop: -12 }}>
+        <div style={{ textAlign: 'center', fontSize: '0.68rem', color: 'var(--tp-muted)', marginTop: -12 }}>
           Showing {page * CARDS_PER_PAGE + 1}–{Math.min((page + 1) * CARDS_PER_PAGE, totalCount)} of {totalCount} cards
         </div>
       )}
@@ -2117,7 +2117,7 @@ function WeeklyProjectTab({
           <h2 className="font-display font-bold text-xs uppercase tracking-[0.15em] mb-1" style={{ color: '#c084fc' }}>
             📋 Weekly Project Card
           </h2>
-          <p className="text-xs italic" style={{ color: 'rgba(180,210,255,0.5)' }}>
+          <p className="text-xs italic" style={{ color: 'var(--tp-muted)' }}>
             {weeklyProject?.week_label || getCurrentWeekLabel()}
             {weeklyProject?.end_date && ` · Due ${new Date(weeklyProject.end_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`}
             {!weeklyProject?.end_date && ' · Students see this task and earn the card for completing it'}
@@ -2140,7 +2140,7 @@ function WeeklyProjectTab({
               <button onClick={handleOpenAward} className="tp-btn-gold" style={{  }}>
                 🏅 Award Students
               </button>
-              <button onClick={handleNewProject} className="tp-btn-outline" style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(180,210,255,0.6)' }}>
+              <button onClick={handleNewProject} className="tp-btn-outline" style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'var(--tp-text2)' }}>
                 + New Project
               </button>
             </>
@@ -2152,20 +2152,20 @@ function WeeklyProjectTab({
       {weeklyView === 'submissions' && hasProject && (
         <div>
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-bold" style={{ color: 'rgba(210,230,255,0.9)' }}>
+            <h3 className="text-sm font-bold" style={{ color: 'var(--tp-text)' }}>
               Student Submissions — {weeklyTitle}
             </h3>
-            <button onClick={() => loadSubmissions(weeklyProject.id)} className="tp-btn-outline" style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(180,210,255,0.5)' }}>
+            <button onClick={() => loadSubmissions(weeklyProject.id)} className="tp-btn-outline" style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'var(--tp-muted)' }}>
               ↻ Refresh
             </button>
           </div>
 
           {submissionsLoading ? (
-            <div className="text-sm italic text-center py-8" style={{ color: 'rgba(180,210,255,0.5)' }}>Loading submissions…</div>
+            <div className="text-sm italic text-center py-8" style={{ color: 'var(--tp-muted)' }}>Loading submissions…</div>
           ) : submissions.length === 0 ? (
             <div className="text-center py-12" style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, border: '2px dashed rgba(200,160,0,0.2)' }}>
               <div style={{ fontSize: '2.5rem', opacity: 0.2, marginBottom: 8 }}>📭</div>
-              <p className="text-sm italic" style={{ color: 'rgba(180,210,255,0.5)' }}>No pending submissions yet</p>
+              <p className="text-sm italic" style={{ color: 'var(--tp-muted)' }}>No pending submissions yet</p>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
@@ -2174,10 +2174,10 @@ function WeeklyProjectTab({
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     {/* Student info */}
                     <div style={{ flex: 1, minWidth: 180 }}>
-                      <div className="font-bold text-sm mb-1" style={{ color: 'rgba(210,230,255,0.95)' }}>
+                      <div className="font-bold text-sm mb-1" style={{ color: 'var(--tp-text)' }}>
                         {sub.students?.name || 'Unknown student'}
                       </div>
-                      <div className="text-xs italic mb-3" style={{ color: 'rgba(180,210,255,0.5)' }}>
+                      <div className="text-xs italic mb-3" style={{ color: 'var(--tp-muted)' }}>
                         Submitted {new Date(sub.submitted_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                       </div>
                       {/* Photos */}
@@ -2201,14 +2201,14 @@ function WeeklyProjectTab({
                           </a>
                         )}
                         {!sub.photo1_url && !sub.photo2_url && (
-                          <span style={{ fontSize:'0.75rem', fontStyle:'italic', color:'rgba(180,210,255,0.4)' }}>No photos attached</span>
+                          <span style={{ fontSize:'0.75rem', fontStyle:'italic', color:'var(--tp-muted)' }}>No photos attached</span>
                         )}
                       </div>
                     </div>
 
                     {/* Award buttons */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                      <div className="text-xs font-bold mb-1 text-center" style={{ color: 'rgba(180,210,255,0.5)' }}>Award as:</div>
+                      <div className="text-xs font-bold mb-1 text-center" style={{ color: 'var(--tp-muted)' }}>Award as:</div>
                       {([
                         { rar: 'common'    as const, label: '⭐ Common',  color: '#a78bfa', bg: 'rgba(167,139,250,0.12)',   border: 'rgba(200,160,0,0.35)' },
                         { rar: 'silver'    as const, label: '✦ Silver',   color: '#5a7a90', bg: 'rgba(56,189,248,0.1)', border: 'rgba(120,160,190,0.4)' },
@@ -2251,12 +2251,12 @@ function WeeklyProjectTab({
               <textarea className="tp-input" style={{ minHeight: 90 }}
                 placeholder="e.g. Create a poster showing the 8 planets in our solar system..."
                 value={weeklyTask} onChange={e => setWeeklyTask(e.target.value)} />
-              <p className="text-xs mt-1 italic" style={{ color: 'rgba(180,210,255,0.5)' }}>This text appears as the task on the student's page.</p>
+              <p className="text-xs mt-1 italic" style={{ color: 'var(--tp-muted)' }}>This text appears as the task on the student's page.</p>
             </div>
 
             <div className="mb-4">
               <label className="tp-label">
-                Card Character Style <span className="text-xs" style={{ color: 'rgba(180,210,255,0.5)' }}>(optional)</span>
+                Card Character Style <span className="text-xs" style={{ color: 'var(--tp-muted)' }}>(optional)</span>
               </label>
               <input type="text" className="tp-input"
                 placeholder="e.g. space explorer robot, planet dragon, cosmic owl…"
@@ -2266,14 +2266,14 @@ function WeeklyProjectTab({
             {/* End date */}
             <div className="mb-5">
               <label className="tp-label">
-                Due Date <span className="text-xs" style={{ color: 'rgba(180,210,255,0.5)' }}>(optional — shown to students)</span>
+                Due Date <span className="text-xs" style={{ color: 'var(--tp-muted)' }}>(optional — shown to students)</span>
               </label>
               <input type="date" className="tp-input"
                 value={weeklyEndDate} onChange={e => setWeeklyEndDate(e.target.value)}
                 min={new Date().toISOString().slice(0, 10)}
               />
               {weeklyEndDate && (
-                <button onClick={() => setWeeklyEndDate('')} className="text-xs mt-1" style={{ color: 'rgba(180,210,255,0.5)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                <button onClick={() => setWeeklyEndDate('')} className="text-xs mt-1" style={{ color: 'var(--tp-muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
                   Clear date
                 </button>
               )}
@@ -2302,16 +2302,16 @@ function WeeklyProjectTab({
                 </div>
                 <div className="p-5 rounded-xs" style={{ background:'rgba(255,255,255,0.07)', border:'1.5px solid rgba(255,255,255,0.9)', borderRadius:20 }}>
                   <div className="text-xs uppercase tracking-widest mb-2" style={{ color: '#c084fc',  }}>📋 Student View Preview</div>
-                  <h3 className="font-display font-black text-base mb-2" style={{ color: 'rgba(210,230,255,0.95)' }}>{weeklyTitle || 'Project Title'}</h3>
+                  <h3 className="font-display font-black text-base mb-2" style={{ color: 'var(--tp-text)' }}>{weeklyTitle || 'Project Title'}</h3>
                   {weeklyEndDate && <p className="text-xs font-bold mb-2" style={{ color: '#f472b6' }}>📅 Due: {new Date(weeklyEndDate).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' })}</p>}
-                  <p className="text-sm" style={{ color: 'rgba(210,230,255,0.9)', lineHeight: 1.7 }}>{weeklyTask || 'Task description will appear here.'}</p>
+                  <p className="text-sm" style={{ color: 'var(--tp-text)', lineHeight: 1.7 }}>{weeklyTask || 'Task description will appear here.'}</p>
                   {hasProject && <div className="mt-3 text-xs" style={{ color: '#4cba80', fontWeight: 700 }}>✓ Published · Students can see this</div>}
                 </div>
               </>
             ) : (
               <div className="flex flex-col items-center justify-center rounded-xs" style={{ minHeight: 380, border: '2px dashed rgba(200,160,0,0.2)', background: 'rgba(255,255,255,0.04)' }}>
                 <span className="text-5xl mb-3" style={{ opacity: 0.2 }}>📋</span>
-                <span className="text-sm italic" style={{ color: 'rgba(180,210,255,0.5)' }}>Fill in the task and click Generate</span>
+                <span className="text-sm italic" style={{ color: 'var(--tp-muted)' }}>Fill in the task and click Generate</span>
               </div>
             )}
           </div>
@@ -2322,9 +2322,9 @@ function WeeklyProjectTab({
       {awardModal && (
         <div className="tp-modal-bg" onClick={() => { if (!awarding) setAwardModal(false); }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'rgba(10,18,48,0.92)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 20, padding: '2rem', width: '95%', maxWidth: 780, maxHeight: '90vh', overflowY: 'auto', position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
-            <button onClick={() => setAwardModal(false)} style={{ position: 'absolute', top: 14, right: 16, background: 'none', border: 'none', fontSize: '1.3rem', cursor: 'pointer', color: 'rgba(180,210,255,0.6)' }}>✕</button>
-            <h3 className="font-display font-black text-xl mb-1" style={{ color: 'rgba(210,230,255,0.95)' }}>🏅 Award "{weeklyTitle}"</h3>
-            <p className="text-xs mb-5 italic" style={{ color: 'rgba(180,210,255,0.5)' }}>Tick each student in the column matching their achievement level. Each student can only receive one rarity.</p>
+            <button onClick={() => setAwardModal(false)} style={{ position: 'absolute', top: 14, right: 16, background: 'none', border: 'none', fontSize: '1.3rem', cursor: 'pointer', color: 'var(--tp-text2)' }}>✕</button>
+            <h3 className="font-display font-black text-xl mb-1" style={{ color: 'var(--tp-text)' }}>🏅 Award "{weeklyTitle}"</h3>
+            <p className="text-xs mb-5 italic" style={{ color: 'var(--tp-muted)' }}>Tick each student in the column matching their achievement level. Each student can only receive one rarity.</p>
             {awardError && <div className="tp-err mb-4 text-sm">{awardError}</div>}
             <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
               {([
@@ -2336,19 +2336,19 @@ function WeeklyProjectTab({
                   <div className="text-center mb-3">
                     <div className="text-2xl mb-1">{col.icon}</div>
                     <div style={{ fontWeight:800, fontSize:'0.85rem', color:col.color }}>{col.label}</div>
-                    <div className="text-xs italic" style={{ color: 'rgba(180,210,255,0.5)' }}>{col.desc}</div>
+                    <div className="text-xs italic" style={{ color: 'var(--tp-muted)' }}>{col.desc}</div>
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    {students.length === 0 && <span className="text-xs italic" style={{ color: 'rgba(180,210,255,0.5)' }}>No students</span>}
+                    {students.length === 0 && <span className="text-xs italic" style={{ color: 'var(--tp-muted)' }}>No students</span>}
                     {students.map((s: any) => {
                       const selected = awardSelections[s.id] === col.key;
                       const selectedOther = awardSelections[s.id] && awardSelections[s.id] !== col.key;
                       return (
                         <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, cursor: 'pointer', background: selected ? col.bg : 'transparent', border: selected ? `1.5px solid ${col.border}` : '1.5px solid transparent', opacity: selectedOther ? 0.4 : 1, transition: 'all 0.15s' }}>
                           <input type="checkbox" checked={selected} onChange={() => handleToggleStudent(s.id, col.key)} style={{ accentColor: col.color, width: 16, height: 16, flexShrink: 0 }} />
-                          <span className="text-sm font-semibold" style={{ color: 'rgba(210,230,255,0.95)' }}>{s.name}</span>
+                          <span className="text-sm font-semibold" style={{ color: 'var(--tp-text)' }}>{s.name}</span>
                           {selected && <span style={{ fontSize:'0.72rem', marginLeft:'auto', color:col.color }}>✓</span>}
-                          {selectedOther && <span className="text-xs ml-auto italic" style={{ color: 'rgba(180,210,255,0.5)' }}>→ {awardSelections[s.id]}</span>}
+                          {selectedOther && <span className="text-xs ml-auto italic" style={{ color: 'var(--tp-muted)' }}>→ {awardSelections[s.id]}</span>}
                         </label>
                       );
                     })}
@@ -2358,13 +2358,13 @@ function WeeklyProjectTab({
             </div>
             <div className="mt-5 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
               <div className="flex items-center justify-between flex-wrap gap-3">
-                <div className="text-sm" style={{ color: 'rgba(210,230,255,0.9)' }}>
+                <div className="text-sm" style={{ color: 'var(--tp-text)' }}>
                   {awardCount > 0
                     ? <>Awarding to <strong>{awardCount}</strong> student{awardCount !== 1 ? 's' : ''}: {Object.entries(awardSelections).map(([sid, rar]: any) => `${students.find((s: any) => s.id === sid)?.name || sid} (${rar})`).join(', ')}</>
-                    : <span className="italic" style={{ color: 'rgba(180,210,255,0.5)' }}>No students selected yet</span>}
+                    : <span className="italic" style={{ color: 'var(--tp-muted)' }}>No students selected yet</span>}
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => setAwardModal(false)} className="tp-btn-outline" style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(180,210,255,0.6)' }}>Cancel</button>
+                  <button onClick={() => setAwardModal(false)} className="tp-btn-outline" style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'var(--tp-text2)' }}>Cancel</button>
                   <button onClick={handleAward} disabled={awarding || awardCount === 0} className="tp-btn-gold" style={{ opacity: awardCount === 0 ? 0.4 : 1,  }}>
                     {awarding ? 'Awarding…' : `🏅 Award ${awardCount > 0 ? awardCount + ' Student' + (awardCount !== 1 ? 's' : '') : ''}`}
                   </button>
