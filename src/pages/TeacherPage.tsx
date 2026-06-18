@@ -1931,7 +1931,6 @@ function WeeklyProjectTab({
   students, session,
   weeklyTask, setWeeklyTask,
   weeklyTitle, setWeeklyTitle,
-  weeklyCharHint,
   weeklyCard, setWeeklyCard,
   weeklyProject, setWeeklyProject,
   weeklyStatus, setWeeklyStatus,
