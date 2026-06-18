@@ -122,7 +122,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
   const [awardError, setAwardError] = useState('');
   const [awarding, setAwarding] = useState(false);
   const [weeklyEndDate, setWeeklyEndDate] = useState('');
-  const [weeklyView, setWeeklyView] = useState<'project'|'submissions'>('project');
+  const [weeklyView, setWeeklyView] = useState<'project'|'submissions'|'bank'>('project');
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [submissionsLoading, setSubmissionsLoading] = useState(false);
 
@@ -1973,6 +1973,61 @@ function WeeklyProjectTab({
     load();
   }, [session.user.id]);
 
+  // ── Challenge Bank ────────────────────────────────────────────────
+  const [challengeBank, setChallengeBank] = React.useState<any[]>([]);
+  const [bankLoading, setBankLoading] = React.useState(false);
+  const [bankDeleting, setBankDeleting] = React.useState<string | null>(null);
+
+  const loadChallengeBank = React.useCallback(async () => {
+    setBankLoading(true);
+    try {
+      const { data } = await sb
+        .from('weekly_projects')
+        .select('*')
+        .eq('teacher_id', session.user.id)
+        .order('created_at', { ascending: false });
+      setChallengeBank(data || []);
+    } catch { setChallengeBank([]); }
+    setBankLoading(false);
+  }, [session.user.id]);
+
+  React.useEffect(() => { loadChallengeBank(); }, [loadChallengeBank]);
+
+  const handleLoadChallenge = (c: any) => {
+    setWeeklyProject(c);
+    setWeeklyTitle(c.title || '');
+    setWeeklyTask(c.task || '');
+    setWeeklyCard(c.card_data || null);
+    setWeeklyEndDate(c.end_date || '');
+    setWeeklyStatus('');
+    setAwardSelections({});
+    setSubmissions([]);
+    // try to match the stored card back to a project card in the picker
+    if (c.card_data?.card_name) {
+      const match = projectCards.find((p: any) => p.card_name === c.card_data.card_name);
+      setPickedCardId(match ? match.id : null);
+    } else {
+      setPickedCardId(null);
+    }
+    setWeeklyView('project');
+  };
+
+  const handleDeleteChallenge = async (id: string) => {
+    if (!window.confirm('Delete this challenge from the bank? This cannot be undone.')) return;
+    setBankDeleting(id);
+    try {
+      await sb.from('weekly_projects').delete().eq('id', id);
+      if (weeklyProject?.id === id) {
+        setWeeklyProject(null);
+        setWeeklyTitle(''); setWeeklyTask('');
+        setWeeklyCard(null); setWeeklyEndDate('');
+        setPickedCardId(null);
+      }
+      await loadChallengeBank();
+    } catch { /* ignore */ }
+    setBankDeleting(null);
+  };
+
   const handlePickCard = (card: any) => {
     setPickedCardId(card.id);
     const rarity = (card.rarity as any) || 'gold-rare';
@@ -2012,17 +2067,17 @@ function WeeklyProjectTab({
     setSubmissionsLoading(false);
   };
 
-  // ── Save / publish the weekly project ───────────────────────────
-  const handleSaveProject = async () => {
-    if (!weeklyCard) { setWErr('Select a Project Card first.'); return; }
-    setWWorking('Saving project…');
+  // ── Save to Bank (draft — students don't see it yet) ─────────────
+  const handleSaveToBank = async () => {
+    if (!weeklyTitle.trim()) { setWErr('Give the challenge a title first.'); return; }
+    setWWorking('Saving to Challenge Bank…');
     try {
       const payload: any = {
         teacher_id: session.user.id,
         title: weeklyTitle,
         task: weeklyTask,
-        char_hint: weeklyCharHint,
-        card_data: weeklyCard,
+        char_hint: '',
+        card_data: weeklyCard || null,
         week_label: getCurrentWeekLabel(),
         end_date: weeklyEndDate || null,
       };
@@ -2035,7 +2090,38 @@ function WeeklyProjectTab({
         saved = data;
       }
       setWeeklyProject(saved);
-      setWDone('Weekly project published! Students can now see it.');
+      await loadChallengeBank();
+      setWDone('✓ Saved to Challenge Bank!');
+    } catch (err: any) { setWErr(err.message); }
+  };
+
+  // ── Publish Challenge (makes it live for students) ───────────────
+  const handleSaveProject = async () => {
+    if (!weeklyCard) { setWErr('Select a Project Card first.'); return; }
+    if (!weeklyTitle.trim()) { setWErr('Give the challenge a title first.'); return; }
+    setWWorking('Publishing challenge…');
+    try {
+      const payload: any = {
+        teacher_id: session.user.id,
+        title: weeklyTitle,
+        task: weeklyTask,
+        char_hint: '',
+        card_data: weeklyCard,
+        week_label: getCurrentWeekLabel(),
+        end_date: weeklyEndDate || null,
+        created_at: new Date().toISOString(), // bump so this becomes the active challenge students see
+      };
+      let saved;
+      if (weeklyProject?.id) {
+        const { data } = await sb.from('weekly_projects').update(payload).eq('id', weeklyProject.id).select().single();
+        saved = data;
+      } else {
+        const { data } = await sb.from('weekly_projects').insert(payload).select().single();
+        saved = data;
+      }
+      setWeeklyProject(saved);
+      await loadChallengeBank();
+      setWDone('🚀 Challenge published! Students can now see it.');
     } catch (err: any) { setWErr(err.message); }
   };
 
@@ -2046,6 +2132,7 @@ function WeeklyProjectTab({
     setWeeklyCard(null); setWeeklyStatus(''); setWeeklyEndDate('');
     setAwardSelections({}); setSubmissions([]);
     setPickedCardId(null);
+    setWeeklyView('project');
   };
 
   // ── Award a single student from submissions view ─────────────────
@@ -2127,38 +2214,122 @@ function WeeklyProjectTab({
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
           <h2 className="font-display font-bold text-xs uppercase tracking-[0.15em] mb-1" style={{ color: '#c084fc' }}>
-            📋 Weekly Project Card
+            🏆 Aurabot Weekly Challenge
           </h2>
           <p className="text-xs italic" style={{ color: 'var(--tp-muted)' }}>
             {weeklyProject?.week_label || getCurrentWeekLabel()}
             {weeklyProject?.end_date && ` · Due ${new Date(weeklyProject.end_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`}
-            {!weeklyProject?.end_date && ' · Students see this task and earn the card for completing it'}
+            {!weeklyProject?.end_date && ' · Students see this challenge and earn the card for completing it'}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          {/* View toggle */}
+          <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <button
+              onClick={() => setWeeklyView('project')}
+              style={{ padding: '5px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', border: 'none', background: weeklyView === 'project' ? 'rgba(192,132,252,0.2)' : 'transparent', color: weeklyView === 'project' ? '#c084fc' : '#9a7040' }}
+            >🏆 Challenge</button>
+            <button
+              onClick={() => { setWeeklyView('bank'); loadChallengeBank(); }}
+              style={{ padding: '5px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', border: 'none', borderLeft: '1px solid rgba(90,50,10,0.2)', background: weeklyView === 'bank' ? 'rgba(192,132,252,0.2)' : 'transparent', color: weeklyView === 'bank' ? '#c084fc' : '#9a7040' }}
+            >🗄️ Bank {challengeBank.length > 0 && <span style={{ background: 'rgba(192,132,252,0.25)', color: '#c084fc', borderRadius: '50%', padding: '1px 5px', fontSize: '0.62rem', marginLeft: 4 }}>{challengeBank.length}</span>}</button>
+            {hasProject && (
+              <button
+                onClick={handleViewSubmissions}
+                style={{ padding: '5px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', border: 'none', borderLeft: '1px solid rgba(90,50,10,0.2)', background: weeklyView === 'submissions' ? 'rgba(192,132,252,0.2)' : 'transparent', color: weeklyView === 'submissions' ? '#c084fc' : '#9a7040' }}
+              >📥 Submissions {submissions.length > 0 && <span style={{ background: 'linear-gradient(135deg,#f472b6,#c084fc)', color: 'white', borderRadius: '50%', padding: '1px 5px', fontSize: '0.62rem', marginLeft: 4 }}>{submissions.length}</span>}</button>
+            )}
+          </div>
           {hasProject && (
-            <>
-              {/* View toggle */}
-              <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <button
-                  onClick={() => setWeeklyView('project')}
-                  style={{ padding: '5px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', border: 'none', background: weeklyView === 'project' ? 'rgba(192,132,252,0.2)' : 'transparent', color: weeklyView === 'project' ? '#8b6a00' : '#9a7040' }}
-                >📋 Project</button>
-                <button
-                  onClick={handleViewSubmissions}
-                  style={{ padding: '5px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', border: 'none', borderLeft: '1px solid rgba(90,50,10,0.2)', background: weeklyView === 'submissions' ? 'rgba(192,132,252,0.2)' : 'transparent', color: weeklyView === 'submissions' ? '#8b6a00' : '#9a7040' }}
-                >📥 Submissions {submissions.length > 0 && <span style={{ background: 'linear-gradient(135deg,#f472b6,#c084fc)', color: 'white', borderRadius: '50%', padding: '1px 5px', fontSize: '0.62rem', marginLeft: 4 }}>{submissions.length}</span>}</button>
-              </div>
-              <button onClick={handleOpenAward} className="tp-btn-gold" style={{  }}>
-                🏅 Award Students
-              </button>
-              <button onClick={handleNewProject} className="tp-btn-outline" style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'var(--tp-text2)' }}>
-                + New Project
-              </button>
-            </>
+            <button onClick={handleOpenAward} className="tp-btn-gold">
+              🏅 Award Students
+            </button>
           )}
+          <button onClick={handleNewProject} className="tp-btn-outline" style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'var(--tp-text2)' }}>
+            + New Challenge
+          </button>
         </div>
       </div>
+
+      {/* ══ CHALLENGE BANK VIEW ══════════════════════════════════════ */}
+      {weeklyView === 'bank' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-bold" style={{ color: 'var(--tp-text)' }}>🗄️ Challenge Bank</h3>
+              <p className="text-xs italic" style={{ color: 'var(--tp-muted)' }}>All your saved challenges. Load any one to edit or publish it.</p>
+            </div>
+            <button onClick={() => { handleNewProject(); }} className="tp-btn-primary" style={{ fontSize: '0.75rem' }}>
+              + Create New
+            </button>
+          </div>
+
+          {bankLoading ? (
+            <div className="text-sm italic text-center py-12" style={{ color: 'var(--tp-muted)' }}>Loading challenges…</div>
+          ) : challengeBank.length === 0 ? (
+            <div className="text-center py-16" style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, border: '2px dashed rgba(192,132,252,0.2)' }}>
+              <div style={{ fontSize: '2.5rem', opacity: 0.2, marginBottom: 8 }}>🏆</div>
+              <p className="text-sm italic" style={{ color: 'var(--tp-muted)' }}>No challenges saved yet. Create your first one!</p>
+            </div>
+          ) : (
+            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+              {challengeBank.map((c: any) => {
+                const isActive = weeklyProject?.id === c.id;
+                const cardImg = c.card_data?.image_url;
+                const cardName = c.card_data?.card_name;
+                const publishedDate = c.created_at ? new Date(c.created_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+                return (
+                  <div key={c.id} style={{
+                    borderRadius: 16, overflow: 'hidden',
+                    border: isActive ? '2px solid #c084fc' : '1.5px solid rgba(255,255,255,0.09)',
+                    background: isActive ? 'rgba(192,132,252,0.07)' : 'rgba(255,255,255,0.05)',
+                    transition: 'all 0.15s',
+                  }}>
+                    {/* Card image strip */}
+                    <div style={{ height: 80, background: 'rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
+                      {cardImg ? (
+                        <img src={cardImg} alt={cardName} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }} />
+                      ) : (
+                        <span style={{ fontSize: '2rem', opacity: 0.15 }}>📋</span>
+                      )}
+                      {isActive && (
+                        <div style={{ position: 'absolute', top: 8, right: 8, background: '#c084fc', color: 'white', fontSize: '0.6rem', fontWeight: 900, padding: '2px 8px', borderRadius: 99, letterSpacing: '0.05em' }}>
+                          ACTIVE
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ padding: '14px 16px' }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--tp-text)', marginBottom: 4 }}>{c.title || 'Untitled Challenge'}</div>
+                      {cardName && <div style={{ fontSize: '0.7rem', color: '#f97316', marginBottom: 4, fontWeight: 600 }}>📋 {cardName}</div>}
+                      <div style={{ fontSize: '0.68rem', color: 'var(--tp-muted)', marginBottom: 2 }}>
+                        {c.task ? `${c.task.slice(0, 80)}${c.task.length > 80 ? '…' : ''}` : <em>No task description</em>}
+                      </div>
+                      {publishedDate && <div style={{ fontSize: '0.63rem', color: 'var(--tp-muted)', marginTop: 6, opacity: 0.6 }}>Last published {publishedDate}</div>}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 8, padding: '0 16px 14px' }}>
+                      <button
+                        onClick={() => handleLoadChallenge(c)}
+                        style={{ flex: 1, padding: '7px 0', borderRadius: 9, fontSize: '0.73rem', fontWeight: 800, cursor: 'pointer', border: '1.5px solid rgba(192,132,252,0.4)', background: 'rgba(192,132,252,0.1)', color: '#c084fc', transition: 'all 0.15s' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(192,132,252,0.2)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(192,132,252,0.1)')}
+                      >✏️ Load & Edit</button>
+                      <button
+                        onClick={() => handleDeleteChallenge(c.id)}
+                        disabled={bankDeleting === c.id}
+                        style={{ padding: '7px 12px', borderRadius: 9, fontSize: '0.73rem', fontWeight: 800, cursor: 'pointer', border: '1.5px solid rgba(239,68,68,0.25)', background: 'transparent', color: 'rgba(239,68,68,0.6)', transition: 'all 0.15s' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >{bankDeleting === c.id ? '…' : '🗑️'}</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ══ SUBMISSIONS VIEW ═════════════════════════════════════════ */}
       {weeklyView === 'submissions' && hasProject && (
@@ -2252,7 +2423,7 @@ function WeeklyProjectTab({
           <div className="p-6 rounded-xs" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(90,50,10,0.18)', boxShadow: '2px 3px 12px rgba(0,0,0,0.09)' }}>
 
             <div className="mb-4">
-              <label className="tp-label">Project Title</label>
+              <label className="tp-label">Challenge Title</label>
               <input type="text" className="tp-input"
                 placeholder="e.g. The Solar System Explorer"
                 value={weeklyTitle} onChange={e => setWeeklyTitle(e.target.value)} />
@@ -2330,11 +2501,16 @@ function WeeklyProjectTab({
               )}
             </div>
 
-            {weeklyCard && (
-              <button onClick={handleSaveProject} className="w-full py-2 rounded-lg text-sm font-bold" style={{ marginTop: 12, background: 'rgba(80,200,120,0.12)', border: '1px solid rgba(80,200,120,0.4)', color: '#4cba80', cursor: 'pointer' }}>
-                {hasProject ? '💾 Update Project' : '🚀 Publish Project'}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button onClick={handleSaveToBank} className="w-full py-2 rounded-lg text-sm font-bold" style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--tp-text2)', cursor: 'pointer' }}>
+                🗄️ Save to Bank
               </button>
-            )}
+              {weeklyCard && (
+                <button onClick={handleSaveProject} className="w-full py-2 rounded-lg text-sm font-bold" style={{ flex: 1, background: 'rgba(80,200,120,0.12)', border: '1px solid rgba(80,200,120,0.4)', color: '#4cba80', cursor: 'pointer' }}>
+                  🚀 Publish Challenge
+                </button>
+              )}
+            </div>
 
             {weeklyStatus && <div className={`tp-status-${weeklyStatusType} mt-3`}>{weeklyStatus}</div>}
           </div>
@@ -2347,17 +2523,17 @@ function WeeklyProjectTab({
                   <PokeCard card={weeklyCard as Card} showShimmerBtn />
                 </div>
                 <div className="p-5 rounded-xs" style={{ background:'rgba(255,255,255,0.07)', border:'1.5px solid rgba(255,255,255,0.9)', borderRadius:20 }}>
-                  <div className="text-xs uppercase tracking-widest mb-2" style={{ color: '#c084fc',  }}>📋 Student View Preview</div>
-                  <h3 className="font-display font-black text-base mb-2" style={{ color: 'var(--tp-text)' }}>{weeklyTitle || 'Project Title'}</h3>
+                  <div className="text-xs uppercase tracking-widest mb-2" style={{ color: '#c084fc' }}>🏆 Student View Preview</div>
+                  <h3 className="font-display font-black text-base mb-2" style={{ color: 'var(--tp-text)' }}>{weeklyTitle || 'Challenge Title'}</h3>
                   {weeklyEndDate && <p className="text-xs font-bold mb-2" style={{ color: '#f472b6' }}>📅 Due: {new Date(weeklyEndDate).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' })}</p>}
                   <p className="text-sm" style={{ color: 'var(--tp-text)', lineHeight: 1.7 }}>{weeklyTask || 'Task description will appear here.'}</p>
-                  {hasProject && <div className="mt-3 text-xs" style={{ color: '#4cba80', fontWeight: 700 }}>✓ Published · Students can see this</div>}
+                  {hasProject && <div className="mt-3 text-xs" style={{ color: '#4cba80', fontWeight: 700 }}>✓ Published · Students can see this challenge</div>}
                 </div>
               </>
             ) : (
               <div className="flex flex-col items-center justify-center rounded-xs" style={{ minHeight: 380, border: '2px dashed rgba(200,160,0,0.2)', background: 'rgba(255,255,255,0.04)' }}>
                 <span className="text-5xl mb-3" style={{ opacity: 0.2 }}>📋</span>
-                <span className="text-sm italic" style={{ color: 'var(--tp-muted)' }}>Fill in the task and click Generate</span>
+                <span className="text-sm italic" style={{ color: 'var(--tp-muted)' }}>Fill in the challenge details and select a card</span>
               </div>
             )}
           </div>
