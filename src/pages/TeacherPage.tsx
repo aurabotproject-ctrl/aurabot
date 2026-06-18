@@ -1181,11 +1181,12 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
 // ══════════════════════════════════════════════════════════════════════
 
 const DB_DECK_OPTIONS = [
-  { id: 'xanimals',  label: '🧬 Xanimals',  color: '#06b6d4' },
-  { id: 'animals',   label: '🐾 Animals',   color: '#22c55e' },
-  { id: 'creatures', label: '👾 Creatures',  color: '#a855f7' },
-  { id: 'humanoids', label: '🧑 Humanoids', color: '#f59e0b' },
-  { id: 'robots',    label: '🤖 Robots',    color: '#3b82f6' },
+  { id: 'xanimals',  label: '🧬 Xanimals',      color: '#06b6d4' },
+  { id: 'animals',   label: '🐾 Animals',        color: '#22c55e' },
+  { id: 'creatures', label: '👾 Creatures',       color: '#a855f7' },
+  { id: 'humanoids', label: '🧑 Humanoids',      color: '#f59e0b' },
+  { id: 'robots',    label: '🤖 Robots',         color: '#3b82f6' },
+  { id: 'project',   label: '📋 Project Cards',  color: '#f97316' },
 ];
 
 const DB_RARITY_OPTIONS = [
@@ -1951,6 +1952,52 @@ function WeeklyProjectTab({
   const setWDone    = (m: string) => { setWeeklyStatus(m); setWeeklyStatusType('done'); setTimeout(() => setWeeklyStatus(''), 2800); };
   const setWErr     = (m: string) => { setWeeklyStatus(m); setWeeklyStatusType('error'); };
 
+  // ── Project card picker ──────────────────────────────────────────
+  const [projectCards, setProjectCards] = React.useState<any[]>([]);
+  const [pickLoading, setPickLoading] = React.useState(false);
+  const [pickedCardId, setPickedCardId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const load = async () => {
+      setPickLoading(true);
+      try {
+        const { data } = await sb
+          .from('card_database')
+          .select('id, card_name, description, image_url, move1_name, move2_name, type, rarity')
+          .eq('teacher_id', session.user.id)
+          .eq('type', 'project')
+          .order('created_at', { ascending: false });
+        setProjectCards(data || []);
+      } catch { setProjectCards([]); }
+      setPickLoading(false);
+    };
+    load();
+  }, [session.user.id]);
+
+  const handlePickCard = (card: any) => {
+    setPickedCardId(card.id);
+    const rarity = (card.rarity as any) || 'gold-rare';
+    const hpMap: Record<string,number> = { common: 90, silver: 110, 'gold-rare': 130, prismatic: 160 };
+    const dmgMap: Record<string,{w:number,s:number}> = { common:{w:45,s:60}, silver:{w:55,s:70}, 'gold-rare':{w:65,s:85}, prismatic:{w:80,s:110} };
+    const hp = hpMap[rarity] ?? 120;
+    const dmg = dmgMap[rarity] ?? {w:65, s:85};
+    setWeeklyCard({
+      card_name: card.card_name,
+      type: card.type,
+      rarity,
+      description: card.description || '',
+      image_url: card.image_url || '',
+      hp,
+      stat1_name: 'HP',                           stat1_val: hp,
+      stat2_name: card.move1_name || 'Attack',     stat2_val: dmg.w,
+      stat3_name: card.move2_name || 'Power',      stat3_val: dmg.s,
+      move1_name: card.move1_name || 'Attack',     move1_dmg: dmg.w,
+      move2_name: card.move2_name || 'Power',      move2_dmg: dmg.s,
+      card_source: 'database' as any,
+    });
+    setWDone('Card selected! Publish the project when ready.');
+  };
+
   // ── Load submissions for this project ───────────────────────────
   const loadSubmissions = async (projectId: string) => {
     setSubmissionsLoading(true);
@@ -1966,44 +2013,9 @@ function WeeklyProjectTab({
     setSubmissionsLoading(false);
   };
 
-  // ── Generate the weekly card ─────────────────────────────────────
-  const handleGenerate = async () => {
-    if (!weeklyTask.trim()) { setWErr('Describe the weekly task first.'); return; }
-    if (!weeklyTitle.trim()) { setWErr('Give the project a title.'); return; }
-    setWeeklyGenerating(true);
-    setWeeklyCard(null);
-    setWWorking('Generating Weekly Project card…');
-    try {
-      const data = await AI.generateCardData('Weekly Project', weeklyTask, weeklyCharHint, 'gold-rare');
-      data.cardName = weeklyTitle;
-      setWWorking('Generating card image…');
-      const imgUrl = AI.generateImageUrl(data.imagePrompt || weeklyTitle);
-      await new Promise<void>(r => {
-        const img = new Image();
-        img.onload = () => r(); img.onerror = () => r();
-        img.src = imgUrl; setTimeout(r, 2500);
-      });
-      const card = {
-        card_name: data.cardName, hp: data.hp, type: data.type,
-        description: data.description,
-        stat1_name: data.stat1Name, stat1_val: data.stat1Val,
-        stat2_name: data.stat2Name, stat2_val: data.stat2Val,
-        stat3_name: data.stat3Name, stat3_val: data.stat3Val,
-        move1_name: data.move1Name, move1_dmg: data.move1Dmg,
-        move2_name: data.move2Name, move2_dmg: data.move2Dmg,
-        rarity: 'gold-rare' as any,
-        image_url: imgUrl,
-        card_source: 'generated' as any,
-      };
-      setWeeklyCard(card);
-      setWDone('Card generated! Save the project to publish it.');
-    } catch (err: any) { setWErr(err.message || 'Generation failed'); }
-    setWeeklyGenerating(false);
-  };
-
   // ── Save / publish the weekly project ───────────────────────────
   const handleSaveProject = async () => {
-    if (!weeklyCard) { setWErr('Generate a card first.'); return; }
+    if (!weeklyCard) { setWErr('Select a Project Card first.'); return; }
     setWWorking('Saving project…');
     try {
       const payload: any = {
@@ -2034,6 +2046,7 @@ function WeeklyProjectTab({
     setWeeklyTask(''); setWeeklyTitle(''); setWeeklyCharHint('');
     setWeeklyCard(null); setWeeklyStatus(''); setWeeklyEndDate('');
     setAwardSelections({}); setSubmissions([]);
+    setPickedCardId(null);
   };
 
   // ── Award a single student from submissions view ─────────────────
@@ -2254,15 +2267,6 @@ function WeeklyProjectTab({
               <p className="text-xs mt-1 italic" style={{ color: 'var(--tp-muted)' }}>This text appears as the task on the student's page.</p>
             </div>
 
-            <div className="mb-4">
-              <label className="tp-label">
-                Card Character Style <span className="text-xs" style={{ color: 'var(--tp-muted)' }}>(optional)</span>
-              </label>
-              <input type="text" className="tp-input"
-                placeholder="e.g. space explorer robot, planet dragon, cosmic owl…"
-                value={weeklyCharHint} onChange={e => setWeeklyCharHint(e.target.value)} />
-            </div>
-
             {/* End date */}
             <div className="mb-5">
               <label className="tp-label">
@@ -2279,13 +2283,56 @@ function WeeklyProjectTab({
               )}
             </div>
 
-            <button onClick={handleGenerate} disabled={weeklyGenerating} className="tp-btn-primary" style={{ width:'100%', marginBottom:10 }}>
-              {weeklyGenerating ? 'Generating…' : '🤖 GENERATE CARD'}
-            </button>
+            {/* ── Project Card Picker ── */}
+            <div>
+              <label className="tp-label">Select a Project Card</label>
+              {pickLoading ? (
+                <div style={{ textAlign: 'center', padding: '20px 0', fontSize: '0.8rem', color: 'var(--tp-muted)' }}>Loading project cards…</div>
+              ) : projectCards.length === 0 ? (
+                <div style={{ padding: '16px', borderRadius: 12, background: 'rgba(249,115,22,0.06)', border: '1.5px dashed rgba(249,115,22,0.3)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.5rem', marginBottom: 6, opacity: 0.4 }}>📋</div>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--tp-muted)', margin: 0, fontStyle: 'italic' }}>
+                    No Project Cards yet. Go to <strong style={{ color: '#f97316' }}>Card Creation</strong> and create a card with deck type <strong style={{ color: '#f97316' }}>📋 Project Cards</strong>.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 280, overflowY: 'auto', paddingRight: 4 }}>
+                  {projectCards.map((c: any) => {
+                    const isPicked = pickedCardId === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => handlePickCard(c)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+                          borderRadius: 12, cursor: 'pointer', textAlign: 'left', width: '100%',
+                          border: isPicked ? '2px solid #f97316' : '1.5px solid rgba(249,115,22,0.2)',
+                          background: isPicked ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.05)',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {c.image_url ? (
+                          <img src={c.image_url} alt={c.card_name}
+                            style={{ width: 48, height: 36, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
+                        ) : (
+                          <div style={{ width: 48, height: 36, borderRadius: 6, background: 'rgba(249,115,22,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>📋</div>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '0.82rem', fontWeight: 800, color: isPicked ? '#f97316' : 'var(--tp-text)', marginBottom: 2 }}>{c.card_name}</div>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--tp-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            ⚡ {c.move1_name || '—'} · 💥 {c.move2_name || '—'}
+                          </div>
+                        </div>
+                        {isPicked && <span style={{ fontSize: '0.75rem', color: '#f97316', fontWeight: 800, flexShrink: 0 }}>✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
-            {weeklyCard && !weeklyGenerating && (
-              <button onClick={handleSaveProject} className="w-full py-2 rounded-lg text-sm font-bold"
-                style={{ background: 'rgba(80,200,120,0.12)', border: '1px solid rgba(80,200,120,0.4)', color: '#4cba80', cursor: 'pointer' }}>
+            {weeklyCard && (
+              <button onClick={handleSaveProject} className="w-full py-2 rounded-lg text-sm font-bold" style={{ marginTop: 12, background: 'rgba(80,200,120,0.12)', border: '1px solid rgba(80,200,120,0.4)', color: '#4cba80', cursor: 'pointer' }}>
                 {hasProject ? '💾 Update Project' : '🚀 Publish Project'}
               </button>
             )}

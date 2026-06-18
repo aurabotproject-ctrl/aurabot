@@ -340,7 +340,7 @@ function PackOpeningOverlay({ pack, packImages, starPoints, isTestAccount, stude
     }
     const fetchWithTimeout = Promise.race([
       pack.id === 'luckydip'
-        ? sb.from('card_database').select('id, card_name, type, description, image_url, move1_name, move2_name').limit(100)
+        ? sb.from('card_database').select('id, card_name, type, description, image_url, move1_name, move2_name').neq('type', 'project').limit(100)
         : sb.from('card_database').select('id, card_name, type, description, image_url, move1_name, move2_name').eq('type', pack.id).limit(100),
       new Promise<{data: null}>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))
     ]);
