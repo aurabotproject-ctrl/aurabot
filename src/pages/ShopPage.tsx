@@ -49,8 +49,8 @@ const TEST_ACCOUNTS = ['Bella Clark', 'Benji Clark'];
 
 const UNLOCK_ITEMS = [
   { id: 'color',     label: 'Unlock Grape & Ocean',    desc: 'Adds 2 new bot colours: Grape purple & Ocean teal', emoji: '🎨', cost: 5 },
-  { id: 'color2',    label: 'Unlock Gold & Silver',    desc: 'Adds shiny Gold & Silver bot colours ✨',            emoji: '⭐', cost: 10 },
-  { id: 'color3',    label: 'Unlock Rainbow & Black Chrome', desc: 'Adds the rare Rainbow & Black Chrome bots 🌈🖤', emoji: '💎', cost: 20 },
+  { id: 'color2',    label: 'Unlock Gold & Silver',    desc: 'Adds shiny Gold & Silver bot colours ✨',            emoji: '⭐', cost: 5, requires: 'color' },
+  { id: 'color3',    label: 'Unlock Rainbow & Black Chrome', desc: 'Adds the rare Rainbow & Black Chrome bots 🌈🖤', emoji: '💎', cost: 5, requires: 'color2' },
   { id: 'face',      label: 'Face Colour Pack',         desc: 'Unlock a new face pixel colour palette',            emoji: '✨', cost: 5 },
   { id: 'buildabot', label: 'Build-a-Bot',              desc: 'Unlock the full bot customisation studio',          emoji: '🔧', cost: 5 },
 ];
@@ -143,6 +143,12 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
   const handleUnlock = async (item: typeof UNLOCK_ITEMS[0]) => {
     if (!isTestAccount && (starPoints === null || starPoints < item.cost)) { showMsg(`Not enough ⭐ — need ${item.cost}`); return; }
     if (unlockedChoices.includes(item.id)) { showMsg('Already unlocked!'); return; }
+    const req = (item as any).requires;
+    if (req && !unlockedChoices.includes(req)) {
+      const reqItem = UNLOCK_ITEMS.find(u => u.id === req);
+      showMsg(`Unlock "${reqItem?.label || req}" first!`);
+      return;
+    }
     setUnlocking(item.id);
     try {
       await sb.from('student_star_points').update({ points: (starPoints || 0) - item.cost }).eq('student_id', studentId);
@@ -231,24 +237,31 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
 
         {/* ── Unlocks ── */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 24 }}>
-          <div style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#5060a0', marginBottom: 14 }}>🔓 Unlocks — 5 ⭐ each</div>
+          <div style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#5060a0', marginBottom: 14 }}>🔓 Unlocks — 5 ⭐ each · unlock in order</div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             {UNLOCK_ITEMS.map(item => {
               const owned = unlockedChoices.includes(item.id);
+              const req = (item as any).requires as string | undefined;
+              const reqMet = !req || unlockedChoices.includes(req);
+              const reqItem = req ? UNLOCK_ITEMS.find(u => u.id === req) : null;
               const canAfford = isTestAccount || (starPoints !== null && starPoints >= item.cost);
+              const isLocked = !owned && !reqMet;
+              const isDisabled = owned || isLocked || unlocking === item.id || (!isTestAccount && !canAfford);
               return (
-                <div key={item.id} style={{ flex: '1', minWidth: 160, background: owned ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.04)', border: `1px solid ${owned ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div key={item.id} style={{ flex: '1', minWidth: 160, background: owned ? 'rgba(34,197,94,0.06)' : isLocked ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.04)', border: `1px solid ${owned ? 'rgba(34,197,94,0.25)' : isLocked ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8, opacity: isLocked ? 0.55 : 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: '1.4rem' }}>{item.emoji}</span>
+                    <span style={{ fontSize: '1.4rem', filter: isLocked ? 'grayscale(1)' : 'none' }}>{isLocked ? '🔒' : item.emoji}</span>
                     <div>
-                      <div style={{ fontWeight: 800, fontSize: '0.82rem', color: owned ? '#4ade80' : 'white' }}>{item.label}</div>
-                      <div style={{ fontSize: '0.68rem', color: '#5060a0', lineHeight: 1.3 }}>{item.desc}</div>
+                      <div style={{ fontWeight: 800, fontSize: '0.82rem', color: owned ? '#4ade80' : isLocked ? '#5060a0' : 'white' }}>{item.label}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#5060a0', lineHeight: 1.3 }}>
+                        {isLocked ? `Requires "${reqItem?.label}" first` : item.desc}
+                      </div>
                     </div>
                   </div>
-                  <button disabled={owned || unlocking === item.id || (!isTestAccount && !canAfford)}
+                  <button disabled={isDisabled}
                     onClick={() => handleUnlock(item)}
-                    style={{ width: '100%', padding: '7px 0', borderRadius: 9, border: 'none', fontWeight: 800, fontSize: '0.76rem', cursor: owned || (!isTestAccount && !canAfford) ? 'not-allowed' : 'pointer', background: owned ? 'rgba(34,197,94,0.15)' : canAfford ? 'linear-gradient(135deg,#7c3aed,#5b21b6)' : 'rgba(60,60,80,0.5)', color: owned ? '#4ade80' : canAfford ? 'white' : '#5060a0' }}>
-                    {owned ? '✓ Owned' : unlocking === item.id ? '…' : `⭐ ${item.cost} — Unlock`}
+                    style={{ width: '100%', padding: '7px 0', borderRadius: 9, border: 'none', fontWeight: 800, fontSize: '0.76rem', cursor: isDisabled ? 'not-allowed' : 'pointer', background: owned ? 'rgba(34,197,94,0.15)' : isLocked ? 'rgba(60,60,80,0.3)' : canAfford ? 'linear-gradient(135deg,#7c3aed,#5b21b6)' : 'rgba(60,60,80,0.5)', color: owned ? '#4ade80' : isLocked ? '#4a5580' : canAfford ? 'white' : '#5060a0' }}>
+                    {owned ? '✓ Owned' : isLocked ? '🔒 Locked' : unlocking === item.id ? '…' : `⭐ ${item.cost} — Unlock`}
                   </button>
                 </div>
               );
