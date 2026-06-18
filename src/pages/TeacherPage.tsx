@@ -2042,7 +2042,7 @@ function WeeklyProjectTab({
   // ── New project ──────────────────────────────────────────────────
   const handleNewProject = () => {
     setWeeklyProject(null);
-    setWeeklyTask(''); setWeeklyTitle(''); setWeeklyCharHint('');
+    setWeeklyTask(''); setWeeklyTitle('');
     setWeeklyCard(null); setWeeklyStatus(''); setWeeklyEndDate('');
     setAwardSelections({}); setSubmissions([]);
     setPickedCardId(null);
