@@ -1995,8 +1995,10 @@ function WeeklyProjectTab({
         .eq('teacher_id', session.user.id)
         .order('created_at', { ascending: false });
       if (error) throw error;
+      console.log('[ChallengeBank] loaded', data?.length || 0, 'rows for teacher_id', session.user.id, data);
       setChallengeBank(data || []);
     } catch (err: any) {
+      console.error('[ChallengeBank] load failed', err);
       setChallengeBank([]);
       setBankError(err.message || 'Could not load the Challenge Bank.');
     }
@@ -2103,10 +2105,11 @@ function WeeklyProjectTab({
         if (error) throw error;
         saved = data;
       }
+      console.log('[ChallengeBank] saved to bank', saved);
       setWeeklyProject(saved);
       await loadChallengeBank();
       setWDone('✓ Saved to Challenge Bank!');
-    } catch (err: any) { setWErr(err.message || JSON.stringify(err)); }
+    } catch (err: any) { console.error('[ChallengeBank] save to bank failed', err); setWErr(err.message || JSON.stringify(err)); }
   };
 
   // ── Publish Challenge (makes it live for students) ───────────────
@@ -2135,10 +2138,11 @@ function WeeklyProjectTab({
         if (error) throw error;
         saved = data;
       }
+      console.log('[ChallengeBank] published challenge', saved);
       setWeeklyProject(saved);
       await loadChallengeBank();
       setWDone('🚀 Challenge published! Students can now see it.');
-    } catch (err: any) { setWErr(err.message || JSON.stringify(err)); }
+    } catch (err: any) { console.error('[ChallengeBank] publish failed', err); setWErr(err.message || JSON.stringify(err)); }
   };
 
   // ── New project ──────────────────────────────────────────────────
