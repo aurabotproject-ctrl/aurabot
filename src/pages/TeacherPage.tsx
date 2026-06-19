@@ -1258,9 +1258,9 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
         ctx.rotate((dbRotation * Math.PI) / 180);
         ctx.scale(dbScale, dbScale);
         ctx.translate((dbPosition.x / 100) * OUTPUT_W, (dbPosition.y / 100) * OUTPUT_H);
-        const coverScale = Math.max(OUTPUT_W / img.naturalWidth, OUTPUT_H / img.naturalHeight);
-        const drawW = img.naturalWidth * coverScale;
-        const drawH = img.naturalHeight * coverScale;
+        const baseScale = Math.min(OUTPUT_W / img.naturalWidth, OUTPUT_H / img.naturalHeight);
+        const drawW = img.naturalWidth * baseScale;
+        const drawH = img.naturalHeight * baseScale;
         ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
         ctx.restore();
         const webpUrl = canvas.toDataURL('image/webp', 0.88);
@@ -1345,7 +1345,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
                   onMouseDown={e => { if (dbCroppedImage) return; e.preventDefault(); setDbIsDragging(true); setDbDragStart({ clientX: e.clientX, clientY: e.clientY, startX: dbPosition.x, startY: dbPosition.y }); }}
                   onMouseMove={e => { if (!dbIsDragging || dbCroppedImage) return; const dx = ((e.clientX - dbDragStart.clientX) / (e.currentTarget.parentElement?.offsetWidth || 200)) * 100; const dy = ((e.clientY - dbDragStart.clientY) / (e.currentTarget.parentElement?.offsetHeight || 150)) * 100; setDbPosition({ x: dbDragStart.startX + dx, y: dbDragStart.startY + dy }); }}
                   onMouseUp={() => setDbIsDragging(false)} onMouseLeave={() => setDbIsDragging(false)}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', transform: `translate(${dbPosition.x}%, ${dbPosition.y}%) scale(${dbScale}) rotate(${dbRotation}deg)`, cursor: dbCroppedImage ? 'default' : (dbIsDragging ? 'grabbing' : 'grab'), userSelect: 'none', minHeight: 130 }}
+                  style={{ width: '100%', height: '100%', objectFit: 'contain', transform: `translate(${dbPosition.x}%, ${dbPosition.y}%) scale(${dbScale}) rotate(${dbRotation}deg)`, cursor: dbCroppedImage ? 'default' : (dbIsDragging ? 'grabbing' : 'grab'), userSelect: 'none', minHeight: 130 }}
                 />
               ) : (
                 <div style={{ textAlign: 'center', color: 'var(--tp-text2)', fontSize: '0.75rem', padding: 16 }}><div style={{ fontSize: '2rem', marginBottom: 4 }}>🖼</div>No image</div>
