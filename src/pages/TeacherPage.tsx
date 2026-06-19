@@ -109,10 +109,10 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
   const [pbUploading, setPbUploading] = useState(false);
 
     // Weekly Project state
-  const [weeklyProject, setWeeklyProject] = useState<any>(null);
+  const [weeklyProject, setWeeklyProject] = useState<any>(null); // the draft currently loaded in the editor (null = new/unsaved)
+  const [activeChallenge, setActiveChallenge] = useState<any>(null); // the live/published challenge students currently see
   const [weeklyTask, setWeeklyTask] = useState('');
   const [weeklyTitle, setWeeklyTitle] = useState('');
-  const [weeklyCharHint, setWeeklyCharHint] = useState('');
   const [weeklyGenerating, setWeeklyGenerating] = useState(false);
   const [weeklyCard, setWeeklyCard] = useState<Partial<Card> & { image_url: string } | null>(null);
   const [weeklyStatus, setWeeklyStatus] = useState('');
@@ -137,7 +137,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
       ]);
       // Hide the auto-granted Aura-Bot welcome card from the teacher's My Cards view
       const cList = cListRaw.filter((c: any) => c.card_name !== Dashboard.WELCOME_CARD_NAME);
-      // Load current week's project if one exists
+      // Load the currently active/published challenge (for display only — does not touch the editor draft)
       try {
         const { data: wp } = await sb.from('weekly_projects')
           .select('*')
@@ -145,13 +145,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
-        if (wp) {
-          setWeeklyProject(wp);
-          setWeeklyTitle(wp.title || '');
-          setWeeklyTask(wp.task || '');
-          setWeeklyCharHint(wp.char_hint || '');
-          if (wp.card_data) setWeeklyCard(wp.card_data);
-        }
+        setActiveChallenge(wp || null);
       } catch { /* no weekly_projects table yet — ignore */ }
       // Load home communications
       try {
@@ -643,14 +637,13 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
             setWeeklyTask={setWeeklyTask}
             weeklyTitle={weeklyTitle}
             setWeeklyTitle={setWeeklyTitle}
-            weeklyCharHint={weeklyCharHint}
-            setWeeklyCharHint={setWeeklyCharHint}
             weeklyGenerating={weeklyGenerating}
             setWeeklyGenerating={setWeeklyGenerating}
             weeklyCard={weeklyCard}
             setWeeklyCard={setWeeklyCard}
             weeklyProject={weeklyProject}
             setWeeklyProject={setWeeklyProject}
+            activeChallenge={activeChallenge}
             weeklyStatus={weeklyStatus}
             setWeeklyStatus={setWeeklyStatus}
             weeklyStatusType={weeklyStatusType}
@@ -1939,6 +1932,7 @@ function WeeklyProjectTab({
   weeklyTitle, setWeeklyTitle,
   weeklyCard, setWeeklyCard,
   weeklyProject, setWeeklyProject,
+  activeChallenge,
   weeklyStatus, setWeeklyStatus,
   weeklyStatusType, setWeeklyStatusType,
   awardModal, setAwardModal,
@@ -2038,6 +2032,7 @@ function WeeklyProjectTab({
         setPickedCardId(null);
       }
       await loadChallengeBank();
+      onRefresh(); // refresh activeChallenge in case the deleted one was live
     } catch { /* ignore */ }
     setBankDeleting(null);
   };
@@ -2141,6 +2136,7 @@ function WeeklyProjectTab({
       console.log('[ChallengeBank] published challenge', saved);
       setWeeklyProject(saved);
       await loadChallengeBank();
+      onRefresh(); // refresh activeChallenge so the header/Award/Submissions reflect this immediately
       setWDone('🚀 Challenge published! Students can now see it.');
     } catch (err: any) { console.error('[ChallengeBank] publish failed', err); setWErr(err.message || JSON.stringify(err)); }
   };
@@ -2157,19 +2153,20 @@ function WeeklyProjectTab({
 
   // ── Award a single student from submissions view ─────────────────
   const handleAwardSubmission = async (submission: any, rarity: 'common' | 'silver' | 'gold-rare') => {
-    if (!weeklyProject || !weeklyCard) return;
+    const liveCard = activeChallenge?.card_data;
+    if (!activeChallenge || !liveCard) return;
     try {
       const mult = rarity === 'common' ? 0.7 : rarity === 'silver' ? 0.85 : 1;
       const cardToSave = {
-        ...weeklyCard,
+        ...liveCard,
         rarity,
         student_id: submission.student_id,
         teacher_id: session.user.id,
         card_source: 'generated' as any,
-        stat1_val: Math.round(weeklyCard.stat1_val * mult),
-        stat2_val: Math.round(weeklyCard.stat2_val * mult),
-        stat3_val: Math.round(weeklyCard.stat3_val * mult),
-        hp: Math.round((weeklyCard.hp || 100) * mult),
+        stat1_val: Math.round(liveCard.stat1_val * mult),
+        stat2_val: Math.round(liveCard.stat2_val * mult),
+        stat3_val: Math.round(liveCard.stat3_val * mult),
+        hp: Math.round((liveCard.hp || 100) * mult),
       };
       await Dashboard.saveCard(cardToSave as any);
       // Mark submission as awarded and delete photos
@@ -2177,7 +2174,7 @@ function WeeklyProjectTab({
         .update({ status: 'awarded', photo1_url: null, photo2_url: null })
         .eq('id', submission.id);
       // Reload submissions
-      await loadSubmissions(weeklyProject.id);
+      await loadSubmissions(activeChallenge.id);
       setWDone(`✓ Awarded ${rarity} card to ${submission.students?.name || 'student'}!`);
       onRefresh();
     } catch (err: any) { setWErr(err.message); }
@@ -2194,7 +2191,8 @@ function WeeklyProjectTab({
     setAwardError('');
   };
   const handleAward = async () => {
-    if (!weeklyProject || !weeklyCard) return;
+    const liveCard = activeChallenge?.card_data;
+    if (!activeChallenge || !liveCard) return;
     const entries = Object.entries(awardSelections);
     if (entries.length === 0) { setAwardError('Select at least one student.'); return; }
     setAwarding(true); setAwardError('');
@@ -2203,29 +2201,29 @@ function WeeklyProjectTab({
       for (const [studentId, rar] of entries) {
         const mult = rar === 'common' ? 0.7 : rar === 'silver' ? 0.85 : 1;
         await Dashboard.saveCard({
-          ...weeklyCard, rarity: rar, student_id: studentId, teacher_id: session.user.id,
+          ...liveCard, rarity: rar, student_id: studentId, teacher_id: session.user.id,
           card_source: 'generated' as any,
-          stat1_val: Math.round(weeklyCard.stat1_val * mult),
-          stat2_val: Math.round(weeklyCard.stat2_val * mult),
-          stat3_val: Math.round(weeklyCard.stat3_val * mult),
-          hp: Math.round((weeklyCard.hp || 100) * mult),
+          stat1_val: Math.round(liveCard.stat1_val * mult),
+          stat2_val: Math.round(liveCard.stat2_val * mult),
+          stat3_val: Math.round(liveCard.stat3_val * mult),
+          hp: Math.round((liveCard.hp || 100) * mult),
         } as any);
         awarded++;
       }
       setAwardModal(false); setAwardSelections({});
-      setWDone(`✓ Awarded "${weeklyTitle}" card to ${awarded} student${awarded !== 1 ? 's' : ''}!`);
+      setWDone(`✓ Awarded "${activeChallenge.title}" card to ${awarded} student${awarded !== 1 ? 's' : ''}!`);
       onRefresh();
     } catch (err: any) { setAwardError(err.message); }
     setAwarding(false);
   };
 
   const awardCount = Object.keys(awardSelections).length;
-  const hasProject = !!weeklyProject?.id;
+  const hasActiveChallenge = !!activeChallenge?.id;
 
   // Switch to submissions view and load
   const handleViewSubmissions = async () => {
     setWeeklyView('submissions');
-    if (weeklyProject?.id) await loadSubmissions(weeklyProject.id);
+    if (activeChallenge?.id) await loadSubmissions(activeChallenge.id);
   };
 
   return (
@@ -2237,9 +2235,10 @@ function WeeklyProjectTab({
             🏆 Aurabot Weekly Challenge
           </h2>
           <p className="text-xs italic" style={{ color: 'var(--tp-muted)' }}>
-            {weeklyProject?.week_label || getCurrentWeekLabel()}
-            {weeklyProject?.end_date && ` · Due ${new Date(weeklyProject.end_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`}
-            {!weeklyProject?.end_date && ' · Students see this challenge and earn the card for completing it'}
+            {activeChallenge?.week_label || getCurrentWeekLabel()}
+            {activeChallenge?.end_date && ` · Due ${new Date(activeChallenge.end_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`}
+            {activeChallenge && !activeChallenge?.end_date && ' · Students see this challenge and earn the card for completing it'}
+            {!activeChallenge && ' · No challenge published yet — publish one or load one from the Bank'}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -2253,14 +2252,14 @@ function WeeklyProjectTab({
               onClick={() => { setWeeklyView('bank'); loadChallengeBank(); }}
               style={{ padding: '5px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', border: 'none', borderLeft: '1px solid rgba(90,50,10,0.2)', background: weeklyView === 'bank' ? 'rgba(192,132,252,0.2)' : 'transparent', color: weeklyView === 'bank' ? '#c084fc' : '#9a7040' }}
             >🗄️ Bank {challengeBank.length > 0 && <span style={{ background: 'rgba(192,132,252,0.25)', color: '#c084fc', borderRadius: '50%', padding: '1px 5px', fontSize: '0.62rem', marginLeft: 4 }}>{challengeBank.length}</span>}</button>
-            {hasProject && (
+            {hasActiveChallenge && (
               <button
                 onClick={handleViewSubmissions}
                 style={{ padding: '5px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', border: 'none', borderLeft: '1px solid rgba(90,50,10,0.2)', background: weeklyView === 'submissions' ? 'rgba(192,132,252,0.2)' : 'transparent', color: weeklyView === 'submissions' ? '#c084fc' : '#9a7040' }}
               >📥 Submissions {submissions.length > 0 && <span style={{ background: 'linear-gradient(135deg,#f472b6,#c084fc)', color: 'white', borderRadius: '50%', padding: '1px 5px', fontSize: '0.62rem', marginLeft: 4 }}>{submissions.length}</span>}</button>
             )}
           </div>
-          {hasProject && (
+          {hasActiveChallenge && (
             <button onClick={handleOpenAward} className="tp-btn-gold">
               🏅 Award Students
             </button>
@@ -2300,7 +2299,7 @@ function WeeklyProjectTab({
           ) : (
             <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
               {challengeBank.map((c: any) => {
-                const isActive = weeklyProject?.id === c.id;
+                const isActive = activeChallenge?.id === c.id;
                 const cardImg = c.card_data?.image_url;
                 const cardName = c.card_data?.card_name;
                 const publishedDate = c.created_at ? new Date(c.created_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
@@ -2332,6 +2331,7 @@ function WeeklyProjectTab({
                         {c.task ? `${c.task.slice(0, 80)}${c.task.length > 80 ? '…' : ''}` : <em>No task description</em>}
                       </div>
                       {publishedDate && <div style={{ fontSize: '0.63rem', color: 'var(--tp-muted)', marginTop: 6, opacity: 0.6 }}>Last published {publishedDate}</div>}
+                      {!isActive && <div style={{ fontSize: '0.62rem', color: 'var(--tp-muted)', marginTop: 4, fontStyle: 'italic' }}>Load it, set a due date, then Publish to make it current</div>}
                     </div>
 
                     <div style={{ display: 'flex', gap: 8, padding: '0 16px 14px' }}>
@@ -2358,13 +2358,13 @@ function WeeklyProjectTab({
       )}
 
       {/* ══ SUBMISSIONS VIEW ═════════════════════════════════════════ */}
-      {weeklyView === 'submissions' && hasProject && (
+      {weeklyView === 'submissions' && hasActiveChallenge && (
         <div>
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-sm font-bold" style={{ color: 'var(--tp-text)' }}>
-              Student Submissions — {weeklyTitle}
+              Student Submissions — {activeChallenge.title}
             </h3>
-            <button onClick={() => loadSubmissions(weeklyProject.id)} className="tp-btn-outline" style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'var(--tp-muted)' }}>
+            <button onClick={() => loadSubmissions(activeChallenge.id)} className="tp-btn-outline" style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'var(--tp-muted)' }}>
               ↻ Refresh
             </button>
           </div>
@@ -2553,7 +2553,8 @@ function WeeklyProjectTab({
                   <h3 className="font-display font-black text-base mb-2" style={{ color: 'var(--tp-text)' }}>{weeklyTitle || 'Challenge Title'}</h3>
                   {weeklyEndDate && <p className="text-xs font-bold mb-2" style={{ color: '#f472b6' }}>📅 Due: {new Date(weeklyEndDate).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' })}</p>}
                   <p className="text-sm" style={{ color: 'var(--tp-text)', lineHeight: 1.7 }}>{weeklyTask || 'Task description will appear here.'}</p>
-                  {hasProject && <div className="mt-3 text-xs" style={{ color: '#4cba80', fontWeight: 700 }}>✓ Published · Students can see this challenge</div>}
+                  {!!weeklyProject?.id && activeChallenge?.id === weeklyProject?.id && <div className="mt-3 text-xs" style={{ color: '#4cba80', fontWeight: 700 }}>✓ Published · Students can see this challenge</div>}
+                  {!!weeklyProject?.id && activeChallenge?.id !== weeklyProject?.id && <div className="mt-3 text-xs" style={{ color: '#c084fc', fontWeight: 700 }}>🗄️ Saved to Bank · Not currently live</div>}
                 </div>
               </>
             ) : (
@@ -2571,7 +2572,7 @@ function WeeklyProjectTab({
         <div className="tp-modal-bg" onClick={() => { if (!awarding) setAwardModal(false); }}>
           <div onClick={e => e.stopPropagation()} style={{ background: 'rgba(10,18,48,0.92)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 20, padding: '2rem', width: '95%', maxWidth: 780, maxHeight: '90vh', overflowY: 'auto', position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
             <button onClick={() => setAwardModal(false)} style={{ position: 'absolute', top: 14, right: 16, background: 'none', border: 'none', fontSize: '1.3rem', cursor: 'pointer', color: 'var(--tp-text2)' }}>✕</button>
-            <h3 className="font-display font-black text-xl mb-1" style={{ color: 'var(--tp-text)' }}>🏅 Award "{weeklyTitle}"</h3>
+            <h3 className="font-display font-black text-xl mb-1" style={{ color: 'var(--tp-text)' }}>🏅 Award "{activeChallenge?.title}"</h3>
             <p className="text-xs mb-5 italic" style={{ color: 'var(--tp-muted)' }}>Tick each student in the column matching their achievement level. Each student can only receive one rarity.</p>
             {awardError && <div className="tp-err mb-4 text-sm">{awardError}</div>}
             <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
