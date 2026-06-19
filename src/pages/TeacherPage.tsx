@@ -1211,12 +1211,14 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
 
   // Image
   const [dbImage, setDbImage] = React.useState<string | null>(null);
-  const [dbCroppedImage, setDbCroppedImage] = React.useState<string | null>(null);
   const [dbScale, setDbScale] = React.useState(1);
   const [dbRotation, setDbRotation] = React.useState(0);
   const [dbPosition, setDbPosition] = React.useState({ x: 0, y: 0 });
   const [dbIsDragging, setDbIsDragging] = React.useState(false);
   const [dbDragStart, setDbDragStart] = React.useState({ clientX: 0, clientY: 0, startX: 0, startY: 0 });
+  const loadedImgRef = React.useRef<HTMLImageElement | null>(null);
+  const [loadedImgKey, setLoadedImgKey] = React.useState<string | null>(null);
+  const [livePreview, setLivePreview] = React.useState<string | null>(null);
 
   // Save
   const [saving, setSaving] = React.useState(false);
@@ -1236,46 +1238,50 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
     const reader = new FileReader();
     reader.onload = ev => {
       setDbImage(ev.target?.result as string);
-      setDbCroppedImage(null);
       setDbScale(1); setDbRotation(0); setDbPosition({ x: 0, y: 0 });
     };
     reader.readAsDataURL(file);
     e.target.value = '';
   };
 
-  const cropImage = (): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      if (!dbImage) { reject(new Error('No image')); return; }
-      const OUTPUT_W = 480; const OUTPUT_H = 360;
-      const canvas = document.createElement('canvas');
-      canvas.width = OUTPUT_W; canvas.height = OUTPUT_H;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { reject(new Error('Canvas error')); return; }
-      const img = new Image();
-      img.onload = () => {
-        ctx.save();
-        ctx.translate(OUTPUT_W / 2, OUTPUT_H / 2);
-        ctx.rotate((dbRotation * Math.PI) / 180);
-        ctx.scale(dbScale, dbScale);
-        ctx.translate((dbPosition.x / 100) * OUTPUT_W, (dbPosition.y / 100) * OUTPUT_H);
-        const baseScale = Math.min(OUTPUT_W / img.naturalWidth, OUTPUT_H / img.naturalHeight);
-        const drawW = img.naturalWidth * baseScale;
-        const drawH = img.naturalHeight * baseScale;
-        ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
-        ctx.restore();
-        const webpUrl = canvas.toDataURL('image/webp', 0.88);
-        resolve(webpUrl.startsWith('data:image/webp') ? webpUrl : canvas.toDataURL('image/jpeg', 0.92));
-      };
-      img.onerror = () => reject(new Error('Image load error'));
-      img.crossOrigin = 'anonymous';
-      img.src = dbImage;
-    });
-  };
+  // Load the raw image once per upload (cached so live edits don't re-decode it every frame)
+  React.useEffect(() => {
+    if (!dbImage) { loadedImgRef.current = null; setLoadedImgKey(null); return; }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => { loadedImgRef.current = img; setLoadedImgKey(dbImage); };
+    img.onerror = () => { loadedImgRef.current = null; setLoadedImgKey(null); };
+    img.src = dbImage;
+  }, [dbImage]);
 
-  const handleCrop = async () => {
-    try { setDbCroppedImage(await cropImage()); }
-    catch (err: any) { alert(err.message || 'Crop failed'); }
-  };
+  // Renders the exact same framing shown in the editor box — used for BOTH the editor
+  // and the card preview, so they can never drift out of sync.
+  const renderCrop = React.useCallback((): string | null => {
+    const img = loadedImgRef.current;
+    if (!img) return null;
+    const OUTPUT_W = 480; const OUTPUT_H = 360;
+    const canvas = document.createElement('canvas');
+    canvas.width = OUTPUT_W; canvas.height = OUTPUT_H;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.save();
+    ctx.translate(OUTPUT_W / 2, OUTPUT_H / 2);
+    ctx.rotate((dbRotation * Math.PI) / 180);
+    ctx.scale(dbScale, dbScale);
+    ctx.translate((dbPosition.x / 100) * OUTPUT_W, (dbPosition.y / 100) * OUTPUT_H);
+    const baseScale = Math.min(OUTPUT_W / img.naturalWidth, OUTPUT_H / img.naturalHeight);
+    const drawW = img.naturalWidth * baseScale;
+    const drawH = img.naturalHeight * baseScale;
+    ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+    ctx.restore();
+    const webpUrl = canvas.toDataURL('image/webp', 0.88);
+    return webpUrl.startsWith('data:image/webp') ? webpUrl : canvas.toDataURL('image/jpeg', 0.92);
+  }, [dbScale, dbRotation, dbPosition]);
+
+  // Keep the live preview perfectly in sync with every drag/zoom/rotate change
+  React.useEffect(() => {
+    setLivePreview(renderCrop());
+  }, [renderCrop, loadedImgKey]);
 
   const handleSaveToDatabase = async () => {
     if (!cardName.trim()) { setSavedMsg('Enter a card name.'); return; }
@@ -1284,7 +1290,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
     if (!strongActionName.trim()) { setSavedMsg('Enter a strong action name.'); return; }
     setSaving(true); setSavedMsg('');
     try {
-      const imageUrl = dbCroppedImage || dbImage || '';
+      const imageUrl = livePreview || dbImage || '';
       // Stats and rarity are NOT stored — assigned at pack-open time
       const payload = {
         teacher_id: session.user.id,
@@ -1308,7 +1314,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
       const { error } = await sb.from('card_database').insert(payload);
       if (error) throw error;
       setSavedMsg('✓ Card sealed and added to database!');
-      setCardName(''); setCardDescription(''); setDbImage(null); setDbCroppedImage(null);
+      setCardName(''); setCardDescription(''); setDbImage(null);
       setWeakActionName(''); setStrongActionName('');
       setIsRareExclusive(false); setMaxCopies(5);
       setDbScale(1); setDbRotation(0); setDbPosition({ x: 0, y: 0 });
@@ -1318,7 +1324,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
     setSaving(false);
   };
 
-  const currentImage = dbCroppedImage || dbImage;
+  const currentImage = livePreview || dbImage;
   const currentRange = RARITY_RANGES[cardRarity] || RARITY_RANGES['common'];
 
   return (
@@ -1342,10 +1348,10 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
             <div style={{ background: '#0d1230', borderRadius: 8, border: '2px dashed rgba(192,132,252,0.25)', aspectRatio: '4/3', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 8, position: 'relative' }}>
               {dbImage ? (
                 <img src={dbImage} alt="preview" draggable={false}
-                  onMouseDown={e => { if (dbCroppedImage) return; e.preventDefault(); setDbIsDragging(true); setDbDragStart({ clientX: e.clientX, clientY: e.clientY, startX: dbPosition.x, startY: dbPosition.y }); }}
-                  onMouseMove={e => { if (!dbIsDragging || dbCroppedImage) return; const dx = ((e.clientX - dbDragStart.clientX) / (e.currentTarget.parentElement?.offsetWidth || 200)) * 100; const dy = ((e.clientY - dbDragStart.clientY) / (e.currentTarget.parentElement?.offsetHeight || 150)) * 100; setDbPosition({ x: dbDragStart.startX + dx, y: dbDragStart.startY + dy }); }}
+                  onMouseDown={e => { e.preventDefault(); setDbIsDragging(true); setDbDragStart({ clientX: e.clientX, clientY: e.clientY, startX: dbPosition.x, startY: dbPosition.y }); }}
+                  onMouseMove={e => { if (!dbIsDragging) return; const dx = ((e.clientX - dbDragStart.clientX) / (e.currentTarget.parentElement?.offsetWidth || 200)) * 100; const dy = ((e.clientY - dbDragStart.clientY) / (e.currentTarget.parentElement?.offsetHeight || 150)) * 100; setDbPosition({ x: dbDragStart.startX + dx, y: dbDragStart.startY + dy }); }}
                   onMouseUp={() => setDbIsDragging(false)} onMouseLeave={() => setDbIsDragging(false)}
-                  style={{ width: '100%', height: '100%', objectFit: 'contain', transform: `translate(${dbPosition.x}%, ${dbPosition.y}%) scale(${dbScale}) rotate(${dbRotation}deg)`, cursor: dbCroppedImage ? 'default' : (dbIsDragging ? 'grabbing' : 'grab'), userSelect: 'none', minHeight: 130 }}
+                  style={{ width: '100%', height: '100%', objectFit: 'contain', transform: `translate(${dbPosition.x}%, ${dbPosition.y}%) scale(${dbScale}) rotate(${dbRotation}deg)`, cursor: dbIsDragging ? 'grabbing' : 'grab', userSelect: 'none', minHeight: 130 }}
                 />
               ) : (
                 <div style={{ textAlign: 'center', color: 'var(--tp-text2)', fontSize: '0.75rem', padding: 16 }}><div style={{ fontSize: '2rem', marginBottom: 4 }}>🖼</div>No image</div>
@@ -1353,7 +1359,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
             </div>
             {dbImage && (
               <div style={{ display: 'flex', gap: 4, marginBottom: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
-                {[['↺', () => setDbRotation(r => r - 90)], ['↻', () => setDbRotation(r => r + 90)], ['⟳', () => { setDbScale(1); setDbRotation(0); setDbPosition({ x:0,y:0 }); setDbCroppedImage(null); }]].map(([l, fn]: any) => (
+                {[['↺', () => setDbRotation(r => r - 90)], ['↻', () => setDbRotation(r => r + 90)], ['⟳', () => { setDbScale(1); setDbRotation(0); setDbPosition({ x:0,y:0 }); }]].map(([l, fn]: any) => (
                   <button key={l} onClick={fn} style={{ fontSize:'0.68rem', padding:'3px 9px', border:'1px solid rgba(160,140,220,0.25)', borderRadius:4, background:'rgba(255,255,255,0.07)', cursor:'pointer', color:'var(--tp-text2)' }}>{l}</button>
                 ))}
               </div>
@@ -1366,19 +1372,19 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
                 <span style={{ fontSize:'0.68rem', color:'var(--tp-muted)', width:28, textAlign:'right' }}>{dbScale.toFixed(1)}×</span>
               </div>
             )}
+            {dbImage && (
+              <div style={{ fontSize:'0.65rem', color:'#4cba80', textAlign:'center', marginBottom:6, fontWeight:600 }}>
+                ✓ Live preview — card on the right always matches this exactly
+              </div>
+            )}
             <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} style={{ display:'none' }} />
             <button onClick={() => fileInputRef.current?.click()} style={{ width:'100%', padding:'0.5rem', border:'1.5px dashed rgba(160,140,220,0.35)', borderRadius:8, background:'rgba(192,132,252,0.1)', color:'var(--tp-text2)', fontSize:'0.8rem', cursor:'pointer', fontWeight:700 }}>
               📁 Upload Image
             </button>
             {dbImage && (
-              <>
-                <button onClick={handleCrop} style={{ width:'100%', marginTop:6, padding:'0.45rem', border:`2px solid ${dbCroppedImage ? 'rgba(80,160,80,0.5)' : 'rgba(80,160,80,0.3)'}`, borderRadius:8, background: dbCroppedImage ? 'rgba(80,160,80,0.12)' : 'rgba(80,160,80,0.06)', color:'#1a6a2a', fontSize:'0.8rem', cursor:'pointer', fontWeight:800 }}>
-                  {dbCroppedImage ? '✓ Re-crop' : '✂ Crop & Apply'}
-                </button>
-                <button onClick={() => { setDbImage(null); setDbCroppedImage(null); setDbScale(1); setDbRotation(0); setDbPosition({x:0,y:0}); }} style={{ width:'100%', marginTop:4, padding:'0.3rem', border:'1px solid rgba(200,50,50,0.2)', borderRadius:6, background:'transparent', color:'#b04040', fontSize:'0.72rem', cursor:'pointer' }}>
-                  ✕ Remove
-                </button>
-              </>
+              <button onClick={() => { setDbImage(null); setDbScale(1); setDbRotation(0); setDbPosition({x:0,y:0}); }} style={{ width:'100%', marginTop:6, padding:'0.3rem', border:'1px solid rgba(200,50,50,0.2)', borderRadius:6, background:'transparent', color:'#b04040', fontSize:'0.72rem', cursor:'pointer' }}>
+                ✕ Remove
+              </button>
             )}
           </div>
         </div>
