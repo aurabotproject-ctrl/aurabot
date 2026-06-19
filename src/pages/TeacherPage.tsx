@@ -1983,16 +1983,23 @@ function WeeklyProjectTab({
   const [bankLoading, setBankLoading] = React.useState(false);
   const [bankDeleting, setBankDeleting] = React.useState<string | null>(null);
 
+  const [bankError, setBankError] = React.useState('');
+
   const loadChallengeBank = React.useCallback(async () => {
     setBankLoading(true);
+    setBankError('');
     try {
-      const { data } = await sb
+      const { data, error } = await sb
         .from('weekly_projects')
         .select('*')
         .eq('teacher_id', session.user.id)
         .order('created_at', { ascending: false });
+      if (error) throw error;
       setChallengeBank(data || []);
-    } catch { setChallengeBank([]); }
+    } catch (err: any) {
+      setChallengeBank([]);
+      setBankError(err.message || 'Could not load the Challenge Bank.');
+    }
     setBankLoading(false);
   }, [session.user.id]);
 
@@ -2088,16 +2095,18 @@ function WeeklyProjectTab({
       };
       let saved;
       if (weeklyProject?.id) {
-        const { data } = await sb.from('weekly_projects').update(payload).eq('id', weeklyProject.id).select().single();
+        const { data, error } = await sb.from('weekly_projects').update(payload).eq('id', weeklyProject.id).select().single();
+        if (error) throw error;
         saved = data;
       } else {
-        const { data } = await sb.from('weekly_projects').insert(payload).select().single();
+        const { data, error } = await sb.from('weekly_projects').insert(payload).select().single();
+        if (error) throw error;
         saved = data;
       }
       setWeeklyProject(saved);
       await loadChallengeBank();
       setWDone('✓ Saved to Challenge Bank!');
-    } catch (err: any) { setWErr(err.message); }
+    } catch (err: any) { setWErr(err.message || JSON.stringify(err)); }
   };
 
   // ── Publish Challenge (makes it live for students) ───────────────
@@ -2118,16 +2127,18 @@ function WeeklyProjectTab({
       };
       let saved;
       if (weeklyProject?.id) {
-        const { data } = await sb.from('weekly_projects').update(payload).eq('id', weeklyProject.id).select().single();
+        const { data, error } = await sb.from('weekly_projects').update(payload).eq('id', weeklyProject.id).select().single();
+        if (error) throw error;
         saved = data;
       } else {
-        const { data } = await sb.from('weekly_projects').insert(payload).select().single();
+        const { data, error } = await sb.from('weekly_projects').insert(payload).select().single();
+        if (error) throw error;
         saved = data;
       }
       setWeeklyProject(saved);
       await loadChallengeBank();
       setWDone('🚀 Challenge published! Students can now see it.');
-    } catch (err: any) { setWErr(err.message); }
+    } catch (err: any) { setWErr(err.message || JSON.stringify(err)); }
   };
 
   // ── New project ──────────────────────────────────────────────────
@@ -2271,6 +2282,12 @@ function WeeklyProjectTab({
 
           {bankLoading ? (
             <div className="text-sm italic text-center py-12" style={{ color: 'var(--tp-muted)' }}>Loading challenges…</div>
+          ) : bankError ? (
+            <div className="text-center py-12" style={{ background: 'rgba(255,80,80,0.06)', borderRadius: 16, border: '1.5px solid rgba(255,80,80,0.25)' }}>
+              <div style={{ fontSize: '1.6rem', marginBottom: 6 }}>⚠️</div>
+              <p style={{ fontSize: '0.82rem', color: '#ff7070', fontWeight: 700, margin: '0 0 4px' }}>Couldn't load the Challenge Bank</p>
+              <p style={{ fontSize: '0.72rem', color: 'var(--tp-muted)', margin: 0, padding: '0 20px' }}>{bankError}</p>
+            </div>
           ) : challengeBank.length === 0 ? (
             <div className="text-center py-16" style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, border: '2px dashed rgba(192,132,252,0.2)' }}>
               <div style={{ fontSize: '2.5rem', opacity: 0.2, marginBottom: 8 }}>🏆</div>
