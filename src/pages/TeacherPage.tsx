@@ -2312,9 +2312,9 @@ function WeeklyProjectTab({
                     transition: 'all 0.15s',
                   }}>
                     {/* Card image strip */}
-                    <div style={{ height: 80, background: 'rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
+                    <div style={{ height: 100, background: 'rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
                       {cardImg ? (
-                        <img src={cardImg} alt={cardName} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }} />
+                        <img src={cardImg} alt={cardName} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                       ) : (
                         <span style={{ fontSize: '2rem', opacity: 0.15 }}>📋</span>
                       )}
