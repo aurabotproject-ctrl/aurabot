@@ -708,6 +708,11 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
           <div onClick={e => e.stopPropagation()} style={{ background: '#141628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, padding: 22, maxWidth: 640, width: '100%', maxHeight: '80vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontWeight: 900, fontSize: '1rem', marginBottom: 4 }}>Pick cards to list for trade</div>
             <div style={{ fontSize: '0.76rem', color: '#6070a0', marginBottom: 16 }}>Select one or more cards — classmates will be able to see and request them.</div>
+            {tradeMsg && (
+              <div style={{ background: tradeMsg.startsWith('✓') ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${tradeMsg.startsWith('✓') ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`, color: tradeMsg.startsWith('✓') ? '#4ade80' : '#f87171', borderRadius: 10, padding: '8px 12px', fontSize: '0.76rem', fontWeight: 700, marginBottom: 14 }}>
+                {tradeMsg}
+              </div>
+            )}
             {myCards.filter(c => !listedCardIds.has(c.id)).length === 0 ? (
               <div style={{ textAlign: 'center', padding: 30, color: '#5060a0', fontSize: '0.8rem' }}>All your cards are already listed, or you don't have any cards yet.</div>
             ) : (
@@ -741,6 +746,11 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
           <div onClick={e => e.stopPropagation()} style={{ background: '#141628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, padding: 22, maxWidth: 680, width: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
             <div style={{ fontWeight: 900, fontSize: '1rem', marginBottom: 4 }}>Offer your cards</div>
             <div style={{ fontSize: '0.76rem', color: '#6070a0', marginBottom: 14 }}>Select your own cards until the value matches exactly — trades must be fair.</div>
+            {tradeMsg && (
+              <div style={{ background: tradeMsg.startsWith('✓') ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${tradeMsg.startsWith('✓') ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`, color: tradeMsg.startsWith('✓') ? '#4ade80' : '#f87171', borderRadius: 10, padding: '8px 12px', fontSize: '0.76rem', fontWeight: 700, marginBottom: 14 }}>
+                {tradeMsg}
+              </div>
+            )}
 
             <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#60a5fa', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>You're requesting ({wantedValue} pts)</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
