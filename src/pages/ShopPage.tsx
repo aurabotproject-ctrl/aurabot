@@ -200,6 +200,14 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
         sb.from('trade_offers').select('*').eq('teacher_id', teacherId).order('created_at', { ascending: false }),
       ]);
 
+      if (cardsRes.error) console.error('[Trade] cards query failed:', cardsRes.error);
+      if (classmatesRes.error) console.error('[Trade] students query failed:', classmatesRes.error);
+      if (listingsRes.error) console.error('[Trade] trade_listings query failed:', listingsRes.error);
+      if (offersRes.error) console.error('[Trade] trade_offers query failed:', offersRes.error);
+
+      const firstError = cardsRes.error || classmatesRes.error || listingsRes.error || offersRes.error;
+      if (firstError) showTradeMsg(`Trade data failed to load: ${firstError.message || 'unknown error'}`);
+
       setMyCards((cardsRes.data || []) as Card[]);
 
       const nameMap: Record<string, string> = {};
@@ -218,7 +226,8 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
       // Fetch full card details for the "what you'd receive" side of incoming offers
       const offeredIds = Array.from(new Set(incoming.flatMap((o: any) => o.offered_card_ids || [])));
       if (offeredIds.length > 0) {
-        const { data: offeredCardsData } = await sb.from('cards').select('*').in('id', offeredIds);
+        const { data: offeredCardsData, error: offeredErr } = await sb.from('cards').select('*').in('id', offeredIds);
+        if (offeredErr) console.error('[Trade] offered-card-details query failed:', offeredErr);
         const detailMap: Record<string, Card> = {};
         (offeredCardsData || []).forEach((c: any) => { detailMap[c.id] = c; });
         setOfferCardDetails(detailMap);
@@ -226,7 +235,7 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
         setOfferCardDetails({});
       }
     } catch (err) {
-      console.error('[Trade] load failed', err);
+      console.error('[Trade] load failed (exception)', err);
     }
     setTradeLoading(false);
   }, [studentId, teacherId]);
