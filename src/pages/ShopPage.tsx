@@ -1,6 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { sb } from '../lib/supabase';
 import type { Session } from '../lib/auth';
+import type { Card } from '../lib/supabase';
+
+// ── Trade fairness rules ──────────────────────────────────────────────
+// Point values double each tier up, so any combination of cards whose
+// point totals match on both sides is considered a fair trade —
+// e.g. 2 commons (1+1=2) = 1 silver (2); 2 golds (4+4=8) = 1 prismatic (8).
+export const RARITY_VALUE: Record<string, number> = { common: 1, silver: 2, 'gold-rare': 4, prismatic: 8 };
+const RARITY_LABEL: Record<string, string> = { common: 'Common', silver: 'Silver', 'gold-rare': 'Gold', prismatic: 'Prismatic' };
+const RARITY_COLOR: Record<string, string> = { common: '#9ca3af', silver: '#94a3b8', 'gold-rare': '#f59e0b', prismatic: '#a855f7' };
+
+function OfferCardRow({ label, cards }: { label: string; cards: Card[] }) {
+  const value = cards.reduce((sum, c) => sum + (RARITY_VALUE[c.rarity] || 0), 0);
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+        {label} <span style={{ opacity: 0.7 }}>({value} pts)</span>
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {cards.length === 0 ? (
+          <span style={{ fontSize: '0.7rem', color: '#5060a0', fontStyle: 'italic' }}>Loading…</span>
+        ) : cards.map(c => (
+          <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.05)', border: `1px solid ${RARITY_COLOR[c.rarity]}55`, borderRadius: 8, padding: '4px 8px' }}>
+            {c.image_url && <img src={c.image_url} alt={c.card_name} style={{ width: 20, height: 20, objectFit: 'cover', borderRadius: 4 }} />}
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'white' }}>{c.card_name}</span>
+            <span style={{ fontSize: '0.6rem', fontWeight: 800, color: RARITY_COLOR[c.rarity] }}>{RARITY_LABEL[c.rarity]}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // ── Re-export constants needed by PackOpeningOverlay ─────────────────
 export const PACK_TYPES = [
@@ -91,6 +122,23 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
   const [msg, setMsg] = useState('');
   const [unlocking, setUnlocking] = useState<string | null>(null);
 
+  // ── Trade state ─────────────────────────────────────────────────────
+  const [myCards, setMyCards] = useState<Card[]>([]);
+  const [myListings, setMyListings] = useState<any[]>([]);       // open listings I've put up
+  const [browseListings, setBrowseListings] = useState<any[]>([]); // open listings from classmates
+  const [incomingOffers, setIncomingOffers] = useState<any[]>([]); // pending offers on my listings
+  const [sentOffers, setSentOffers] = useState<any[]>([]);         // pending offers I've made
+  const [offerCardDetails, setOfferCardDetails] = useState<Record<string, Card>>({}); // full card data for cards in others' offers
+  const [classmates, setClassmates] = useState<Record<string, string>>({}); // id -> name
+  const [tradeLoading, setTradeLoading] = useState(false);
+  const [tradeMsg, setTradeMsg] = useState('');
+  const [showListPicker, setShowListPicker] = useState(false);
+  const [wantedOwnerId, setWantedOwnerId] = useState<string | null>(null);
+  const [wantedCardIds, setWantedCardIds] = useState<string[]>([]);
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [offeredCardIds, setOfferedCardIds] = useState<string[]>([]);
+  const [tradeBusy, setTradeBusy] = useState(false);
+
   const isTestAccount = TEST_ACCOUNTS.includes(studentName);
 
   useEffect(() => {
@@ -137,6 +185,207 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
       setPackImages(map);
     })();
   }, [session]);
+
+  // ── Trade data loading ──────────────────────────────────────────────
+  const loadTradeData = useCallback(async () => {
+    if (!studentId || !teacherId) return;
+    setTradeLoading(true);
+    try {
+      const [cardsRes, classmatesRes, listingsRes, offersRes] = await Promise.all([
+        sb.from('cards').select('*').eq('student_id', studentId).order('created_at', { ascending: false }),
+        sb.from('students').select('id, name').eq('teacher_id', teacherId),
+        sb.from('trade_listings').select('*, cards(*)').eq('teacher_id', teacherId).eq('status', 'open').order('created_at', { ascending: false }),
+        sb.from('trade_offers').select('*').eq('teacher_id', teacherId).order('created_at', { ascending: false }),
+      ]);
+
+      setMyCards((cardsRes.data || []) as Card[]);
+
+      const nameMap: Record<string, string> = {};
+      (classmatesRes.data || []).forEach((s: any) => { nameMap[s.id] = s.name; });
+      setClassmates(nameMap);
+
+      const allListings = listingsRes.data || [];
+      setMyListings(allListings.filter((l: any) => l.student_id === studentId));
+      setBrowseListings(allListings.filter((l: any) => l.student_id !== studentId));
+
+      const allOffers = (offersRes.data || []).filter((o: any) => o.status === 'pending');
+      const incoming = allOffers.filter((o: any) => o.to_student_id === studentId);
+      setIncomingOffers(incoming);
+      setSentOffers(allOffers.filter((o: any) => o.from_student_id === studentId));
+
+      // Fetch full card details for the "what you'd receive" side of incoming offers
+      const offeredIds = Array.from(new Set(incoming.flatMap((o: any) => o.offered_card_ids || [])));
+      if (offeredIds.length > 0) {
+        const { data: offeredCardsData } = await sb.from('cards').select('*').in('id', offeredIds);
+        const detailMap: Record<string, Card> = {};
+        (offeredCardsData || []).forEach((c: any) => { detailMap[c.id] = c; });
+        setOfferCardDetails(detailMap);
+      } else {
+        setOfferCardDetails({});
+      }
+    } catch (err) {
+      console.error('[Trade] load failed', err);
+    }
+    setTradeLoading(false);
+  }, [studentId, teacherId]);
+
+  useEffect(() => { loadTradeData(); }, [loadTradeData]);
+  useEffect(() => {
+    const onFocus = () => loadTradeData();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [loadTradeData]);
+
+  const showTradeMsg = (m: string) => { setTradeMsg(m); setTimeout(() => setTradeMsg(''), 3500); };
+
+  // A card is "listed" if it has an open trade_listings row
+  const listedCardIds = new Set(myListings.map((l: any) => l.card_id));
+
+  // ── List a card for trade ───────────────────────────────────────────
+  const handleListCard = async (card: Card) => {
+    setTradeBusy(true);
+    try {
+      const { error } = await sb.from('trade_listings').insert({
+        teacher_id: teacherId, student_id: studentId, card_id: card.id, status: 'open',
+      });
+      if (error) throw error;
+      setShowListPicker(false);
+      await loadTradeData();
+      showTradeMsg(`✓ "${card.card_name}" is now up for trade!`);
+    } catch (err: any) { showTradeMsg('Could not list that card — try again.'); console.error(err); }
+    setTradeBusy(false);
+  };
+
+  const handleCancelListing = async (listing: any) => {
+    setTradeBusy(true);
+    try {
+      await sb.from('trade_listings').update({ status: 'cancelled' }).eq('id', listing.id);
+      // Auto-decline any pending offers that were requesting this card
+      const affected = sentOffers.concat(incomingOffers).filter((o: any) =>
+        (o.requested_card_ids || []).includes(listing.card_id) && o.status === 'pending'
+      );
+      for (const o of affected) {
+        await sb.from('trade_offers').update({ status: 'declined', responded_at: new Date().toISOString() }).eq('id', o.id);
+      }
+      await loadTradeData();
+      showTradeMsg('Listing removed.');
+    } catch (err) { console.error(err); }
+    setTradeBusy(false);
+  };
+
+  // ── Browse & select cards to request ────────────────────────────────
+  const toggleWantedCard = (listing: any) => {
+    if (wantedOwnerId && wantedOwnerId !== listing.student_id && wantedCardIds.length > 0) {
+      showTradeMsg('You can only trade with one classmate at a time — clear your selection first.');
+      return;
+    }
+    setWantedOwnerId(listing.student_id);
+    setWantedCardIds(prev => {
+      const next = prev.includes(listing.card_id) ? prev.filter(id => id !== listing.card_id) : [...prev, listing.card_id];
+      if (next.length === 0) setWantedOwnerId(null);
+      return next;
+    });
+  };
+
+  const clearWantedSelection = () => { setWantedCardIds([]); setWantedOwnerId(null); };
+
+  const wantedCards = browseListings.filter((l: any) => wantedCardIds.includes(l.card_id)).map((l: any) => l.cards as Card);
+  const wantedValue = wantedCards.reduce((sum, c) => sum + (RARITY_VALUE[c.rarity] || 0), 0);
+
+  const offeredCards = myCards.filter(c => offeredCardIds.includes(c.id));
+  const offeredValue = offeredCards.reduce((sum, c) => sum + (RARITY_VALUE[c.rarity] || 0), 0);
+  const tradeBalanced = wantedValue > 0 && wantedValue === offeredValue;
+
+  const toggleOfferedCard = (card: Card) => {
+    setOfferedCardIds(prev => prev.includes(card.id) ? prev.filter(id => id !== card.id) : [...prev, card.id]);
+  };
+
+  const handleSendOffer = async () => {
+    if (!tradeBalanced || !wantedOwnerId) return;
+    setTradeBusy(true);
+    try {
+      const { error } = await sb.from('trade_offers').insert({
+        teacher_id: teacherId,
+        to_student_id: wantedOwnerId,
+        from_student_id: studentId,
+        requested_card_ids: wantedCardIds,
+        offered_card_ids: offeredCardIds,
+        status: 'pending',
+      });
+      if (error) throw error;
+      setShowOfferModal(false);
+      clearWantedSelection();
+      setOfferedCardIds([]);
+      await loadTradeData();
+      showTradeMsg('✓ Trade offer sent! Waiting for them to respond.');
+    } catch (err: any) { showTradeMsg('Could not send that offer — try again.'); console.error(err); }
+    setTradeBusy(false);
+  };
+
+  const handleCancelOffer = async (offer: any) => {
+    setTradeBusy(true);
+    try {
+      await sb.from('trade_offers').update({ status: 'cancelled', responded_at: new Date().toISOString() }).eq('id', offer.id);
+      await loadTradeData();
+    } catch (err) { console.error(err); }
+    setTradeBusy(false);
+  };
+
+  // ── Respond to an incoming offer ────────────────────────────────────
+  const handleRespondOffer = async (offer: any, accept: boolean) => {
+    setTradeBusy(true);
+    try {
+      if (!accept) {
+        await sb.from('trade_offers').update({ status: 'declined', responded_at: new Date().toISOString() }).eq('id', offer.id);
+        await loadTradeData();
+        showTradeMsg('Offer declined.');
+        setTradeBusy(false);
+        return;
+      }
+
+      // Re-verify both sides still own exactly what they're claiming to trade —
+      // protects against a card already having moved in a different trade.
+      const allIds = [...offer.requested_card_ids, ...offer.offered_card_ids];
+      const { data: liveCards } = await sb.from('cards').select('id, student_id').in('id', allIds);
+      const liveMap: Record<string, string> = {};
+      (liveCards || []).forEach((c: any) => { liveMap[c.id] = c.student_id; });
+      const requestedOk = offer.requested_card_ids.every((id: string) => liveMap[id] === offer.to_student_id);
+      const offeredOk = offer.offered_card_ids.every((id: string) => liveMap[id] === offer.from_student_id);
+
+      if (!requestedOk || !offeredOk) {
+        await sb.from('trade_offers').update({ status: 'declined', responded_at: new Date().toISOString() }).eq('id', offer.id);
+        await loadTradeData();
+        showTradeMsg('This trade is no longer valid — one of the cards has already been traded.');
+        setTradeBusy(false);
+        return;
+      }
+
+      // Swap ownership
+      await sb.from('cards').update({ student_id: offer.from_student_id }).in('id', offer.requested_card_ids);
+      await sb.from('cards').update({ student_id: offer.to_student_id }).in('id', offer.offered_card_ids);
+
+      // Close out the listings for the traded cards
+      await sb.from('trade_listings').update({ status: 'completed' }).in('card_id', offer.requested_card_ids).eq('status', 'open');
+
+      // Mark this offer accepted
+      await sb.from('trade_offers').update({ status: 'accepted', responded_at: new Date().toISOString() }).eq('id', offer.id);
+
+      // Auto-decline any other pending offers that referenced the now-moved cards
+      const { data: otherPending } = await sb.from('trade_offers').select('*').eq('teacher_id', teacherId).eq('status', 'pending');
+      for (const o of (otherPending || [])) {
+        if (o.id === offer.id) continue;
+        const refs = [...(o.requested_card_ids || []), ...(o.offered_card_ids || [])];
+        if (refs.some((id: string) => allIds.includes(id))) {
+          await sb.from('trade_offers').update({ status: 'declined', responded_at: new Date().toISOString() }).eq('id', o.id);
+        }
+      }
+
+      await loadTradeData();
+      onCardsAdded?.();
+      showTradeMsg('✓ Trade complete!');
+    } catch (err: any) { console.error(err); showTradeMsg('Something went wrong completing this trade.'); }
+    setTradeBusy(false);
+  };
 
   const showMsg = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
 
@@ -271,14 +520,196 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
 
         {/* ── Trade ── */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 24 }}>
-          <div style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#5060a0', marginBottom: 14 }}>🔄 Trade Cards</div>
-          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 16, padding: '28px', textAlign: 'center' }}>
-            <div style={{ fontSize: '2rem', marginBottom: 8 }}>🔄</div>
-            <div style={{ fontWeight: 800, color: '#a78bfa', marginBottom: 4 }}>Coming Soon</div>
-            <div style={{ fontSize: '0.76rem', color: '#5060a0', lineHeight: 1.5 }}>Soon you'll be able to swap cards with classmates.</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#5060a0' }}>🔄 Trade Cards</div>
+            <button onClick={() => loadTradeData()} style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6070a0', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}>↻ Refresh</button>
           </div>
+
+          {tradeMsg && (
+            <div style={{ background: tradeMsg.startsWith('✓') ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${tradeMsg.startsWith('✓') ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`, color: tradeMsg.startsWith('✓') ? '#4ade80' : '#f87171', borderRadius: 12, padding: '9px 14px', fontSize: '0.78rem', fontWeight: 700, marginBottom: 16 }}>
+              {tradeMsg}
+            </div>
+          )}
+
+          {tradeLoading ? (
+            <div style={{ textAlign: 'center', padding: 30, color: '#5060a0', fontSize: '0.8rem' }}>Loading trades…</div>
+          ) : (
+            <>
+              {/* Incoming offers — needs my response */}
+              {incomingOffers.length > 0 && (
+                <div style={{ marginBottom: 22 }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#f472b6', marginBottom: 10 }}>📥 Offers waiting on you ({incomingOffers.length})</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {incomingOffers.map((offer: any) => {
+                      const reqCards = myCards.filter(c => offer.requested_card_ids.includes(c.id));
+                      // offered cards belong to from_student_id, which may not be in myCards — fetch via browseListings' embedded card or fallback name
+                      return (
+                        <div key={offer.id} style={{ background: 'rgba(244,114,182,0.06)', border: '1.5px solid rgba(244,114,182,0.25)', borderRadius: 14, padding: 14 }}>
+                          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#f472b6', marginBottom: 8 }}>
+                            {classmates[offer.from_student_id] || 'A classmate'} wants to trade with you
+                          </div>
+                          <OfferCardRow label="They get (yours)" cards={reqCards} />
+                          <OfferCardRow label="You get (theirs)" cards={offer.offered_card_ids.map((id: string) => offerCardDetails[id]).filter(Boolean)} />
+                          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                            <button disabled={tradeBusy} onClick={() => handleRespondOffer(offer, true)} style={{ flex: 1, padding: '8px 0', borderRadius: 9, border: 'none', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer', background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: 'white' }}>✓ Accept</button>
+                            <button disabled={tradeBusy} onClick={() => handleRespondOffer(offer, false)} style={{ flex: 1, padding: '8px 0', borderRadius: 9, border: '1px solid rgba(239,68,68,0.3)', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer', background: 'rgba(239,68,68,0.08)', color: '#f87171' }}>✕ Decline</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* My sent offers — pending */}
+              {sentOffers.length > 0 && (
+                <div style={{ marginBottom: 22 }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', marginBottom: 10 }}>📤 Offers you've sent ({sentOffers.length})</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {sentOffers.map((offer: any) => (
+                      <div key={offer.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '10px 14px' }}>
+                        <span style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
+                          Waiting on <strong style={{ color: 'white' }}>{classmates[offer.to_student_id] || 'a classmate'}</strong> — {offer.offered_card_ids.length} of yours for {offer.requested_card_ids.length} of theirs
+                        </span>
+                        <button disabled={tradeBusy} onClick={() => handleCancelOffer(offer)} style={{ fontSize: '0.68rem', fontWeight: 700, color: '#f87171', background: 'transparent', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 7, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>Cancel</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* My listings */}
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#a78bfa' }}>🃏 My cards up for trade ({myListings.length})</div>
+                  <button onClick={() => setShowListPicker(true)} style={{ fontSize: '0.72rem', fontWeight: 800, color: 'white', background: 'linear-gradient(135deg,#7c3aed,#5b21b6)', border: 'none', borderRadius: 9, padding: '6px 12px', cursor: 'pointer' }}>+ List a Card</button>
+                </div>
+                {myListings.length === 0 ? (
+                  <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 14, padding: '18px', textAlign: 'center', fontSize: '0.76rem', color: '#5060a0' }}>
+                    You haven't listed any cards yet. Click "+ List a Card" to offer one up for trade.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+                    {myListings.map((l: any) => (
+                      <div key={l.id} style={{ position: 'relative', flexShrink: 0 }}>
+                        <PokeCard card={l.cards} size="mini" />
+                        <button disabled={tradeBusy} onClick={() => handleCancelListing(l)} style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.6)', color: '#f87171', fontSize: '0.7rem', fontWeight: 900, cursor: 'pointer' }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Browse trade hub */}
+              <div>
+                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#60a5fa', marginBottom: 10 }}>🔍 Browse classmates' trades ({browseListings.length})</div>
+                {browseListings.length === 0 ? (
+                  <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 14, padding: '18px', textAlign: 'center', fontSize: '0.76rem', color: '#5060a0' }}>
+                    No classmates have listed cards yet — check back soon!
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                    {browseListings.map((l: any) => {
+                      const selected = wantedCardIds.includes(l.card_id);
+                      return (
+                        <div key={l.id} style={{ position: 'relative', cursor: 'pointer' }} onClick={() => toggleWantedCard(l)}>
+                          <div style={{ borderRadius: 12, outline: selected ? '3px solid #60a5fa' : 'none', outlineOffset: 2 }}>
+                            <PokeCard card={l.cards} size="mini" />
+                          </div>
+                          <div style={{ position: 'absolute', bottom: 14, left: 6, fontSize: '0.6rem', fontWeight: 800, color: 'white', background: 'rgba(0,0,0,0.65)', borderRadius: 6, padding: '2px 6px' }}>
+                            {classmates[l.student_id] || '?'}
+                          </div>
+                          {selected && <div style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', background: '#60a5fa', color: 'white', fontSize: '0.7rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Sticky selection bar */}
+              {wantedCardIds.length > 0 && (
+                <div style={{ position: 'sticky', bottom: 12, marginTop: 16, background: 'rgba(20,22,40,0.95)', backdropFilter: 'blur(10px)', border: '1.5px solid rgba(96,165,250,0.35)', borderRadius: 14, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'white' }}>
+                    Wanting {wantedCardIds.length} card{wantedCardIds.length !== 1 ? 's' : ''} from <strong>{classmates[wantedOwnerId || ''] || 'classmate'}</strong> · worth <strong style={{ color: '#60a5fa' }}>{wantedValue} pts</strong>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                    <button onClick={clearWantedSelection} style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '7px 12px', cursor: 'pointer' }}>Clear</button>
+                    <button onClick={() => { setOfferedCardIds([]); setShowOfferModal(true); }} style={{ fontSize: '0.72rem', fontWeight: 800, color: 'white', background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', whiteSpace: 'nowrap' }}>Offer My Cards →</button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
+
+      {/* ── List a Card modal ── */}
+      {showListPicker && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setShowListPicker(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#141628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, padding: 22, maxWidth: 640, width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
+            <div style={{ fontWeight: 900, fontSize: '1rem', marginBottom: 4 }}>Pick a card to list for trade</div>
+            <div style={{ fontSize: '0.76rem', color: '#6070a0', marginBottom: 16 }}>Classmates will be able to see and request this card.</div>
+            {myCards.filter(c => !listedCardIds.has(c.id)).length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 30, color: '#5060a0', fontSize: '0.8rem' }}>All your cards are already listed, or you don't have any cards yet.</div>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {myCards.filter(c => !listedCardIds.has(c.id)).map(card => (
+                  <div key={card.id} onClick={() => !tradeBusy && handleListCard(card)} style={{ cursor: tradeBusy ? 'default' : 'pointer', opacity: tradeBusy ? 0.5 : 1 }}>
+                    <PokeCard card={card} size="mini" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Offer my cards modal ── */}
+      {showOfferModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setShowOfferModal(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#141628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, padding: 22, maxWidth: 680, width: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ fontWeight: 900, fontSize: '1rem', marginBottom: 4 }}>Offer your cards</div>
+            <div style={{ fontSize: '0.76rem', color: '#6070a0', marginBottom: 14 }}>Select your own cards until the value matches exactly — trades must be fair.</div>
+
+            <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#60a5fa', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>You're requesting ({wantedValue} pts)</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+              {wantedCards.map(c => <PokeCard key={c.id} card={c} size="mini" />)}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#f472b6', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Your cards — pick {offeredValue} / {wantedValue} pts</div>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+              {myCards.length === 0 ? (
+                <div style={{ fontSize: '0.78rem', color: '#5060a0' }}>You don't have any cards to offer.</div>
+              ) : myCards.map(card => {
+                const selected = offeredCardIds.includes(card.id);
+                return (
+                  <div key={card.id} onClick={() => toggleOfferedCard(card)} style={{ position: 'relative', cursor: 'pointer' }}>
+                    <div style={{ borderRadius: 12, outline: selected ? '3px solid #f472b6' : 'none', outlineOffset: 2 }}>
+                      <PokeCard card={card} size="mini" />
+                    </div>
+                    {selected && <div style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', background: '#f472b6', color: 'white', fontSize: '0.7rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</div>}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 16px', borderRadius: 12, background: tradeBalanced ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.04)', border: `1.5px solid ${tradeBalanced ? 'rgba(34,197,94,0.35)' : 'rgba(255,255,255,0.1)'}` }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: tradeBalanced ? '#4ade80' : '#94a3b8' }}>
+                {tradeBalanced ? '✓ Fair trade — values match!' : `Requesting ${wantedValue} pts · Offering ${offeredValue} pts`}
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setShowOfferModal(false)} style={{ fontSize: '0.74rem', fontWeight: 700, color: '#94a3b8', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9, padding: '8px 14px', cursor: 'pointer' }}>Cancel</button>
+                <button disabled={!tradeBalanced || tradeBusy} onClick={handleSendOffer} style={{ fontSize: '0.74rem', fontWeight: 800, color: 'white', background: tradeBalanced ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'rgba(60,60,80,0.5)', border: 'none', borderRadius: 9, padding: '8px 16px', cursor: tradeBalanced ? 'pointer' : 'not-allowed' }}>
+                  {tradeBusy ? 'Sending…' : '🤝 Send Offer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Pack Opening Overlay */}
       {openingPack && (
