@@ -133,11 +133,13 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
   const [tradeLoading, setTradeLoading] = useState(false);
   const [tradeMsg, setTradeMsg] = useState('');
   const [showListPicker, setShowListPicker] = useState(false);
+  const [selectedListIds, setSelectedListIds] = useState<string[]>([]);
   const [wantedOwnerId, setWantedOwnerId] = useState<string | null>(null);
   const [wantedCardIds, setWantedCardIds] = useState<string[]>([]);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [offeredCardIds, setOfferedCardIds] = useState<string[]>([]);
   const [tradeBusy, setTradeBusy] = useState(false);
+  const [expandedTraderId, setExpandedTraderId] = useState<string | null>(null);
 
   const isTestAccount = TEST_ACCOUNTS.includes(studentName);
 
@@ -241,18 +243,33 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
   // A card is "listed" if it has an open trade_listings row
   const listedCardIds = new Set(myListings.map((l: any) => l.card_id));
 
-  // ── List a card for trade ───────────────────────────────────────────
-  const handleListCard = async (card: Card) => {
+  // Group classmates' open listings by who owns them, for the trader-list view
+  const tradersGrouped: Record<string, any[]> = {};
+  browseListings.forEach((l: any) => {
+    if (!tradersGrouped[l.student_id]) tradersGrouped[l.student_id] = [];
+    tradersGrouped[l.student_id].push(l);
+  });
+  const traderIds = Object.keys(tradersGrouped).sort((a, b) => (classmates[a] || '').localeCompare(classmates[b] || ''));
+
+  // ── List cards for trade (multi-select) ──────────────────────────────
+  const toggleSelectedListCard = (card: Card) => {
+    setSelectedListIds(prev => prev.includes(card.id) ? prev.filter(id => id !== card.id) : [...prev, card.id]);
+  };
+
+  const handleListCards = async () => {
+    if (selectedListIds.length === 0) return;
     setTradeBusy(true);
     try {
-      const { error } = await sb.from('trade_listings').insert({
-        teacher_id: teacherId, student_id: studentId, card_id: card.id, status: 'open',
-      });
+      const rows = selectedListIds.map(cardId => ({
+        teacher_id: teacherId, student_id: studentId, card_id: cardId, status: 'open',
+      }));
+      const { error } = await sb.from('trade_listings').insert(rows);
       if (error) throw error;
       setShowListPicker(false);
+      setSelectedListIds([]);
       await loadTradeData();
-      showTradeMsg(`✓ "${card.card_name}" is now up for trade!`);
-    } catch (err: any) { showTradeMsg('Could not list that card — try again.'); console.error(err); }
+      showTradeMsg(`✓ ${rows.length} card${rows.length !== 1 ? 's' : ''} now up for trade!`);
+    } catch (err: any) { showTradeMsg('Could not list those cards — try again.'); console.error(err); }
     setTradeBusy(false);
   };
 
@@ -582,11 +599,11 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
               <div style={{ marginBottom: 22 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                   <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#a78bfa' }}>🃏 My cards up for trade ({myListings.length})</div>
-                  <button onClick={() => setShowListPicker(true)} style={{ fontSize: '0.72rem', fontWeight: 800, color: 'white', background: 'linear-gradient(135deg,#7c3aed,#5b21b6)', border: 'none', borderRadius: 9, padding: '6px 12px', cursor: 'pointer' }}>+ List a Card</button>
+                  <button onClick={() => setShowListPicker(true)} style={{ fontSize: '0.72rem', fontWeight: 800, color: 'white', background: 'linear-gradient(135deg,#7c3aed,#5b21b6)', border: 'none', borderRadius: 9, padding: '6px 12px', cursor: 'pointer' }}>+ List Cards</button>
                 </div>
                 {myListings.length === 0 ? (
                   <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 14, padding: '18px', textAlign: 'center', fontSize: '0.76rem', color: '#5060a0' }}>
-                    You haven't listed any cards yet. Click "+ List a Card" to offer one up for trade.
+                    You haven't listed any cards yet. Click "+ List Cards" to offer some up for trade.
                   </div>
                 ) : (
                   <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
@@ -602,24 +619,65 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
 
               {/* Browse trade hub */}
               <div>
-                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#60a5fa', marginBottom: 10 }}>🔍 Browse classmates' trades ({browseListings.length})</div>
-                {browseListings.length === 0 ? (
+                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#60a5fa', marginBottom: 10 }}>🔍 Browse classmates' trades ({traderIds.length})</div>
+                {traderIds.length === 0 ? (
                   <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 14, padding: '18px', textAlign: 'center', fontSize: '0.76rem', color: '#5060a0' }}>
                     No classmates have listed cards yet — check back soon!
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                    {browseListings.map((l: any) => {
-                      const selected = wantedCardIds.includes(l.card_id);
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {traderIds.map(traderId => {
+                      const listings = tradersGrouped[traderId];
+                      const isExpanded = expandedTraderId === traderId;
+                      const totalValue = listings.reduce((sum: number, l: any) => sum + (RARITY_VALUE[l.cards?.rarity] || 0), 0);
                       return (
-                        <div key={l.id} style={{ position: 'relative', cursor: 'pointer' }} onClick={() => toggleWantedCard(l)}>
-                          <div style={{ borderRadius: 12, outline: selected ? '3px solid #60a5fa' : 'none', outlineOffset: 2 }}>
-                            <PokeCard card={l.cards} size="mini" />
+                        <div key={traderId} style={{ background: 'rgba(255,255,255,0.03)', border: `1.5px solid ${isExpanded ? 'rgba(96,165,250,0.4)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 14, overflow: 'hidden' }}>
+                          <div
+                            onClick={() => {
+                              if (isExpanded) { setExpandedTraderId(null); return; }
+                              setExpandedTraderId(traderId);
+                              if (wantedOwnerId && wantedOwnerId !== traderId) { setWantedCardIds([]); setWantedOwnerId(null); }
+                            }}
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', cursor: 'pointer' }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.85rem', color: 'white', flexShrink: 0 }}>
+                                {(classmates[traderId] || '?').charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 800, fontSize: '0.84rem', color: 'white' }}>{classmates[traderId] || 'Classmate'}</div>
+                                <div style={{ fontSize: '0.68rem', color: '#6070a0' }}>
+                                  {listings.length} card{listings.length !== 1 ? 's' : ''} up for trade · {totalValue} pts total
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              {/* Tiny rarity-dot preview strip */}
+                              <div style={{ display: 'flex', gap: 3 }}>
+                                {listings.slice(0, 6).map((l: any) => (
+                                  <span key={l.id} style={{ width: 8, height: 8, borderRadius: '50%', background: RARITY_COLOR[l.cards?.rarity] || '#6070a0' }} />
+                                ))}
+                                {listings.length > 6 && <span style={{ fontSize: '0.62rem', color: '#6070a0' }}>+{listings.length - 6}</span>}
+                              </div>
+                              <span style={{ color: '#6070a0', fontSize: '0.8rem', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>▾</span>
+                            </div>
                           </div>
-                          <div style={{ position: 'absolute', bottom: 14, left: 6, fontSize: '0.6rem', fontWeight: 800, color: 'white', background: 'rgba(0,0,0,0.65)', borderRadius: 6, padding: '2px 6px' }}>
-                            {classmates[l.student_id] || '?'}
-                          </div>
-                          {selected && <div style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', background: '#60a5fa', color: 'white', fontSize: '0.7rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</div>}
+
+                          {isExpanded && (
+                            <div style={{ padding: '0 16px 16px', display: 'flex', flexWrap: 'wrap', gap: 10, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 14 }}>
+                              {listings.map((l: any) => {
+                                const selected = wantedCardIds.includes(l.card_id);
+                                return (
+                                  <div key={l.id} style={{ position: 'relative', cursor: 'pointer' }} onClick={() => toggleWantedCard(l)}>
+                                    <div style={{ borderRadius: 12, outline: selected ? '3px solid #60a5fa' : 'none', outlineOffset: 2 }}>
+                                      <PokeCard card={l.cards} size="mini" />
+                                    </div>
+                                    {selected && <div style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', background: '#60a5fa', color: 'white', fontSize: '0.7rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</div>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -644,23 +702,35 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
         </div>
       </div>
 
-      {/* ── List a Card modal ── */}
+      {/* ── List Cards modal ── */}
       {showListPicker && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setShowListPicker(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#141628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, padding: 22, maxWidth: 640, width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
-            <div style={{ fontWeight: 900, fontSize: '1rem', marginBottom: 4 }}>Pick a card to list for trade</div>
-            <div style={{ fontSize: '0.76rem', color: '#6070a0', marginBottom: 16 }}>Classmates will be able to see and request this card.</div>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => { setShowListPicker(false); setSelectedListIds([]); }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#141628', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 18, padding: 22, maxWidth: 640, width: '100%', maxHeight: '80vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontWeight: 900, fontSize: '1rem', marginBottom: 4 }}>Pick cards to list for trade</div>
+            <div style={{ fontSize: '0.76rem', color: '#6070a0', marginBottom: 16 }}>Select one or more cards — classmates will be able to see and request them.</div>
             {myCards.filter(c => !listedCardIds.has(c.id)).length === 0 ? (
               <div style={{ textAlign: 'center', padding: 30, color: '#5060a0', fontSize: '0.8rem' }}>All your cards are already listed, or you don't have any cards yet.</div>
             ) : (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                {myCards.filter(c => !listedCardIds.has(c.id)).map(card => (
-                  <div key={card.id} onClick={() => !tradeBusy && handleListCard(card)} style={{ cursor: tradeBusy ? 'default' : 'pointer', opacity: tradeBusy ? 0.5 : 1 }}>
-                    <PokeCard card={card} size="mini" />
-                  </div>
-                ))}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+                {myCards.filter(c => !listedCardIds.has(c.id)).map(card => {
+                  const selected = selectedListIds.includes(card.id);
+                  return (
+                    <div key={card.id} onClick={() => !tradeBusy && toggleSelectedListCard(card)} style={{ position: 'relative', cursor: tradeBusy ? 'default' : 'pointer', opacity: tradeBusy ? 0.5 : 1 }}>
+                      <div style={{ borderRadius: 12, outline: selected ? '3px solid #7c3aed' : 'none', outlineOffset: 2 }}>
+                        <PokeCard card={card} size="mini" />
+                      </div>
+                      {selected && <div style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', background: '#7c3aed', color: 'white', fontSize: '0.7rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</div>}
+                    </div>
+                  );
+                })}
               </div>
             )}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 14 }}>
+              <button onClick={() => { setShowListPicker(false); setSelectedListIds([]); }} style={{ fontSize: '0.74rem', fontWeight: 700, color: '#94a3b8', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9, padding: '8px 14px', cursor: 'pointer' }}>Cancel</button>
+              <button disabled={selectedListIds.length === 0 || tradeBusy} onClick={handleListCards} style={{ fontSize: '0.74rem', fontWeight: 800, color: 'white', background: selectedListIds.length > 0 ? 'linear-gradient(135deg,#7c3aed,#5b21b6)' : 'rgba(60,60,80,0.5)', border: 'none', borderRadius: 9, padding: '8px 16px', cursor: selectedListIds.length > 0 ? 'pointer' : 'not-allowed' }}>
+                {tradeBusy ? 'Listing…' : `🃏 List ${selectedListIds.length || ''} Card${selectedListIds.length !== 1 ? 's' : ''} for Trade`}
+              </button>
+            </div>
           </div>
         </div>
       )}
