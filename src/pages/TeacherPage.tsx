@@ -2079,6 +2079,14 @@ function WeeklyProjectTab({
   // ── Save to Bank (draft — students don't see it yet) ─────────────
   const handleSaveToBank = async () => {
     if (!weeklyTitle.trim()) { setWErr('Give the challenge a title first.'); return; }
+    if (weeklyProject?.id && weeklyProject.title !== weeklyTitle) {
+      const proceed = window.confirm(
+        `You're currently editing "${weeklyProject.title}" in the Bank.\n\n` +
+        `It looks like you've changed it to "${weeklyTitle}" — if this is meant to be a NEW challenge, click Cancel and press "+ New Challenge" first, then try again.\n\n` +
+        `Click OK to overwrite "${weeklyProject.title}" with these changes instead.`
+      );
+      if (!proceed) return;
+    }
     setWWorking('Saving to Challenge Bank…');
     try {
       const payload: any = {
@@ -2111,6 +2119,14 @@ function WeeklyProjectTab({
   const handleSaveProject = async () => {
     if (!weeklyCard) { setWErr('Select a Project Card first.'); return; }
     if (!weeklyTitle.trim()) { setWErr('Give the challenge a title first.'); return; }
+    if (weeklyProject?.id && weeklyProject.title !== weeklyTitle) {
+      const proceed = window.confirm(
+        `You're currently editing "${weeklyProject.title}" in the Bank.\n\n` +
+        `It looks like you've changed it to "${weeklyTitle}" — if this is meant to be a NEW challenge, click Cancel and press "+ New Challenge" first, then try again.\n\n` +
+        `Click OK to overwrite "${weeklyProject.title}" with these changes instead.`
+      );
+      if (!proceed) return;
+    }
     setWWorking('Publishing challenge…');
     try {
       const payload: any = {
@@ -2447,6 +2463,21 @@ function WeeklyProjectTab({
 
           {/* Left: form */}
           <div className="p-6 rounded-xs" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(90,50,10,0.18)', boxShadow: '2px 3px 12px rgba(0,0,0,0.09)' }}>
+
+            {weeklyProject?.id ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 16, padding: '8px 12px', borderRadius: 10, background: 'rgba(192,132,252,0.1)', border: '1px solid rgba(192,132,252,0.3)' }}>
+                <span style={{ fontSize: '0.72rem', color: '#c084fc', fontWeight: 700 }}>
+                  ✏️ Editing "{weeklyProject.title}" — Save will update this Bank entry
+                </span>
+                <button onClick={handleNewProject} style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--tp-text2)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 7, padding: '3px 9px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  + New instead
+                </button>
+              </div>
+            ) : (
+              <div style={{ marginBottom: 16, padding: '8px 12px', borderRadius: 10, background: 'rgba(80,200,120,0.08)', border: '1px solid rgba(80,200,120,0.25)' }}>
+                <span style={{ fontSize: '0.72rem', color: '#4cba80', fontWeight: 700 }}>🆕 New challenge — Save will add this as a fresh Bank entry</span>
+              </div>
+            )}
 
             <div className="mb-4">
               <label className="tp-label">Challenge Title</label>
