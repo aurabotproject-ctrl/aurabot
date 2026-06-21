@@ -53,7 +53,7 @@ const RARITY_LABEL: Record<string, string> = {
   common: 'Common', silver: 'Silver', 'gold-rare': 'Gold Rare', prismatic: 'Prismatic',
 };
 const RARITY_COLOR: Record<string, string> = {
-  common: '#9ca3af', silver: '#cbd5e1', 'gold-rare': '#f59e0b', prismatic: '#c084fc',
+  common: '#8b5a2b', silver: '#cbd5e1', 'gold-rare': '#f59e0b', prismatic: '#c084fc',
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────

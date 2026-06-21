@@ -364,13 +364,13 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         const handleDownload = () => {
           // ── helpers ──────────────────────────────────────────────────────
           const RARITY_BG: Record<string, string> = {
-            common:     'linear-gradient(160deg,#f5e97a 0%,#e8c830 40%,#f5e097 70%,#ffe680 100%)',
+            common:     'linear-gradient(160deg,#d2a679 0%,#a9744a 40%,#c9986a 70%,#8b5a2b 100%)',
             silver:     'linear-gradient(160deg,#d8e4ee 0%,#a8bfcf 40%,#e0eaf2 70%,#c0d4e4 100%)',
             'gold-rare':'linear-gradient(160deg,#ffe090 0%,#f0b020 30%,#ffd060 60%,#e89010 80%,#ffdc80 100%)',
             prismatic:  'linear-gradient(135deg,#ffb3b3 0%,#ffd9a0 14%,#ffffa0 28%,#b3ffb3 42%,#a0e8ff 57%,#b3b3ff 71%,#e8b3ff 85%,#ffb3e8 100%)',
           };
           const RARITY_BORDER: Record<string, string> = {
-            common: '#c8a000', silver: '#7a9ab0', 'gold-rare': '#c07800', prismatic: '#c080ff',
+            common: '#8b5a2b', silver: '#7a9ab0', 'gold-rare': '#c07800', prismatic: '#c080ff',
           };
           const RARITY_LABELS: Record<string, string> = {
             common: 'COMMON', silver: 'SILVER', 'gold-rare': 'GOLD', prismatic: 'PRISMATIC',
@@ -378,7 +378,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
           const renderPokeCard = (card: any) => {
             const bg = RARITY_BG[card.rarity] || RARITY_BG.common;
-            const border = RARITY_BORDER[card.rarity] || '#c8a000';
+            const border = RARITY_BORDER[card.rarity] || '#8b5a2b';
             const imgHtml = card.image_url
               ? `<img src="${card.image_url}" alt="${card.card_name}" style="width:100%;height:100%;object-fit:contain;" />`
               : `<span style="font-size:40px;">🎭</span>`;
@@ -425,8 +425,8 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
     /* ── PokeCard (Generate Card) styles ── */
     .poke-card {
       width: 260px; height: 375px; border-radius: 18px; position: relative;
-      overflow: hidden; border: 3px solid #c8a000; user-select: none; flex-shrink: 0;
-      box-shadow: 0 8px 25px rgba(200,160,0,0.2);
+      overflow: hidden; border: 3px solid #8b5a2b; user-select: none; flex-shrink: 0;
+      box-shadow: 0 0 0 2px #8b5a2b, 0 8px 25px rgba(139,90,43,0.3);
     }
     .poke-card[data-rarity="silver"] { box-shadow: 0 0 0 2px #7a9ab0, 0 8px 30px rgba(120,160,200,0.2); }
     .poke-card[data-rarity="gold-rare"] { box-shadow: 0 0 0 3px #d4a017, 0 8px 40px rgba(212,160,23,0.35); }

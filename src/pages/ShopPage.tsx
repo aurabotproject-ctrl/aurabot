@@ -9,7 +9,7 @@ import type { Card } from '../lib/supabase';
 // e.g. 2 commons (1+1=2) = 1 silver (2); 2 golds (4+4=8) = 1 prismatic (8).
 export const RARITY_VALUE: Record<string, number> = { common: 1, silver: 2, 'gold-rare': 4, prismatic: 8 };
 const RARITY_LABEL: Record<string, string> = { common: 'Common', silver: 'Silver', 'gold-rare': 'Gold', prismatic: 'Prismatic' };
-const RARITY_COLOR: Record<string, string> = { common: '#9ca3af', silver: '#94a3b8', 'gold-rare': '#f59e0b', prismatic: '#a855f7' };
+const RARITY_COLOR: Record<string, string> = { common: '#8b5a2b', silver: '#94a3b8', 'gold-rare': '#f59e0b', prismatic: '#a855f7' };
 
 function OfferCardRow({ label, cards }: { label: string; cards: Card[] }) {
   const value = cards.reduce((sum, c) => sum + (RARITY_VALUE[c.rarity] || 0), 0);
@@ -847,7 +847,7 @@ function PackOpeningOverlay({ pack, packImages, starPoints, isTestAccount, stude
   const [cardSwiped, setCardSwiped] = useState([false, false, false]);
 
   const rarityGlow: Record<string, string> = {
-    common: 'rgba(156,163,175,0.5)', silver: 'rgba(148,163,184,0.7)',
+    common: 'rgba(139,90,43,0.5)', silver: 'rgba(148,163,184,0.7)',
     'gold-rare': 'rgba(245,158,11,0.8)', prismatic: 'rgba(168,85,247,0.9)',
   };
 

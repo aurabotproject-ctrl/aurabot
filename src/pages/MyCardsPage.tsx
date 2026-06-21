@@ -9,7 +9,7 @@ const PAGE_SIZE = 12;
 
 const RARITIES = ['all', 'common', 'silver', 'gold-rare', 'prismatic'];
 const RARITY_LABELS: Record<string, string> = { all: 'All', common: 'Common', silver: 'Silver', 'gold-rare': 'Gold', prismatic: '🌈 Prismatic' };
-const RARITY_COLORS: Record<string, string> = { all: '#6060a0', common: '#9ca3af', silver: '#94a3b8', 'gold-rare': '#f59e0b', prismatic: '#a855f7' };
+const RARITY_COLORS: Record<string, string> = { all: '#6060a0', common: '#8b5a2b', silver: '#94a3b8', 'gold-rare': '#f59e0b', prismatic: '#a855f7' };
 
 const TYPES = [
   { id: 'all',       label: 'All Types', emoji: '🃏', color: '#6060a0' },
