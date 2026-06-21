@@ -396,6 +396,19 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
       // Mark this offer accepted
       await sb.from('trade_offers').update({ status: 'accepted', responded_at: new Date().toISOString() }).eq('id', offer.id);
 
+      // Trade fee — 1 ⭐ from each side of the trade (skip for test accounts)
+      const feeStudentIds = [offer.to_student_id, offer.from_student_id].filter(
+        id => !TEST_ACCOUNTS.includes(classmates[id] || (id === studentId ? studentName : ''))
+      );
+      if (feeStudentIds.length > 0) {
+        const { data: pointsRows } = await sb.from('student_star_points').select('student_id, points').in('student_id', feeStudentIds);
+        for (const row of (pointsRows || [])) {
+          const newPoints = Math.max(0, (row.points || 0) - 1);
+          await sb.from('student_star_points').update({ points: newPoints }).eq('student_id', row.student_id);
+          if (row.student_id === studentId) setStarPoints(newPoints);
+        }
+      }
+
       // Auto-decline any other pending offers that referenced the now-moved cards
       const { data: otherPending } = await sb.from('trade_offers').select('*').eq('teacher_id', teacherId).eq('status', 'pending');
       for (const o of (otherPending || [])) {
@@ -408,7 +421,7 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
 
       await loadTradeData();
       onCardsAdded?.();
-      showTradeMsg('✓ Trade complete!');
+      showTradeMsg('✓ Trade complete! (1 ⭐ trade fee charged to each player)');
     } catch (err: any) { console.error(err); showTradeMsg('Something went wrong completing this trade.'); }
     setTradeBusy(false);
   };
@@ -576,6 +589,7 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
                           </div>
                           <OfferCardRow label="They get (yours)" cards={reqCards} />
                           <OfferCardRow label="You get (theirs)" cards={offer.offered_card_ids.map((id: string) => offerCardDetails[id]).filter(Boolean)} />
+                          <div style={{ fontSize: '0.66rem', color: '#94a3b8', fontStyle: 'italic', marginTop: 6 }}>Accepting costs 1 ⭐ for each of you.</div>
                           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                             <button disabled={tradeBusy} onClick={() => handleRespondOffer(offer, true)} style={{ flex: 1, padding: '8px 0', borderRadius: 9, border: 'none', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer', background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: 'white' }}>✓ Accept</button>
                             <button disabled={tradeBusy} onClick={() => handleRespondOffer(offer, false)} style={{ flex: 1, padding: '8px 0', borderRadius: 9, border: '1px solid rgba(239,68,68,0.3)', fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer', background: 'rgba(239,68,68,0.08)', color: '#f87171' }}>✕ Decline</button>
@@ -784,6 +798,8 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
                 );
               })}
             </div>
+
+            <div style={{ fontSize: '0.66rem', color: '#94a3b8', fontStyle: 'italic', marginBottom: 8 }}>If accepted, this trade costs 1 ⭐ for each of you.</div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 16px', borderRadius: 12, background: tradeBalanced ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.04)', border: `1.5px solid ${tradeBalanced ? 'rgba(34,197,94,0.35)' : 'rgba(255,255,255,0.1)'}` }}>
               <span style={{ fontSize: '0.8rem', fontWeight: 800, color: tradeBalanced ? '#4ade80' : '#94a3b8' }}>
