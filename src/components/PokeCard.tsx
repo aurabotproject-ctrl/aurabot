@@ -190,7 +190,7 @@ function getDefaultShadow(rarity: string): string {
     case 'prismatic': return '0 0 0 3px #c080ff, 0 8px 50px rgba(180,100,255,0.5), 0 0 30px rgba(255,150,255,0.2)';
     case 'gold-rare': return '0 0 0 3px #d4a017, 0 8px 40px rgba(212,160,23,0.35)';
     case 'silver': return '0 0 0 2px #7a9ab0, 0 8px 30px rgba(120,160,200,0.2)';
-    default: return '0 8px 25px rgba(200,160,0,0.2)';
+    default: return '0 0 0 2px #8b5a2b, 0 8px 25px rgba(139,90,43,0.3)';
   }
 }
 
@@ -201,7 +201,7 @@ function getShadow(rarity: string, sx: number, sy: number): string {
 
 function generateStars(rarity: string, count: number) {
   const colors: Record<string, string[]> = {
-    common: ['#c8a000', '#ffe680', '#f0e097'],
+    common: ['#8b5a2b', '#c9986a', '#d2a679'],
     silver: ['#7a9ab0', '#c0d4e4', '#e0eaf2', '#d8e4ee'],
     'gold-rare': ['#c07800', '#ffe090', '#ffd060', '#ffdc80'],
     prismatic: ['#ffb3b3', '#ffd9a0', '#b3ffb3', '#a0e8ff', '#b3b3ff', '#e8b3ff'],
