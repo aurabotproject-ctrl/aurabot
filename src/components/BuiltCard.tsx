@@ -6,7 +6,7 @@ const TYPE_COLORS: Record<string, string> = {
   electric: '#eab308', psychic: '#a855f7',
 };
 const RARITY_COLORS: Record<string, string> = {
-  common: '#9ca3af', silver: '#94a3b8', 'gold-rare': '#f59e0b', prismatic: '#a855f7',
+  common: '#8b5a2b', silver: '#94a3b8', 'gold-rare': '#f59e0b', prismatic: '#a855f7',
 };
 
 const HOLO_CSS_ID = 'built-card-holo-global';
