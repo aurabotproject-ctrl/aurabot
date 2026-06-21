@@ -1179,6 +1179,7 @@ const DB_DECK_OPTIONS = [
   { id: 'creatures', label: '👾 Creatures',       color: '#a855f7' },
   { id: 'humanoids', label: '🧑 Humanoids',      color: '#f59e0b' },
   { id: 'robots',    label: '🤖 Robots',         color: '#3b82f6' },
+  { id: 'special',   label: '✨ Special',        color: '#be123c' },
   { id: 'project',   label: '📋 Project Cards',  color: '#f97316' },
 ];
 

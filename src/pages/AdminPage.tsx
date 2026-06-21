@@ -516,6 +516,7 @@ const PACK_SLOTS = [
   { id: 'creatures', label: 'Creatures', color: '#0369a1', emoji: '👾' },
   { id: 'humanoids', label: 'Humanoids', color: '#b45309', emoji: '🧑' },
   { id: 'robots',    label: 'Robots',    color: '#374151', emoji: '🤖' },
+  { id: 'special',   label: 'Special',   color: '#be123c', emoji: '✨' },
 ];
 
 const TIER_SLOTS = [

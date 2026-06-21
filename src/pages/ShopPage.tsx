@@ -40,7 +40,8 @@ export const PACK_TYPES = [
   { id: 'creatures', label: 'Creatures Pack', subtitle: 'Magical & Mythical!',      color: '#0369a1', glow: '#38bdf8', emoji: '👾' },
   { id: 'humanoids', label: 'Humanoids Pack', subtitle: 'People & Warriors!',       color: '#b45309', glow: '#f59e0b', emoji: '🧑' },
   { id: 'robots',    label: 'Robots Pack',    subtitle: 'Mechanical & Futuristic!', color: '#374151', glow: '#9ca3af', emoji: '🤖' },
-  { id: 'luckydip',  label: 'Lucky Dip Pack', subtitle: 'Mix of All Themes!',      color: '#be123c', glow: '#f43f5e', emoji: '🎲' },
+  { id: 'special',   label: 'Special Pack',   subtitle: 'Limited & One-of-a-Kind!', color: '#be123c', glow: '#fb7185', emoji: '✨' },
+  { id: 'luckydip',  label: 'Lucky Dip Pack', subtitle: 'Mix of All Themes!',      color: '#a21caf', glow: '#e879f9', emoji: '🎲' },
 ];
 
 const PACK_TIERS = [
