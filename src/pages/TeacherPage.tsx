@@ -1093,7 +1093,7 @@ function BulkAddStudentsModal({ teacherId, onDone, onCancel }: {
   );
 }
 
-
+function ModalForm({ fields, onSubmit, submitLabel, error, onCancel }: {
   fields: { label: string; name: string; type: string; placeholder?: string; default?: string; readonly?: boolean; optional?: boolean }[];
   onSubmit: (vals: Record<string, string>) => void;
   submitLabel: string;
