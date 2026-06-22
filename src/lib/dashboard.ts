@@ -27,6 +27,11 @@ export const Dashboard = {
     return data as Student;
   },
 
+  async markPinChanged(studentId: string): Promise<void> {
+    const { error } = await sb.from('students').update({ must_change_pin: false }).eq('id', studentId);
+    if (error) throw error;
+  },
+
   async getMyStudents(teacherId: string): Promise<Student[]> {
     const { data, error } = await sb.from('students').select('*').eq('teacher_id', teacherId).order('name');
     if (error) throw error;

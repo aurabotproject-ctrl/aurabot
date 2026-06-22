@@ -5,6 +5,7 @@ import type { Profile } from './supabase';
 export type Session = {
   user: { id: string; email: string };
   profile: Profile;
+  mustChangePin?: boolean;
 };
 
 export const Auth = {
@@ -45,7 +46,14 @@ export const Auth = {
     const user = await this.getUser();
     if (!user) return null;
     const profile = await this.getProfile(user.id);
-    return { user: { id: user.id, email: user.email || '' }, profile };
+    let mustChangePin = false;
+    if (profile.role === 'student' && profile.student_id) {
+      try {
+        const { data } = await sb.from('students').select('must_change_pin').eq('id', profile.student_id).maybeSingle();
+        mustChangePin = !!data?.must_change_pin;
+      } catch { /* non-fatal — default to not forcing a change if this lookup fails */ }
+    }
+    return { user: { id: user.id, email: user.email || '' }, profile, mustChangePin };
   },
 
   redirectByRole(role: string) {

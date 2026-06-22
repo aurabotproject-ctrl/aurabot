@@ -22,6 +22,7 @@ export type Student = {
   login_email?: string;
   robot_color_index?: number;
   face_pixels?: string;
+  must_change_pin?: boolean;
   created_at: string;
 };
 
