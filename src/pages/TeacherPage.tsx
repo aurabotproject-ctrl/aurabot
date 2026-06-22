@@ -1046,18 +1046,28 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
     loadColors();
   }, [students]);
 
+  const [loadError, setLoadError] = React.useState('');
+
   const loadStars = async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const ids = students.map(s => s.id);
       if (ids.length === 0) { setLoading(false); return; }
-      const { data } = await sb.from('student_star_points')
+      const { data, error } = await sb.from('student_star_points')
         .select('student_id, points')
         .in('student_id', ids);
+      if (error) {
+        console.error('[Stars] load failed:', error);
+        setLoadError(error.message || 'Could not load star points.');
+      }
       const map: Record<string, number> = {};
       (data || []).forEach((r: any) => { map[r.student_id] = r.points; });
       setStarPoints(map);
-    } catch { /* table may not exist yet */ }
+    } catch (err: any) {
+      console.error('[Stars] load failed (exception):', err);
+      setLoadError(err.message || 'Could not load star points.');
+    }
     setLoading(false);
   };
 
@@ -1085,15 +1095,19 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
     try {
       const current = starPoints[studentId] || 0;
       const newTotal = current + amount;
-      await sb.from('student_star_points').upsert({
+      const { error } = await sb.from('student_star_points').upsert({
         student_id: studentId,
         teacher_id: session.user.id,
         points: newTotal,
       }, { onConflict: 'student_id' });
+      if (error) throw error;
       setStarPoints(prev => ({ ...prev, [studentId]: newTotal }));
       setFlash(prev => ({ ...prev, [studentId]: type }));
       setTimeout(() => setFlash(prev => { const n = { ...prev }; delete n[studentId]; return n; }), 1200);
-    } catch (err: any) { alert('Error: ' + err.message); }
+    } catch (err: any) {
+      console.error('[Stars] give failed:', err);
+      alert('Error saving star points: ' + (err.message || 'unknown error') + '\n\nThe points were NOT saved — please try again.');
+    }
     setGiving(null);
   };
 
@@ -1106,6 +1120,11 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
+      {loadError && (
+        <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: 12, padding: '10px 16px', fontSize: '0.8rem', fontWeight: 700 }}>
+          ⚠️ Couldn't load star points: {loadError} — the numbers below may be out of date.
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: '18px 24px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
