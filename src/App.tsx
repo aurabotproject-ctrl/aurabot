@@ -7,11 +7,12 @@ import ArenaPage from './pages/ArenaPage';
 import BuildABotPage from './pages/BuildABotPage';
 import MyCardsPage from './pages/MyCardsPage';
 import ShopPage from './pages/ShopPage';
+import SetPinPage from './pages/SetPinPage';
 import { Auth } from './lib/auth';
 import { Router } from './lib/router';
 import type { Session } from './lib/auth';
 
-type Page = 'login' | 'teacher' | 'student' | 'admin' | 'arena' | 'buildabot' | 'mycards' | 'shop';
+type Page = 'login' | 'teacher' | 'student' | 'admin' | 'arena' | 'buildabot' | 'mycards' | 'shop' | 'setpin';
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -35,7 +36,11 @@ function App() {
         setPage('login');
       } else {
         const role = s.profile.role;
-        if (path === '/' || path === '/login') {
+        // A student who hasn't set their own PIN yet is forced here no matter
+        // what path they were trying to reach — no way to skip this step.
+        if (role === 'student' && s.mustChangePin) {
+          setPage('setpin');
+        } else if (path === '/' || path === '/login') {
           const rmap: Record<string, Page> = { admin: 'admin', teacher: 'teacher', student: 'student' };
           const target = rmap[role] || 'login';
           Router.navigate('/' + target);
@@ -93,6 +98,7 @@ function App() {
   return (
     <>
       {page === 'login'    && <LoginPage />}
+      {page === 'setpin'   && <SetPinPage session={session!} onSignOut={handleSignOut} onDone={() => { Router.navigate('/student'); init(); }} />}
       {page === 'teacher'  && <TeacherPage session={session!} onSignOut={handleSignOut} />}
       {page === 'student'  && <StudentPage session={session!} onSignOut={handleSignOut} />}
       {page === 'admin'    && <AdminPage session={session!} onSignOut={handleSignOut} />}
