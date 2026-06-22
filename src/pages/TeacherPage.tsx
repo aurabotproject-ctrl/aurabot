@@ -298,7 +298,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
               fields={[
                 { label: 'Student Name', name: 'name', type: 'text', placeholder: 'e.g. Jamie Chen' },
                 { label: 'Student Login Email', name: 'email', type: 'email', placeholder: 'student@school.edu' },
-                { label: '8-Digit PIN (keypad login)', name: 'password', type: 'password', placeholder: 'e.g. 12345678' },
+                { label: 'Temporary 8-Digit PIN (they must set their own on first login)', name: 'password', type: 'password', placeholder: 'e.g. 12345678' },
               ]}
               onSubmit={async (vals) => {
                 setModalError('');
@@ -331,6 +331,16 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
               }}
               submitLabel="Create Student"
               error={modalError}
+              onCancel={() => setModal(null)}
+            />
+          </ModalWrapper>
+        );
+      case 'bulkAddStudents':
+        return (
+          <ModalWrapper title="📋 Bulk Add Students" onClose={() => setModal(null)}>
+            <BulkAddStudentsModal
+              teacherId={session.user.id}
+              onDone={() => { loadData(); setModal(null); }}
               onCancel={() => setModal(null)}
             />
           </ModalWrapper>
@@ -687,7 +697,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
               <div className="tp-section" style={{ marginBottom:0 }}>Your Students</div>
               <div style={{ display:'flex', gap:8 }}>
-
+                <button onClick={() => setModal({ type: 'bulkAddStudents' })} className="tp-btn-outline" style={{ fontSize:'0.8rem' }}>📋 Bulk Add</button>
                 <button onClick={() => setModal({ type: 'addStudent' })} className="tp-btn-primary" style={{ fontSize:'0.8rem' }}>+ Add Student</button>
               </div>
             </div>
@@ -975,7 +985,115 @@ function ModalWrapper({ title, children, onClose, danger }: { title: string; chi
   );
 }
 
-function ModalForm({ fields, onSubmit, submitLabel, error, onCancel }: {
+const BULK_DEFAULT_PIN = '87654321';
+
+function BulkAddStudentsModal({ teacherId, onDone, onCancel }: {
+  teacherId: string;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [text, setText] = React.useState('');
+  const [running, setRunning] = React.useState(false);
+  const [results, setResults] = React.useState<{ line: string; ok: boolean; message: string }[] | null>(null);
+
+  const parseLines = () => {
+    return text
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 0)
+      .map(line => {
+        const idx = line.indexOf(',');
+        if (idx === -1) return { name: '', email: '', raw: line };
+        return { name: line.slice(0, idx).trim(), email: line.slice(idx + 1).trim(), raw: line };
+      });
+  };
+
+  const preview = parseLines();
+  const validCount = preview.filter(p => p.name && p.email).length;
+
+  const handleCreate = async () => {
+    const rows = parseLines();
+    if (rows.length === 0) return;
+    setRunning(true);
+    const out: { line: string; ok: boolean; message: string }[] = [];
+
+    for (const row of rows) {
+      if (!row.name || !row.email) {
+        out.push({ line: row.raw, ok: false, message: 'Could not read "Name, email" from this line.' });
+        continue;
+      }
+      try {
+        const newUser = await Auth.signUp(row.email, BULK_DEFAULT_PIN, 'student', row.name);
+        const newStudent = await Dashboard.createStudent(row.name, teacherId, newUser.id, row.email);
+        try { await Dashboard.giveWelcomeCard(newStudent.id, teacherId); }
+        catch (e: any) { console.warn('Welcome card failed (non-fatal):', e.message); }
+        out.push({ line: row.raw, ok: true, message: 'Created' });
+      } catch (err: any) {
+        out.push({ line: row.raw, ok: false, message: err.message || 'Failed to create' });
+      }
+      setResults([...out]); // live progress as each row completes
+    }
+
+    setRunning(false);
+  };
+
+  const successCount = results?.filter(r => r.ok).length ?? 0;
+  const failCount = results?.filter(r => !r.ok).length ?? 0;
+
+  return (
+    <div>
+      {!results && (
+        <>
+          <p style={{ fontSize: '0.82rem', color: 'var(--tp-text2)', marginBottom: 10, lineHeight: 1.5 }}>
+            Paste one student per line, in the format <strong>Name, email</strong>. Every student will be given the
+            same temporary PIN (<strong>{BULK_DEFAULT_PIN}</strong>) and will be required to set their own PIN the first time they log in.
+          </p>
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder={'Jamie Chen, jamie@school.edu\nAlex Smith, alex@school.edu\nPriya Patel, priya@school.edu'}
+            className="tp-input"
+            style={{ minHeight: 180, fontFamily: 'monospace', fontSize: '0.82rem', whiteSpace: 'pre' }}
+          />
+          {text.trim() && (
+            <p style={{ fontSize: '0.74rem', color: 'var(--tp-muted)', marginTop: 8 }}>
+              {validCount} of {preview.length} line{preview.length !== 1 ? 's' : ''} look ready to import.
+            </p>
+          )}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 18 }}>
+            <button onClick={onCancel} className="tp-btn-outline">Cancel</button>
+            <button onClick={handleCreate} disabled={validCount === 0 || running} className="tp-btn-primary">
+              {running ? 'Creating…' : `Create ${validCount} Student${validCount !== 1 ? 's' : ''}`}
+            </button>
+          </div>
+        </>
+      )}
+
+      {results && (
+        <>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 14 }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#4cba80' }}>✓ {successCount} created</span>
+            {failCount > 0 && <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#e05050' }}>✕ {failCount} failed</span>}
+            {running && <span style={{ fontSize: '0.85rem', color: 'var(--tp-muted)' }}>Working…</span>}
+          </div>
+          <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {results.map((r, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '7px 10px', borderRadius: 8, background: r.ok ? 'rgba(76,186,128,0.08)' : 'rgba(224,80,80,0.08)', fontSize: '0.78rem' }}>
+                <span style={{ color: 'var(--tp-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.line}</span>
+                <span style={{ color: r.ok ? '#4cba80' : '#e05050', fontWeight: 700, flexShrink: 0 }}>{r.ok ? '✓' : r.message}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 18 }}>
+            <button onClick={onDone} disabled={running} className="tp-btn-primary">Done</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
   fields: { label: string; name: string; type: string; placeholder?: string; default?: string; readonly?: boolean; optional?: boolean }[];
   onSubmit: (vals: Record<string, string>) => void;
   submitLabel: string;
