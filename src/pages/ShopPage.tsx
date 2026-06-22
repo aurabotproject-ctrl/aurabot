@@ -122,6 +122,7 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
   const [openingPack, setOpeningPack] = useState<typeof PACK_TYPES[0] | null>(null);
   const [msg, setMsg] = useState('');
   const [unlocking, setUnlocking] = useState<string | null>(null);
+  const [specialPackSettings, setSpecialPackSettings] = useState<{ is_lucky_dip: boolean; set_name: string } | null>(null);
 
   // ── Trade state ─────────────────────────────────────────────────────
   const [myCards, setMyCards] = useState<Card[]>([]);
@@ -143,6 +144,13 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
   const [expandedTraderId, setExpandedTraderId] = useState<string | null>(null);
 
   const isTestAccount = TEST_ACCOUNTS.includes(studentName);
+
+  const displayPackTypes = PACK_TYPES.map(p => {
+    if (p.id === 'special' && specialPackSettings && !specialPackSettings.is_lucky_dip && specialPackSettings.set_name.trim()) {
+      return { ...p, label: `${specialPackSettings.set_name.trim()} Pack`, subtitle: 'Limited Time Set!' };
+    }
+    return p;
+  });
 
   useEffect(() => {
     (async () => {
@@ -186,6 +194,12 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
       const map: Record<string, string> = {};
       (imgs || []).forEach((r: any) => { map[r.pack_id] = r.image_url; });
       setPackImages(map);
+
+      try {
+        const { data: ps, error: psErr } = await sb.from('pack_settings').select('is_lucky_dip, set_name').eq('pack_id', 'special').maybeSingle();
+        if (psErr) console.error('[PackSettings] load failed', psErr);
+        setSpecialPackSettings(ps ? { is_lucky_dip: ps.is_lucky_dip, set_name: ps.set_name || '' } : { is_lucky_dip: true, set_name: '' });
+      } catch (err) { console.error('[PackSettings] load failed', err); }
     })();
   }, [session]);
 
@@ -482,7 +496,7 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
         <div>
           <div style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#5060a0', marginBottom: 14 }}>🃏 Card Packs — 5 ⭐ each • 3 cards per pack</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 14 }}>
-            {PACK_TYPES.map(pack => {
+            {displayPackTypes.map(pack => {
               const canBuy = isTestAccount || (starPoints !== null && starPoints >= 5);
               return (
                 <div key={pack.id} className="pack-card">
@@ -826,6 +840,7 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
           isTestAccount={isTestAccount}
           studentId={studentId}
           teacherId={teacherId}
+          specialPackSettings={specialPackSettings}
           onClose={() => setOpeningPack(null)}
           onStarsSpent={amt => setStarPoints(p => (p || 0) - amt)}
           onComplete={() => { setOpeningPack(null); onCardsAdded?.(); }}
@@ -838,10 +853,11 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
 // ── Pack Opening Overlay (self-contained) ─────────────────────────────
 type OpenPhase = 'tiers' | 'confirm' | 'zoom' | 'tear' | 'reveal';
 
-function PackOpeningOverlay({ pack, packImages, starPoints, isTestAccount, studentId, teacherId, onClose, onComplete, onStarsSpent }: {
+function PackOpeningOverlay({ pack, packImages, starPoints, isTestAccount, studentId, teacherId, specialPackSettings, onClose, onComplete, onStarsSpent }: {
   pack: typeof PACK_TYPES[0]; packImages: Record<string, string>;
   starPoints: number; isTestAccount: boolean;
   studentId: string; teacherId: string;
+  specialPackSettings: { is_lucky_dip: boolean; set_name: string } | null;
   onClose: () => void; onComplete: (cards: OpenedCard[]) => void;
   onStarsSpent: (amt: number) => void;
 }) {
@@ -875,8 +891,10 @@ function PackOpeningOverlay({ pack, packImages, starPoints, isTestAccount, stude
       await sb.from('student_star_points').update({ points: starPoints - selectedTier.stars }).eq('student_id', studentId);
       onStarsSpent(selectedTier.stars);
     }
+    // Special acts as a second Lucky Dip when no limited-time set is currently active
+    const actsAsLuckyDip = pack.id === 'luckydip' || (pack.id === 'special' && (specialPackSettings?.is_lucky_dip ?? true));
     const fetchWithTimeout = Promise.race([
-      pack.id === 'luckydip'
+      actsAsLuckyDip
         ? sb.from('card_database').select('id, card_name, type, description, image_url, move1_name, move2_name').neq('type', 'project').limit(100)
         : sb.from('card_database').select('id, card_name, type, description, image_url, move1_name, move2_name').eq('type', pack.id).limit(100),
       new Promise<{data: null}>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000))

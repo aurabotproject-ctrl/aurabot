@@ -532,7 +532,12 @@ function PackImagesManager() {
   const [msgType, setMsgType] = useState<'ok'|'err'>('ok');
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  useEffect(() => { loadPackImages(); }, []);
+  // Special pack: Lucky Dip toggle + limited-set name
+  const [specialIsLuckyDip, setSpecialIsLuckyDip] = useState(true);
+  const [specialSetName, setSpecialSetName] = useState('');
+  const [specialSaving, setSpecialSaving] = useState(false);
+
+  useEffect(() => { loadPackImages(); loadPackSettings(); }, []);
 
   const loadPackImages = async () => {
     try {
@@ -541,6 +546,39 @@ function PackImagesManager() {
       (data || []).forEach((r: any) => { map[r.pack_id] = r.image_url; });
       setPackImages(map);
     } catch { /* table may not exist yet */ }
+  };
+
+  const loadPackSettings = async () => {
+    try {
+      const { data, error } = await sb.from('pack_settings').select('*').eq('pack_id', 'special').maybeSingle();
+      if (error) { console.error('[PackSettings] load failed', error); return; }
+      if (data) {
+        setSpecialIsLuckyDip(data.is_lucky_dip);
+        setSpecialSetName(data.set_name || '');
+      }
+    } catch (err) { console.error('[PackSettings] load failed', err); }
+  };
+
+  const saveSpecialSettings = async (updates: { is_lucky_dip?: boolean; set_name?: string }) => {
+    setSpecialSaving(true);
+    try {
+      const { error } = await sb.from('pack_settings').upsert({
+        pack_id: 'special',
+        is_lucky_dip: updates.is_lucky_dip ?? specialIsLuckyDip,
+        set_name: updates.set_name ?? specialSetName,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'pack_id' });
+      if (error) throw error;
+    } catch (err: any) {
+      console.error('[PackSettings] save failed', err);
+      showMsg(err.message || 'Could not save Special pack settings', 'err');
+    }
+    setSpecialSaving(false);
+  };
+
+  const handleToggleLuckyDip = (checked: boolean) => {
+    setSpecialIsLuckyDip(checked);
+    saveSpecialSettings({ is_lucky_dip: checked });
   };
 
   const showMsg = (m: string, type: 'ok'|'err' = 'ok') => {
@@ -602,11 +640,47 @@ function PackImagesManager() {
           {PACK_SLOTS.map(pack => (
             <div key={pack.id}>
               {/* Theme header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: pack.id === 'special' ? 10 : 12, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '1.2rem' }}>{pack.emoji}</span>
-                <span style={{ fontWeight: 800, color: pack.color, fontSize: '0.9rem', letterSpacing: '0.05em' }}>{pack.label}</span>
+                <span style={{ fontWeight: 800, color: pack.color, fontSize: '0.9rem', letterSpacing: '0.05em' }}>
+                  {pack.id === 'special' && !specialIsLuckyDip && specialSetName.trim() ? specialSetName : pack.label}
+                </span>
                 <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg,${pack.color}44,transparent)` }} />
               </div>
+
+              {/* Lucky Dip toggle + limited-set name, only for the Special pack */}
+              {pack.id === 'special' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14, padding: '10px 14px', borderRadius: 12, background: 'rgba(190,18,60,0.06)', border: '1px solid rgba(190,18,60,0.2)' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700, color: '#fb7185' }}>
+                    <input
+                      type="checkbox"
+                      checked={specialIsLuckyDip}
+                      onChange={e => handleToggleLuckyDip(e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: '#be123c', cursor: 'pointer' }}
+                    />
+                    🎲 Lucky Dip (mix of all themes)
+                  </label>
+
+                  {!specialIsLuckyDip && (
+                    <input
+                      type="text"
+                      value={specialSetName}
+                      onChange={e => setSpecialSetName(e.target.value)}
+                      onBlur={() => saveSpecialSettings({ set_name: specialSetName })}
+                      placeholder="e.g. Halloween 2026"
+                      style={{ flex: 1, minWidth: 180, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: 'white', fontSize: '0.78rem' }}
+                    />
+                  )}
+
+                  {specialSaving && <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Saving…</span>}
+
+                  <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic', width: '100%' }}>
+                    {specialIsLuckyDip
+                      ? 'Right now the Special pack mixes cards from every theme, just like Lucky Dip.'
+                      : `Right now the Special pack only draws from cards you create under the "${specialSetName.trim() || '(unnamed)'}" deck.`}
+                  </span>
+                </div>
+              )}
 
               {/* 3 tier cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>

@@ -89,6 +89,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
   const [modal, setModal] = useState<{ type: string; data?: any } | null>(null);
   const [modalError, setModalError] = useState('');
   const [detailCard, setDetailCard] = useState<Card | null>(null);
+  const [specialPackLabel, setSpecialPackLabel] = useState<string | null>(null); // custom name for the "special" deck, if not in Lucky Dip mode
 
   // Home Communications state
   type HomeComm = { id: string; teacher_id: string; event_date: string; comment: string; created_at: string };
@@ -137,6 +138,13 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
       ]);
       // Hide the auto-granted Aura-Bot welcome card from the teacher's My Cards view
       const cList = cListRaw.filter((c: any) => c.card_name !== Dashboard.WELCOME_CARD_NAME);
+
+      // Load the Special pack's Lucky Dip / named-set setting (drives the deck label in Card Creation)
+      try {
+        const { data: ps } = await sb.from('pack_settings').select('is_lucky_dip, set_name').eq('pack_id', 'special').maybeSingle();
+        setSpecialPackLabel(ps && !ps.is_lucky_dip && ps.set_name?.trim() ? ps.set_name.trim() : null);
+      } catch { /* table may not exist yet */ }
+
       // Load the currently active/published challenge (for display only — does not touch the editor draft)
       try {
         const { data: wp } = await sb.from('weekly_projects')
@@ -623,7 +631,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
         {/* Generate Card Tab */}
         {tab === 'generate' && (
-          <CardDatabaseTab session={session} />
+          <CardDatabaseTab session={session} specialPackLabel={specialPackLabel} />
         )}
 
 
@@ -670,7 +678,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
         {/* My Cards Tab */}
         {tab === 'cards' && (
-          <CharacterPoolTab session={session} />
+          <CharacterPoolTab session={session} specialPackLabel={specialPackLabel} />
         )}
 
         {/* Students Tab */}
@@ -1190,7 +1198,11 @@ const DB_RARITY_OPTIONS = [
   { id: 'prismatic', label: '🌈 Rainbow',    color: '#a855f7', hint: 'Extremely rare, holographic' },
 ];
 
-function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth').Session> }) {
+function CardDatabaseTab({ session, specialPackLabel }: { session: NonNullable<import('../lib/auth').Session>; specialPackLabel: string | null }) {
+  const deckOptions = React.useMemo(
+    () => DB_DECK_OPTIONS.map(d => d.id === 'special' && specialPackLabel ? { ...d, label: `✨ ${specialPackLabel}` } : d),
+    [specialPackLabel]
+  );
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Card fields
@@ -1411,7 +1423,7 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
           <div>
             <label className="tp-label">Deck Type</label>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              {DB_DECK_OPTIONS.map(d => (
+              {deckOptions.map(d => (
                 <button key={d.id} onClick={() => setCardDeck(d.id)} style={{ padding:'5px 12px', borderRadius:20, fontSize:'0.76rem', fontWeight:700, cursor:'pointer', border: cardDeck === d.id ? `2px solid ${d.color}` : '1.5px solid rgba(180,160,220,0.2)', background: cardDeck === d.id ? `${d.color}18` : 'rgba(255,255,255,0.07)', color: cardDeck === d.id ? d.color : '#8090b0' }}>
                   {d.label}
                 </button>
@@ -1546,7 +1558,11 @@ function CardDatabaseTab({ session }: { session: NonNullable<import('../lib/auth
 
 const CARDS_PER_PAGE = 10;
 
-function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/auth').Session> }) {
+function CharacterPoolTab({ session, specialPackLabel }: { session: NonNullable<import('../lib/auth').Session>; specialPackLabel: string | null }) {
+  const deckOptions = React.useMemo(
+    () => DB_DECK_OPTIONS.map(d => d.id === 'special' && specialPackLabel ? { ...d, label: `✨ ${specialPackLabel}` } : d),
+    [specialPackLabel]
+  );
   const [cards, setCards]       = React.useState<any[]>([]);
   const [loading, setLoading]   = React.useState(true);
   const [filter, setFilter]     = React.useState<string>('all');
@@ -1708,7 +1724,7 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
                 <div>
                   <label style={labelStyle}>Category</label>
                   <select style={{ ...inputStyle, cursor: 'pointer' }} value={editForm.type} onChange={ef('type')}>
-                    {DB_DECK_OPTIONS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+                    {deckOptions.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
                   </select>
                 </div>
               </div>
@@ -1827,7 +1843,7 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
           <button onClick={() => handleFilterChange('all')} style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === 'all' ? '2px solid rgba(192,132,252,0.7)' : '1px solid rgba(255,255,255,0.1)', background: filter === 'all' ? 'rgba(192,132,252,0.18)' : 'rgba(255,255,255,0.05)', color: filter === 'all' ? '#c084fc' : 'var(--tp-muted)' }}>
             ✦ All <span style={{ opacity: 0.6 }}>({deckCounts['all'] ?? 0})</span>
           </button>
-          {DB_DECK_OPTIONS.map(d => (
+          {deckOptions.map(d => (
             <button key={d.id} onClick={() => handleFilterChange(d.id)} style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === d.id ? `2px solid ${d.color}` : '1px solid rgba(255,255,255,0.1)', background: filter === d.id ? `${d.color}22` : 'rgba(255,255,255,0.05)', color: filter === d.id ? d.color : 'var(--tp-muted)' }}>
               {d.label} <span style={{ opacity: 0.6 }}>({deckCounts[d.id] ?? 0})</span>
             </button>
@@ -1849,7 +1865,7 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 16 }}>
           {cards.map(c => {
-            const dc = DB_DECK_OPTIONS.find(d => d.id === c.type)?.color || '#818cf8';
+            const dc = deckOptions.find(d => d.id === c.type)?.color || '#818cf8';
             return (
               <div key={c.id} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, overflow: 'hidden', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
                 <div style={{ height: 3, background: `linear-gradient(90deg,${dc},${dc}66)` }} />
@@ -1862,7 +1878,7 @@ function CharacterPoolTab({ session }: { session: NonNullable<import('../lib/aut
                   <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--tp-text)', marginBottom: 3 }}>{c.card_name}</div>
                   <div style={{ fontSize: '0.65rem', color: 'var(--tp-muted)', marginBottom: 8, fontStyle: 'italic', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{c.description}</div>
                   <div style={{ display: 'flex', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.6rem', padding: '2px 8px', borderRadius: 20, background: `${dc}22`, color: dc, fontWeight: 700, border: `1px solid ${dc}44` }}>{c.type}</span>
+                    <span style={{ fontSize: '0.6rem', padding: '2px 8px', borderRadius: 20, background: `${dc}22`, color: dc, fontWeight: 700, border: `1px solid ${dc}44` }}>{deckOptions.find(d => d.id === c.type)?.label || c.type}</span>
                     {c.is_rare_exclusive && <span style={{ fontSize: '0.6rem', padding: '2px 8px', borderRadius: 20, background: 'rgba(192,132,252,0.15)', color: '#c084fc', fontWeight: 700, border: '1px solid rgba(192,132,252,0.3)' }}>🌟 ×{c.max_copies}</span>}
                   </div>
                   <div style={{ fontSize: '0.62rem', color: 'var(--tp-muted)', marginBottom: 8, display: 'flex', gap: 6 }}>
