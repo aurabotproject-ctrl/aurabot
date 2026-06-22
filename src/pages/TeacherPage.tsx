@@ -1090,11 +1090,11 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
     } catch {}
   };
 
-  const giveStars = async (studentId: string, amount: number, type: 'bronze' | 'silver' | 'gold') => {
+  const giveStars = async (studentId: string, amount: number, type: 'bronze' | 'silver' | 'gold' | 'minus') => {
     setGiving(studentId);
     try {
       const current = starPoints[studentId] || 0;
-      const newTotal = current + amount;
+      const newTotal = Math.max(0, current + amount);
       const { error } = await sb.from('student_star_points').upsert({
         student_id: studentId,
         teacher_id: session.user.id,
@@ -1186,6 +1186,17 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
                     <div key={type} style={{ flex: 1, textAlign: 'center', fontSize: '0.58rem', fontWeight: 700, color: 'var(--tp-muted)', letterSpacing: '0.04em' }}>+{cfg.pts}pt</div>
                   ))}
                 </div>
+
+                {/* Minus button — for mistakes / wrong student */}
+                <button disabled={isBusy || pts <= 0} onClick={() => giveStars(student.id, -1, 'minus')}
+                  title="Remove 1 star point"
+                  style={{
+                    width: '100%', marginTop: 2, height: 26, borderRadius: 9, fontSize: '0.68rem', fontWeight: 800,
+                    border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#f87171',
+                    cursor: pts > 0 ? 'pointer' : 'not-allowed', opacity: pts > 0 ? 1 : 0.4,
+                  }}>
+                  − 1 ⭐
+                </button>
               </div>
             );
           })}
