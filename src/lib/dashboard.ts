@@ -63,6 +63,21 @@ export const Dashboard = {
     return (data || []) as Card[];
   },
 
+  /** Lightweight count of cards per student — fetches only student_id (no
+   * images, no card content), so it's cheap regardless of how many cards
+   * each student has collected. Use this instead of getMyCards() whenever
+   * you only need the numbers, not the actual card data. */
+  async getCardCountsByStudent(teacherId: string): Promise<Record<string, number>> {
+    const { data, error } = await sb.from('cards')
+      .select('student_id')
+      .eq('teacher_id', teacherId)
+      .neq('card_name', this.WELCOME_CARD_NAME);
+    if (error) throw error;
+    const counts: Record<string, number> = {};
+    (data || []).forEach((r: any) => { counts[r.student_id] = (counts[r.student_id] || 0) + 1; });
+    return counts;
+  },
+
   async getStudentCards(studentId: string): Promise<Card[]> {
     const { data, error } = await sb.from('cards').select('*').eq('student_id', studentId).order('created_at', { ascending: false });
     if (error) throw error;
