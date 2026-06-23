@@ -84,7 +84,8 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
   const [tab, setTab] = useState<TabKey>('generate');
   const [students, setStudents] = useState<Student[]>([]);
-  const [cards, setCards] = useState<Card[]>([]);
+  const [cardCounts, setCardCounts] = useState<Record<string, number>>({});
+  const [downloadLoading, setDownloadLoading] = useState<string | null>(null);
   const [geminiKey, setGeminiKey] = useState('');
   const [modal, setModal] = useState<{ type: string; data?: any } | null>(null);
   const [modalError, setModalError] = useState('');
@@ -132,12 +133,10 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
   const loadData = useCallback(async () => {
     try {
-      const [sList, cListRaw] = await Promise.all([
+      const [sList, countsMap] = await Promise.all([
         Dashboard.getMyStudents(session.user.id),
-        Dashboard.getMyCards(session.user.id),
+        Dashboard.getCardCountsByStudent(session.user.id),
       ]);
-      // Hide the auto-granted Aura-Bot welcome card from the teacher's My Cards view
-      const cList = cListRaw.filter((c: any) => c.card_name !== Dashboard.WELCOME_CARD_NAME);
 
       // Load the Special pack's Lucky Dip / named-set setting (drives the deck label in Card Creation)
       try {
@@ -178,7 +177,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         }
       } catch { /* table may not exist yet */ }
       setStudents(sList);
-      setCards(cList);
+      setCardCounts(countsMap);
       setGeminiKey(AI.getGeminiKey());
     } catch (err: any) {
       console.error(err.message);
@@ -378,7 +377,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
           </ModalWrapper>
         );
       case 'downloadCards': {
-        const studentCards = cards.filter(c => c.student_id === modal.data.id);
+        const studentCards = modal.data.cards as Card[];
         const handleDownload = () => {
           // ── helpers ──────────────────────────────────────────────────────
           const RARITY_BG: Record<string, string> = {
@@ -712,10 +711,24 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                     <tr key={s.id}>
                       <td style={{ fontWeight:700 }}>{s.name}</td>
                       <td style={{ fontSize:'0.78rem', color:'var(--tp-muted)' }}>{s.login_email || '—'}</td>
-                      <td>{cards.filter(c => c.student_id === s.id).length}</td>
+                      <td>{cardCounts[s.id] || 0}</td>
                       <td>
                         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                          <button onClick={() => setModal({ type: 'downloadCards', data: s })} className="tp-btn-outline">⬇ Cards</button>
+                          <button
+                            onClick={async () => {
+                              setDownloadLoading(s.id);
+                              try {
+                                const studentCards = await Dashboard.getStudentCards(s.id);
+                                const filtered = studentCards.filter(c => c.card_name !== Dashboard.WELCOME_CARD_NAME);
+                                setModal({ type: 'downloadCards', data: { ...s, cards: filtered } });
+                              } catch (err: any) {
+                                alert('Could not load this student\'s cards: ' + (err.message || 'unknown error'));
+                              }
+                              setDownloadLoading(null);
+                            }}
+                            disabled={downloadLoading === s.id}
+                            className="tp-btn-outline"
+                          >{downloadLoading === s.id ? '…' : '⬇ Cards'}</button>
                           <button onClick={() => setModal({ type: 'editStudent', data: s })} className="tp-btn-outline">✏ Edit</button>
                           <button onClick={() => { setModalError(''); setModal({ type: 'resetPassword', data: s }); }} className="tp-btn-outline" style={{ borderColor:'rgba(80,200,120,0.35)', color:'#2a7a50' }}>🔑 Reset PIN</button>
                           <button onClick={() => setModal({ type: 'deleteStudent', data: s })} className="tp-btn-danger">🗑</button>
