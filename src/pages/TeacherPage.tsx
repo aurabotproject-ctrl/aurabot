@@ -4,6 +4,7 @@ import PokeCard from '../components/PokeCard';
 import { TeacherBotThumbnail } from '../components/BotAvatar';
 import { Auth } from '../lib/auth';
 import { fileToWebP } from '../lib/imageUtils';
+import { uploadImageToR2 } from '../lib/r2Upload';
 import { Dashboard } from '../lib/dashboard';
 import { AI } from '../lib/ai';
 import { sb } from '../lib/supabase';
@@ -244,10 +245,11 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
     if (!pbMessage.trim()) { setPbStatus('Please enter a message.'); return; }
     setPbSaving(true); setPbStatus('Saving…');
     try {
+      const photoUrl = await uploadImageToR2(pbPhotoUrl || '', 'pinboard');
       const payload = {
         teacher_id: session.user.id,
         message: pbMessage.trim(),
-        photo_url: pbPhotoUrl || null,
+        photo_url: photoUrl || null,
       };
       let saved;
       if (pinboard?.id) {
@@ -1457,7 +1459,10 @@ function CardDatabaseTab({ session, specialPackLabel }: { session: NonNullable<i
     if (!strongActionName.trim()) { setSavedMsg('Enter a strong action name.'); return; }
     setSaving(true); setSavedMsg('');
     try {
-      const imageUrl = livePreview || dbImage || '';
+      setSavedMsg('Uploading image…');
+      const rawImage = livePreview || dbImage || '';
+      const imageUrl = await uploadImageToR2(rawImage, 'cards');
+      setSavedMsg('Saving card…');
       // Stats and rarity are NOT stored — assigned at pack-open time
       const payload = {
         teacher_id: session.user.id,
@@ -1814,6 +1819,7 @@ function CharacterPoolTab({ session, specialPackLabel }: { session: NonNullable<
     setEditSaving(true);
     setEditError('');
     try {
+      const imageUrl = await uploadImageToR2(editForm.image_url || '', 'cards');
       const { error } = await sb.from('card_database').update({
         card_name:   editForm.card_name,
         description: editForm.description,
@@ -1827,7 +1833,7 @@ function CharacterPoolTab({ session, specialPackLabel }: { session: NonNullable<
         move1_dmg:   Number(editForm.move1_dmg),
         move2_name:  editForm.move2_name,
         move2_dmg:   Number(editForm.move2_dmg),
-        image_url:   editForm.image_url || null,
+        image_url:   imageUrl || null,
       }).eq('id', editCard.id);
       if (error) throw error;
       setEditCard(null);

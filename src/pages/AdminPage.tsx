@@ -3,6 +3,7 @@ import { Auth } from '../lib/auth';
 import { sb } from '../lib/supabase';
 import type { Session } from '../lib/auth';
 import { fileToWebP } from '../lib/imageUtils';
+import { uploadImageToR2 } from '../lib/r2Upload';
 
 type TabKey = 'teachers' | 'design';
 
@@ -591,14 +592,15 @@ function PackImagesManager() {
     if (file.size > 5 * 1024 * 1024) { showMsg('Image must be under 5MB', 'err'); return; }
     setUploading(slotKey);
     try {
-      const dataUrl = await fileToWebP(file, 1200, 1200, 0.88);
+      const rawDataUrl = await fileToWebP(file, 1200, 1200, 0.88);
+      const imageUrl = await uploadImageToR2(rawDataUrl, 'packs');
       const { error } = await sb.from('pack_images').upsert({
         pack_id: slotKey,
-        image_url: dataUrl,
+        image_url: imageUrl,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'pack_id' });
       if (error) throw error;
-      setPackImages(prev => ({ ...prev, [slotKey]: dataUrl }));
+      setPackImages(prev => ({ ...prev, [slotKey]: imageUrl }));
       showMsg(`✓ Image updated!`);
     } catch (err: any) {
       showMsg(err.message || 'Upload failed', 'err');
