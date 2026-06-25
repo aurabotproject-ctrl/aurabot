@@ -421,21 +421,29 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
       try {
         const profile = session.profile;
         let studentId = profile.student_id;
-        if (!studentId) {
-          const { data } = await sb.from('students').select('id').eq('auth_user_id', session.user.id).maybeSingle();
-          if (data) studentId = data.id;
+        let myTeacherId: string | null = null;
+
+        if (studentId) {
+          const { data } = await sb.from('students').select('teacher_id').eq('id', studentId).maybeSingle();
+          myTeacherId = data?.teacher_id || null;
+        } else {
+          const { data } = await sb.from('students').select('id, teacher_id').eq('auth_user_id', session.user.id).maybeSingle();
+          if (data) { studentId = data.id; myTeacherId = data.teacher_id; }
         }
+
         if (studentId) {
           const cards = await Dashboard.getStudentCards(studentId);
           setP1AllCards(cards);
           setP1Ready(true);
           setMyStudentId(studentId);
         }
+
+        if (myTeacherId) {
+          const classmates = await Dashboard.getMyStudents(myTeacherId);
+          setAllStudents(classmates.filter(st => st.auth_user_id !== session.user.id));
+        }
       } catch (e: any) { setSetupError(e.message); }
     })();
-    Dashboard.getAllStudents().then(s => {
-      setAllStudents(s.filter(st => st.auth_user_id !== session.user.id));
-    }).catch(() => {});
   }, [session]);
 
   const handleChallengeOpponent = async () => {
