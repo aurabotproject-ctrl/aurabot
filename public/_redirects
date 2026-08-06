@@ -1,2 +1,3 @@
 /api/* /.netlify/functions/:splat 200
+/3daura/* /3daura/:splat 200
 /* /index.html 200

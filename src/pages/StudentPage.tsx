@@ -593,6 +593,21 @@ function StatsPanel({ total, medals, scoreboard, weekEnd, onSignOut, studentName
         </div>
       </div>
 
+      {/* 3D Aura button */}
+      <div
+        onClick={() => { window.location.hash = '/3daura'; }}
+        style={{ cursor: 'pointer' }}
+      >
+        <div
+          style={{ background: 'linear-gradient(135deg,#43e97b,#38f9d7,#3ac0ef)', borderRadius: 18, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 6px 20px rgba(60,180,180,0.3)', cursor: 'pointer', transition: 'all 0.2s' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.03)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 8px 28px rgba(60,180,180,0.5)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 20px rgba(60,180,180,0.3)'; }}
+        >
+          <span style={{ fontSize: '0.75rem', fontWeight: 900, letterSpacing: '0.1em', color: '#fff', textTransform: 'uppercase' }}>3D Aura</span>
+          <span style={{ fontSize: '1rem' }}>🤖</span>
+        </div>
+      </div>
+
       {/* Weekly scoreboard */}
       <div className="sd-panel" style={{ background: 'var(--panel-bg,rgba(8,18,50,0.75))', borderRadius: 20, padding: '14px 14px', border: '1.5px solid var(--panel-border,rgba(60,100,200,0.2))', boxShadow: 'var(--panel-shadow,0 4px 16px rgba(0,0,0,0.3))', backdropFilter: 'blur(16px)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>

@@ -8,11 +8,12 @@ import BuildABotPage from './pages/BuildABotPage';
 import MyCardsPage from './pages/MyCardsPage';
 import ShopPage from './pages/ShopPage';
 import SetPinPage from './pages/SetPinPage';
+import ThreeDAuraPage from './pages/ThreeDAuraPage';
 import { Auth } from './lib/auth';
 import { Router } from './lib/router';
 import type { Session } from './lib/auth';
 
-type Page = 'login' | 'teacher' | 'student' | 'admin' | 'arena' | 'buildabot' | 'mycards' | 'shop' | 'setpin';
+type Page = 'login' | 'teacher' | 'student' | 'admin' | 'arena' | 'buildabot' | 'mycards' | 'shop' | 'setpin' | '3daura';
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -66,6 +67,9 @@ function App() {
         } else if (path.startsWith('/shop')) {
           if (role !== 'student' && role !== 'admin') { Router.navigate('/'); setPage('login'); }
           else setPage('shop');
+        } else if (path.startsWith('/3daura')) {
+          if (role !== 'student' && role !== 'admin') { Router.navigate('/'); setPage('login'); }
+          else setPage('3daura');
         } else {
           setPage('login');
         }
@@ -106,6 +110,7 @@ function App() {
       {page === 'buildabot' && <BuildABotPage onBack={() => goTo('student', '/student')} userId={session?.user.id ?? ''} />}
       {page === 'mycards'  && <MyCardsPage session={session!} onBack={() => goTo('student', '/student')} />}
       {page === 'shop'     && <ShopPage session={session!} onBack={() => goTo('student', '/student')} onCardsAdded={() => goTo('mycards', '/mycards')} />}
+      {page === '3daura'   && <ThreeDAuraPage />}
     </>
   );
 }
