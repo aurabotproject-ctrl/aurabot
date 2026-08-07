@@ -3092,6 +3092,21 @@
     handle.textContent = '⠿';
     mainLine.appendChild(handle);
 
+    // Drag-and-drop (below) doesn't work on touch devices, so this button gives
+    // iPad/touchscreen users a tap-friendly way to do the exact same move.
+    const moveBtn = document.createElement('button');
+    moveBtn.type = 'button';
+    moveBtn.className = 'pet-move-btn';
+    moveBtn.title = listName === 'active' ? 'Move to Not Following' : 'Move to Following';
+    moveBtn.textContent = listName === 'active' ? '↓' : '↑';
+    moveBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      const toList = listName === 'active' ? 'inactive' : 'active';
+      if (movePet(id, toList)) { savePetSettings(); renderPetLists(); }
+    });
+    moveBtn.addEventListener('pointerdown', e => e.stopPropagation());
+    mainLine.appendChild(moveBtn);
+
     if (listName === 'active') {
       const orderBadge = document.createElement('span');
       orderBadge.className = 'pet-order-num';
@@ -3135,7 +3150,7 @@
         if (ev.key === 'Enter') input.blur();
         if (ev.key === 'Escape') { input.value = petNames[id]; input.blur(); }
       });
-      input.addEventListener('mousedown', ev => ev.stopPropagation());
+      input.addEventListener('pointerdown', ev => ev.stopPropagation());
     });
 
     row.appendChild(mainLine);
@@ -3158,7 +3173,7 @@
         swatchLine.querySelectorAll('.pet-swatch').forEach(el => el.classList.remove('selected'));
         sw.classList.add('selected');
       });
-      sw.addEventListener('mousedown', e => e.stopPropagation());
+      sw.addEventListener('pointerdown', e => e.stopPropagation());
       swatchLine.appendChild(sw);
     });
     row.appendChild(swatchLine);
@@ -3873,10 +3888,15 @@
   const buildRaycaster = new THREE.Raycaster();
   const mouseNDC = new THREE.Vector2(0, 0);
   const MAX_STACK_HEIGHT = 8;
-  window.addEventListener('mousemove', e => {
+  function updateMouseNDC(e) {
     mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
     mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
-  });
+  }
+  window.addEventListener('pointermove', updateMouseNDC);
+  // Touch taps go straight from pointerdown to pointerup with no pointermove in
+  // between, so the raycast target must also be set on pointerdown or a tap would
+  // aim wherever the NDC coords last happened to be (e.g. 0,0 on the very first tap).
+  window.addEventListener('pointerdown', updateMouseNDC);
 
   const gridOverlayGroup = new THREE.Group();
   gridOverlayGroup.position.y = -4.61;
@@ -4685,9 +4705,9 @@
       apply();
     }
     let dragging = false;
-    document.getElementById(wrapId).addEventListener('mousedown', e => { dragging = true; updateFromPoint(e.clientX, e.clientY); });
-    window.addEventListener('mousemove', e => { if (dragging) updateFromPoint(e.clientX, e.clientY); });
-    window.addEventListener('mouseup', () => { dragging = false; });
+    document.getElementById(wrapId).addEventListener('pointerdown', e => { dragging = true; updateFromPoint(e.clientX, e.clientY); });
+    window.addEventListener('pointermove', e => { if (dragging) updateFromPoint(e.clientX, e.clientY); });
+    window.addEventListener('pointerup', () => { dragging = false; });
     document.getElementById(lightnessSliderId).addEventListener('input', e => {
       state.lightness = parseFloat(e.target.value);
       apply();
@@ -4743,12 +4763,12 @@
   document.getElementById('brushSizeSlider').addEventListener('input', e => { brushSize = parseFloat(e.target.value); });
 
   let drawingOnCanvas = false, canvasStrokeMoved = false, lastCanvasPt = null, downCanvasPt = null;
-  paintCanvasEl.addEventListener('mousedown', e => {
+  paintCanvasEl.addEventListener('pointerdown', e => {
     drawingOnCanvas = true; canvasStrokeMoved = false;
     downCanvasPt = canvasPointFromEvent(e);
     lastCanvasPt = downCanvasPt;
   });
-  window.addEventListener('mousemove', e => {
+  window.addEventListener('pointermove', e => {
     if (!drawingOnCanvas) return;
     const pt = canvasPointFromEvent(e);
     const dist = Math.hypot(pt.x - downCanvasPt.x, pt.y - downCanvasPt.y);
@@ -4771,7 +4791,7 @@
     paintCtx.globalAlpha = 1;
     lastCanvasPt = pt;
   });
-  window.addEventListener('mouseup', () => {
+  window.addEventListener('pointerup', () => {
     if (!drawingOnCanvas) return;
     drawingOnCanvas = false;
     if (!canvasStrokeMoved) {
@@ -5127,13 +5147,13 @@
 
   // ---- Click-and-drag panning on the full-area map ----
   function largeMapScale() { return Math.min(largeMapCanvas.width, largeMapCanvas.height) / 190; }
-  largeMapCanvas.addEventListener('mousedown', e => {
+  largeMapCanvas.addEventListener('pointerdown', e => {
     isPanningMap = true;
     panMouseX = e.clientX; panMouseY = e.clientY;
     largeMapCanvas.classList.add('panning');
     e.preventDefault();
   });
-  window.addEventListener('mousemove', e => {
+  window.addEventListener('pointermove', e => {
     if (!isPanningMap) return;
     const dx = e.clientX - panMouseX, dy = e.clientY - panMouseY;
     panMouseX = e.clientX; panMouseY = e.clientY;
@@ -5141,7 +5161,7 @@
     largeMapPanX = THREE.MathUtils.clamp(largeMapPanX - dx / scale, -LARGE_MAP_PAN_LIMIT, LARGE_MAP_PAN_LIMIT);
     largeMapPanZ = THREE.MathUtils.clamp(largeMapPanZ - dy / scale, -LARGE_MAP_PAN_LIMIT, LARGE_MAP_PAN_LIMIT);
   });
-  window.addEventListener('mouseup', () => {
+  window.addEventListener('pointerup', () => {
     if (!isPanningMap) return;
     isPanningMap = false;
     largeMapCanvas.classList.remove('panning');
@@ -5330,29 +5350,213 @@
   
   const smoothFocus = new THREE.Vector3(0, 2.1, 0);
 
-  window.addEventListener('mousedown', e => { if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON' && !e.target.closest('#minimapContainer') && !e.target.closest('.hud-panel') && !e.target.closest('#inventoryPanel') && !e.target.closest('#petPanel') && !e.target.closest('#editMenuModal') && !e.target.closest('#eraseAllConfirmModal') && !e.target.closest('#spraypaintPanel') && !e.target.closest('#paintCanvasModal')) { isDragging = true; prevMouseX = e.clientX; prevMouseY = e.clientY; dragStartX = e.clientX; dragStartY = e.clientY; }});
-  window.addEventListener('mousemove', e => { if (!isDragging) return; const dx = e.clientX - prevMouseX; const dy = e.clientY - prevMouseY; camAngleX -= dx * 0.008; camAngleY = Math.max(0.05, Math.min(Math.PI / 2 - 0.05, camAngleY + dy * 0.008)); prevMouseX = e.clientX; prevMouseY = e.clientY; });
-  window.addEventListener('mouseup', e => {
-    if (isDragging && buildMode.active) {
-      const dist = Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY);
-      if (dist < 6) placeBuildBlockAtHover();
+  // Elements that should swallow their own taps/drags rather than orbiting the world
+  // camera underneath them. Works for mouse AND touch since pointerdown/move/up fire
+  // for both (Pointer Events are used throughout so iPad/touch users get the exact
+  // same orbit-drag, tap-to-place, and pinch-to-zoom behaviour as desktop mouse users).
+  const UI_BLOCK_SELECTOR = '#minimapContainer, .hud-panel, #inventoryPanel, #petPanel, #editMenuModal, #eraseAllConfirmModal, #spraypaintPanel, #paintCanvasModal, #largeMapModal, #mobileControls, #placementTouchPanel, #buildTouchPanel';
+  function isUiTarget(target) {
+    return target.tagName === 'INPUT' || target.tagName === 'BUTTON' || !!target.closest(UI_BLOCK_SELECTOR);
+  }
+
+  // Tracks every finger/pointer currently down on the world so two-finger touch
+  // can pinch-zoom while a single finger orbits the camera (mouse wheel still
+  // works too, see the 'wheel' listener below).
+  const activePointers = new Map();
+  let pinchStartDist = null, pinchStartCamDist = null;
+  function currentPinchDist() {
+    const pts = Array.from(activePointers.values());
+    if (pts.length < 2) return null;
+    return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+  }
+
+  window.addEventListener('pointerdown', e => {
+    if (isUiTarget(e.target)) return;
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (activePointers.size >= 2) {
+      isDragging = false;
+      pinchStartDist = currentPinchDist();
+      pinchStartCamDist = camDist;
+    } else {
+      isDragging = true;
+      prevMouseX = e.clientX; prevMouseY = e.clientY;
+      dragStartX = e.clientX; dragStartY = e.clientY;
     }
-    if (isDragging && editMode.active && editMode.eraseArmed) {
-      const dist = Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY);
-      if (dist < 6) eraseObjectAtMouse();
-    }
-    if (isDragging && editMode.active && editMode.sprayArmed) {
-      const dist = Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY);
-      if (dist < 6) paintObjectAtMouse();
-    }
-    if (isDragging && editMode.active && editMode.drawApplyArmed) {
-      const dist = Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY);
-      if (dist < 6) applyDesignAtMouse();
-    }
-    isDragging = false;
   });
+  window.addEventListener('pointermove', e => {
+    if (activePointers.has(e.pointerId)) activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (activePointers.size >= 2) {
+      const d = currentPinchDist();
+      if (d && pinchStartDist) camDist = Math.max(8, Math.min(120, pinchStartCamDist * (pinchStartDist / d)));
+      return;
+    }
+    if (!isDragging) return;
+    const dx = e.clientX - prevMouseX; const dy = e.clientY - prevMouseY;
+    camAngleX -= dx * 0.008; camAngleY = Math.max(0.05, Math.min(Math.PI / 2 - 0.05, camAngleY + dy * 0.008));
+    prevMouseX = e.clientX; prevMouseY = e.clientY;
+  });
+  function endWorldPointer(e) {
+    const wasSoleDrag = isDragging && activePointers.size <= 1;
+    activePointers.delete(e.pointerId);
+    if (activePointers.size < 2) { pinchStartDist = null; pinchStartCamDist = null; }
+    if (wasSoleDrag) {
+      if (buildMode.active) {
+        const dist = Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY);
+        if (dist < 6) placeBuildBlockAtHover();
+      }
+      if (editMode.active && editMode.eraseArmed) {
+        const dist = Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY);
+        if (dist < 6) eraseObjectAtMouse();
+      }
+      if (editMode.active && editMode.sprayArmed) {
+        const dist = Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY);
+        if (dist < 6) paintObjectAtMouse();
+      }
+      if (editMode.active && editMode.drawApplyArmed) {
+        const dist = Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY);
+        if (dist < 6) applyDesignAtMouse();
+      }
+    }
+    if (activePointers.size === 0) isDragging = false;
+  }
+  window.addEventListener('pointerup', endWorldPointer);
+  window.addEventListener('pointercancel', endWorldPointer);
   
   window.addEventListener('wheel', e => { camDist = Math.max(8, Math.min(120, camDist + e.deltaY * 0.02)); });
+
+  // ═══════════════════════════════════════════════════════════════
+  // TOUCH CONTROLS (iPad / touchscreen) — joystick, action buttons,
+  // and the contextual placement/build panels. Everything here just
+  // drives the exact same state (keys.*, tryJump(), enterEditMode(),
+  // placementMode.gx/gz, buildMode.selectedType, etc.) that the
+  // keyboard handlers above already use, so behaviour stays identical
+  // regardless of input method.
+  // ═══════════════════════════════════════════════════════════════
+  const IS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
+
+  const mobileControlsEl = document.getElementById('mobileControls');
+  const placementTouchPanelEl = document.getElementById('placementTouchPanel');
+  const buildTouchPanelEl = document.getElementById('buildTouchPanel');
+
+  if (IS_TOUCH) {
+    mobileControlsEl.classList.remove('hidden');
+
+    // Touch devices never see the keyboard hint text, so swap it for one that
+    // matches what's actually on screen.
+    const hintEl = document.getElementById('hint');
+    hintEl.textContent = 'DRAG to look around · PINCH to zoom · use the on-screen controls to move';
+
+    // ---- Virtual joystick: maps drag position to the same keys{} booleans
+    // the keyboard uses (independent per-axis thresholds so diagonals work
+    // exactly like holding two arrow keys at once). ----
+    const joystickBaseEl = document.getElementById('joystickBase');
+    const joystickKnobEl = document.getElementById('joystickKnob');
+    const JOY_RADIUS = 46; // px the knob can travel from center
+    const JOY_DEADZONE = 0.28; // fraction of radius before a direction registers
+    let joyPointerId = null, joyCenterX = 0, joyCenterY = 0;
+
+    function resetJoystick() {
+      keys.w = false; keys.a = false; keys.s = false; keys.d = false;
+      joystickKnobEl.style.transform = 'translate(-50%, -50%)';
+      joystickBaseEl.classList.remove('active');
+    }
+
+    function updateJoystick(clientX, clientY) {
+      let dx = clientX - joyCenterX, dy = clientY - joyCenterY;
+      const dist = Math.hypot(dx, dy);
+      if (dist > JOY_RADIUS) { dx = (dx / dist) * JOY_RADIUS; dy = (dy / dist) * JOY_RADIUS; }
+      joystickKnobEl.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+
+      const nx = dx / JOY_RADIUS, ny = dy / JOY_RADIUS;
+      keys.w = ny < -JOY_DEADZONE;
+      keys.s = ny > JOY_DEADZONE;
+      keys.a = nx < -JOY_DEADZONE;
+      keys.d = nx > JOY_DEADZONE;
+    }
+
+    joystickBaseEl.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      joyPointerId = e.pointerId;
+      const rect = joystickBaseEl.getBoundingClientRect();
+      joyCenterX = rect.left + rect.width / 2;
+      joyCenterY = rect.top + rect.height / 2;
+      joystickBaseEl.classList.add('active');
+      joystickBaseEl.setPointerCapture(joyPointerId);
+      updateJoystick(e.clientX, e.clientY);
+    });
+    joystickBaseEl.addEventListener('pointermove', e => {
+      if (e.pointerId !== joyPointerId) return;
+      updateJoystick(e.clientX, e.clientY);
+    });
+    function releaseJoystick(e) {
+      if (e.pointerId !== joyPointerId) return;
+      joyPointerId = null;
+      resetJoystick();
+    }
+    joystickBaseEl.addEventListener('pointerup', releaseJoystick);
+    joystickBaseEl.addEventListener('pointercancel', releaseJoystick);
+
+    // ---- Jump / Bag / Pets / Edit buttons: identical actions to the Q/P/E
+    // and Space keyboard shortcuts, gated the same way (blocked while placing
+    // an item or stacking a build block). ----
+    document.getElementById('btnTouchJump').addEventListener('pointerdown', e => { e.preventDefault(); tryJump(); });
+
+    document.getElementById('btnTouchInventory').addEventListener('click', () => {
+      if (placementMode.active || buildMode.active) return;
+      document.getElementById('inventoryPanel').classList.toggle('hidden');
+    });
+    document.getElementById('btnTouchPets').addEventListener('click', () => {
+      if (placementMode.active || buildMode.active) return;
+      document.getElementById('petPanel').classList.toggle('hidden');
+    });
+    document.getElementById('btnTouchEdit').addEventListener('click', () => {
+      if (placementMode.active || buildMode.active) return;
+      if (editMode.active) exitEditMode(); else enterEditMode();
+    });
+
+    // ---- Placement mode touch panel (dispenser items: seeds/water) ----
+    document.getElementById('dpadUp').addEventListener('click', () => { placementMode.gz -= 1; updateCursorPosition(); });
+    document.getElementById('dpadDown').addEventListener('click', () => { placementMode.gz += 1; updateCursorPosition(); });
+    document.getElementById('dpadLeft').addEventListener('click', () => { placementMode.gx -= 1; updateCursorPosition(); });
+    document.getElementById('dpadRight').addEventListener('click', () => { placementMode.gx += 1; updateCursorPosition(); });
+    document.getElementById('btnTouchPlace').addEventListener('click', () => { placeGridItem(); });
+    document.getElementById('btnTouchCancelPlacement').addEventListener('click', () => { exitPlacementMode(); });
+
+    // ---- Build mode touch panel (stacking blocks) ----
+    document.getElementById('btnBuildPrev').addEventListener('click', () => { cycleBuildType(-1); });
+    document.getElementById('btnBuildNext').addEventListener('click', () => { cycleBuildType(1); });
+    document.getElementById('btnTouchExitBuild').addEventListener('click', () => { exitBuildMode(); });
+
+    // ---- Per-frame sync: show/hide the contextual panels & disable the
+    // menu buttons while placement/build mode owns the input, exactly
+    // mirroring the keyboard's own gating logic. Called from animate(). ----
+    let lastPlacementActive = null, lastBuildActive = null;
+    window.syncTouchControls = function syncTouchControls() {
+      if (placementMode.active !== lastPlacementActive) {
+        placementTouchPanelEl.classList.toggle('hidden', !placementMode.active);
+        lastPlacementActive = placementMode.active;
+        if (placementMode.active) {
+          document.getElementById('placementTouchLabel').textContent = 'PLACING: ' + (placementMode.item || '').toUpperCase();
+        }
+      }
+      if (buildMode.active !== lastBuildActive) {
+        buildTouchPanelEl.classList.toggle('hidden', !buildMode.active);
+        lastBuildActive = buildMode.active;
+      }
+      if (buildMode.active) {
+        const qty = inventory[buildMode.selectedType] || 0;
+        document.getElementById('buildTouchMaterial').textContent = `${buildMode.selectedType || '-'} (x${qty})`;
+      }
+      const blockMenus = placementMode.active || buildMode.active;
+      document.getElementById('btnTouchInventory').disabled = blockMenus;
+      document.getElementById('btnTouchPets').disabled = blockMenus;
+      document.getElementById('btnTouchEdit').disabled = blockMenus;
+      // If a menu/mode closed elsewhere (e.g. Escape via a connected keyboard,
+      // or running out of inventory mid-placement) make sure the joystick
+      // doesn't get stuck mid-drag driving stale movement keys.
+      if (blockMenus && joyPointerId !== null) { joyPointerId = null; resetJoystick(); }
+    };
+  }
 
   let moveSpeed = 0, turnSpeed = 0, walkPhase = 0;
   const maxSpeed = 0.22, maxTurn = 0.05, accel = 0.019, friction = 0.88;
@@ -5995,6 +6199,9 @@
     if (isLargeMapOpen) {
       drawTacticalMap(largeMapCtx, time, false, Math.min(largeMapCanvas.width, largeMapCanvas.height) / 190);
     }
+
+    // --- TOUCH CONTROLS: keep the contextual placement/build panels in sync ---
+    if (window.syncTouchControls) window.syncTouchControls();
   }
 
   loadState();

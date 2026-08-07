@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>AURA Robot — Arena, Bank, Snack & Nature Dispensers</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -451,6 +452,50 @@
 
     </div>
   </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     TOUCH CONTROLS (iPad / touchscreen)
+     Only shown automatically on touch devices — see main.js IS_TOUCH.
+     Movement joystick + jump/menu buttons are always available;
+     the placement/build panels appear only while those modes are active.
+═══════════════════════════════════════════════════════════════ -->
+<div id="mobileControls" class="hidden">
+  <div id="joystickBase" title="Drag to move AURA">
+    <div id="joystickKnob"></div>
+  </div>
+  <div id="mobileActionButtons">
+    <button id="btnTouchJump" class="mobile-action-btn" title="Jump">⤴<span>Jump</span></button>
+    <button id="btnTouchInventory" class="mobile-action-btn" title="Inventory (Q)">🎒<span>Bag</span></button>
+    <button id="btnTouchPets" class="mobile-action-btn" title="Pets (P)">🐾<span>Pets</span></button>
+    <button id="btnTouchEdit" class="mobile-action-btn" title="Edit (E)">🛠️<span>Edit</span></button>
+  </div>
+</div>
+
+<!-- Shown only while placing a single dispenser item (seed/water) on the grid -->
+<div id="placementTouchPanel" class="hidden">
+  <div class="touch-panel-label" id="placementTouchLabel">PLACING ITEM</div>
+  <div class="touch-dpad">
+    <button id="dpadUp" class="dpad-btn dpad-up" title="Move cursor up">▲</button>
+    <button id="dpadLeft" class="dpad-btn dpad-left" title="Move cursor left">◀</button>
+    <button id="dpadRight" class="dpad-btn dpad-right" title="Move cursor right">▶</button>
+    <button id="dpadDown" class="dpad-btn dpad-down" title="Move cursor down">▼</button>
+  </div>
+  <div class="touch-panel-actions">
+    <button id="btnTouchPlace" class="mc-btn mc-btn-cyan">✔ Place</button>
+    <button id="btnTouchCancelPlacement" class="mc-btn mc-btn-outline">✖ Cancel</button>
+  </div>
+</div>
+
+<!-- Shown only while stacking build blocks -->
+<div id="buildTouchPanel" class="hidden">
+  <div class="touch-panel-label">MATERIAL: <span id="buildTouchMaterial">-</span></div>
+  <div class="touch-panel-actions">
+    <button id="btnBuildPrev" class="mc-btn">◀ Switch</button>
+    <button id="btnBuildNext" class="mc-btn">Switch ▶</button>
+  </div>
+  <div class="touch-panel-hint">👆 Tap the ground or a block to place</div>
+  <button id="btnTouchExitBuild" class="mc-btn mc-btn-outline">✖ Exit Build</button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>

@@ -75,7 +75,7 @@
     box-shadow: 0 12px 32px rgba(46, 226, 250, 0.4);
     border-color: #2EE2FA;
   }
-  #minimap { width: 100%; height: 100%; display: block; }
+  #minimap { width: 100%; height: 100%; display: block; touch-action: none; }
   .minimap-label {
     position: absolute; bottom: 8px; width: 100%; text-align: center;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -114,7 +114,7 @@
     transition: transform 0.15s ease, background 0.15s ease;
   }
   #closeLargeMap:hover { transform: scale(1.15); background: #DF3C00; }
-  #largeMapCanvas { width: 100%; flex-grow: 1; display: block; cursor: grab; }
+  #largeMapCanvas { width: 100%; flex-grow: 1; display: block; cursor: grab; touch-action: none; }
   #largeMapCanvas.panning { cursor: grabbing; }
 
   /* ---------- RESET CONFIRMATION MODAL ---------- */
@@ -234,7 +234,7 @@
     box-shadow: 0 4px 14px rgba(0,0,0,0.35);
   }
   #paintCanvasTools { width: 150px; display: flex; flex-direction: column; gap: 10px; }
-  #paintColorWheelWrap { position: relative; width: 130px; height: 130px; margin: 0 auto; cursor: crosshair; }
+  #paintColorWheelWrap { position: relative; width: 130px; height: 130px; margin: 0 auto; cursor: crosshair; touch-action: none; }
   #paintColorWheel {
     width: 100%; height: 100%; border-radius: 50%; border: 3px solid #000;
     background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 68%),
@@ -306,7 +306,7 @@
   }
   #spraypaintPanel.hidden { opacity: 0; transform: translateY(-50%) translateX(-24px) scale(0.95); pointer-events: none; }
   #spraypaintHint { font-size: 10px; font-weight: 700; color: #ccc; text-align: center; margin: 8px 0 14px; line-height: 1.5; }
-  #colorWheelWrap { position: relative; width: 160px; height: 160px; margin: 0 auto; cursor: crosshair; }
+  #colorWheelWrap { position: relative; width: 160px; height: 160px; margin: 0 auto; cursor: crosshair; touch-action: none; }
   #colorWheel {
     width: 100%; height: 100%; border-radius: 50%; border: 3px solid #000;
     background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 68%),
@@ -534,6 +534,14 @@
   .pet-item.drag-over { border-color: #2EE2FA; transform: translateY(-1px); background: #232530; }
   .pet-item-main { display: flex; align-items: center; gap: 8px; }
   .pet-drag-handle { color: #666; font-size: 13px; line-height: 1; flex-shrink: 0; }
+  .pet-move-btn {
+    flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid rgba(46,226,250,0.4);
+    background: rgba(46,226,250,0.12); color: #2EE2FA; font-size: 12px; font-weight: 900; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding: 0; touch-action: manipulation;
+    transition: background 0.12s ease, transform 0.12s ease;
+  }
+  .pet-move-btn:hover { background: rgba(46,226,250,0.25); }
+  .pet-move-btn:active { transform: scale(0.88); }
   .pet-order-num {
     background: #FF007F; color: #fff; width: 16px; height: 16px; border-radius: 50%;
     font-size: 9px; font-weight: 900; display: flex; align-items: center; justify-content: center;
@@ -560,3 +568,109 @@
   .pet-hint { text-align: center; color: #777; font-size: 10px; font-weight: 700; padding: 12px 0 2px; text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.5; }
 
   canvas { display:block; }
+
+  /* ═══════════════════════════════════════════════════════════════
+     TOUCH CONTROLS (iPad / touchscreen)
+  ═══════════════════════════════════════════════════════════════ */
+  #mobileControls, #placementTouchPanel, #buildTouchPanel {
+    position: fixed; z-index: 500; -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none; touch-action: none;
+  }
+  #mobileControls.hidden, #placementTouchPanel.hidden, #buildTouchPanel.hidden { display: none; }
+
+  #mobileControls {
+    left: 0; right: 0; bottom: 0; display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 0 18px calc(18px + env(safe-area-inset-bottom, 0px)); pointer-events: none;
+  }
+  #mobileControls > * { pointer-events: auto; }
+
+  /* ---- Movement joystick ---- */
+  #joystickBase {
+    width: 116px; height: 116px; border-radius: 50%;
+    background: rgba(255,255,255,0.55); border: 3px solid #000;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25); backdrop-filter: blur(4px);
+    position: relative; flex-shrink: 0;
+  }
+  #joystickKnob {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: #FF5E13; border: 3px solid #000;
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.3); transition: background 0.1s ease;
+  }
+  #joystickBase.active #joystickKnob { background: #ffb066; }
+
+  /* ---- Action button cluster (jump / bag / pets / edit) ---- */
+  #mobileActionButtons { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .mobile-action-btn {
+    width: 58px; height: 58px; border-radius: 50%; border: 3px solid #000;
+    background: rgba(255,255,255,0.88); font-size: 20px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25); transition: transform 0.12s ease, background 0.12s ease;
+  }
+  .mobile-action-btn span {
+    font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #000;
+  }
+  .mobile-action-btn:active { transform: scale(0.9); background: #FF5E13; }
+  .mobile-action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .mobile-action-btn:disabled:active { transform: none; background: rgba(255,255,255,0.88); }
+  #btnTouchJump { background: rgba(46,226,250,0.9); }
+  #btnTouchJump:active { background: #2EE2FA; }
+
+  /* ---- Placement mode (dispenser items) touch panel ---- */
+  #placementTouchPanel {
+    left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+    background: rgba(20,20,26,0.92); border: 2px solid #2EE2FA; border-radius: 18px;
+    padding: 12px 16px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4); backdrop-filter: blur(8px);
+  }
+  .touch-panel-label {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 10px; font-weight: 800; letter-spacing: 0.08em; color: #2EE2FA; text-transform: uppercase;
+  }
+  .touch-dpad {
+    display: grid; grid-template-columns: 44px 44px 44px; grid-template-rows: 44px 44px;
+    grid-template-areas: ". up ." "left down right"; gap: 4px;
+  }
+  .dpad-btn {
+    border: 2px solid #000; border-radius: 10px; background: #fff; font-size: 16px; font-weight: 900;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.25); transition: transform 0.1s ease, background 0.1s ease;
+  }
+  .dpad-btn:active { transform: scale(0.9); background: #2EE2FA; }
+  .dpad-up { grid-area: up; } .dpad-left { grid-area: left; }
+  .dpad-right { grid-area: right; } .dpad-down { grid-area: down; }
+  .touch-panel-actions { display: flex; gap: 8px; width: 100%; }
+  .touch-panel-hint {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 10px; font-weight: 700; color: #aaa; text-align: center; letter-spacing: 0.02em;
+  }
+  .mc-btn {
+    flex: 1; padding: 10px 14px; border: 2px solid #000; border-radius: 10px;
+    background: #fff; color: #000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap;
+    transition: transform 0.1s ease, background 0.1s ease;
+  }
+  .mc-btn:active { transform: scale(0.95); }
+  .mc-btn-cyan { background: #2EE2FA; }
+  .mc-btn-cyan:active { background: #17b6cc; }
+  .mc-btn-outline { background: transparent; border-color: #FF5A5F; color: #FF5A5F; }
+  .mc-btn-outline:active { background: #FF5A5F; color: #fff; }
+
+  /* ---- Build mode (stacking blocks) touch panel ---- */
+  #buildTouchPanel {
+    left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+    background: rgba(20,20,26,0.92); border: 2px solid #FFB800; border-radius: 18px;
+    padding: 12px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px;
+    width: min(320px, 84vw); box-shadow: 0 8px 24px rgba(0,0,0,0.4); backdrop-filter: blur(8px);
+  }
+  #buildTouchPanel .touch-panel-label { color: #FFB800; }
+  #buildTouchMaterial { color: #fff; }
+  #buildTouchPanel .touch-panel-actions { justify-content: center; }
+  #btnTouchExitBuild { width: 100%; }
+
+  @media (min-width: 700px) {
+    #joystickBase { width: 130px; height: 130px; }
+    #joystickKnob { width: 58px; height: 58px; }
+    .mobile-action-btn { width: 64px; height: 64px; font-size: 22px; }
+  }
