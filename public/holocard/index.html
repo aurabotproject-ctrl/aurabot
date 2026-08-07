@@ -100,21 +100,6 @@
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
         camera.position.set(0, 0, 9);
 
-        // A glowing background baked into the render itself, tinted to loosely
-        // match the rarity so the whole scene feels cohesive.
-        function buildGlowBackground(hex) {
-            const c = document.createElement('canvas');
-            c.width = 512; c.height = 512;
-            const g = c.getContext('2d');
-            const grad = g.createRadialGradient(256, 256, 0, 256, 256, 380);
-            grad.addColorStop(0, hex.bright);
-            grad.addColorStop(0.5, hex.mid);
-            grad.addColorStop(1, hex.dark);
-            g.fillStyle = grad;
-            g.fillRect(0, 0, 512, 512);
-            return c;
-        }
-
         // 2. Renderer Setup
         const renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -155,7 +140,6 @@
                 nameColor: '#2a1808', hpColor: '#5a2a0a', statLabelColor: '#3a2410', statValueColor: '#241206',
                 bodyTextColor: '#2a1808', badgeTextColor: '#ffffff', footerColor: '#3a2410',
                 trimColor: '#8b5a2b', tag: 'COMMON',
-                glow: { bright: '#ffb877', mid: '#7a4a1e', dark: '#160a00' }
             },
             silver: {
                 gradientAngle: 160,
@@ -164,7 +148,6 @@
                 nameColor: '#16232c', hpColor: '#2f4d5c', statLabelColor: '#26404c', statValueColor: '#16232c',
                 bodyTextColor: '#20343e', badgeTextColor: '#ffffff', footerColor: '#26404c',
                 trimColor: '#7a9ab0', tag: 'SILVER',
-                glow: { bright: '#a9d8ff', mid: '#3a5a70', dark: '#00080f' }
             },
             gold: {
                 gradientAngle: 160,
@@ -173,7 +156,6 @@
                 nameColor: '#1a1000', hpColor: '#8b0000', statLabelColor: '#5a3a00', statValueColor: '#1a0800',
                 bodyTextColor: '#2a1800', badgeTextColor: '#ffffff', footerColor: '#3a2200',
                 trimColor: '#c07800', tag: 'GOLD',
-                glow: { bright: '#ff5a3c', mid: '#c4001e', dark: '#1a0004' }
             },
             prismatic: {
                 gradientAngle: 135,
@@ -182,11 +164,10 @@
                 nameColor: '#2a1030', hpColor: '#7a1050', statLabelColor: '#40204a', statValueColor: '#240a2a',
                 bodyTextColor: '#2a1030', badgeTextColor: '#ffffff', footerColor: '#40204a',
                 trimColor: '#c080ff', tag: 'PRISMATIC',
-                glow: { bright: '#ff9dfb', mid: '#7a1e9c', dark: '#0a0012' }
             }
         };
         const rarity = RARITIES[currentRarity];
-        scene.background = new THREE.CanvasTexture(buildGlowBackground(rarity.glow));
+        scene.background = new THREE.Color(0x000000);
 
         // ==========================================
         // STEP A: CARD GEOMETRY (matches the original physical card's

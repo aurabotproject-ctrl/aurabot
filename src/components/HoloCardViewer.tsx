@@ -16,19 +16,28 @@ import type { Card } from '../lib/supabase';
    does today.
 ───────────────────────────────────────────── */
 
+function truncate(str: string | undefined, max: number): string {
+  if (!str) return '';
+  return str.length > max ? str.slice(0, max - 1).trimEnd() + '…' : str;
+}
+
 function buildHoloCardUrl(card: Card): string {
   const p = new URLSearchParams();
-  p.set('name', card.card_name || '');
+  p.set('name', truncate(card.card_name, 40));
   p.set('hp', String(card.hp ?? ''));
   p.set('type', card.type || '');
-  p.set('desc', card.description || '');
+  // The card face only ever displays ~180 chars anyway (see truncate() inside
+  // holocard/index.html) - truncating here too is what actually fixes the
+  // 414: without it, a long AI-generated description alone can push the
+  // whole URL past the length limit before it ever reaches the iframe.
+  p.set('desc', truncate(card.description, 200));
   p.set('rarity', card.rarity);
   p.set('img', card.image_url || '');
-  p.set('s1n', card.stat1_name || ''); p.set('s1v', String(card.stat1_val ?? ''));
-  p.set('s2n', card.stat2_name || ''); p.set('s2v', String(card.stat2_val ?? ''));
-  p.set('s3n', card.stat3_name || ''); p.set('s3v', String(card.stat3_val ?? ''));
-  p.set('m1n', card.move1_name || ''); p.set('m1v', String(card.move1_dmg ?? ''));
-  p.set('m2n', card.move2_name || ''); p.set('m2v', String(card.move2_dmg ?? ''));
+  p.set('s1n', truncate(card.stat1_name, 24)); p.set('s1v', String(card.stat1_val ?? ''));
+  p.set('s2n', truncate(card.stat2_name, 24)); p.set('s2v', String(card.stat2_val ?? ''));
+  p.set('s3n', truncate(card.stat3_name, 24)); p.set('s3v', String(card.stat3_val ?? ''));
+  p.set('m1n', truncate(card.move1_name, 30)); p.set('m1v', String(card.move1_dmg ?? ''));
+  p.set('m2n', truncate(card.move2_name, 30)); p.set('m2v', String(card.move2_dmg ?? ''));
   return `/holocard/index.html?${p.toString()}`;
 }
 
