@@ -1,48 +1,73 @@
-# Holographic card integration
+# React + TypeScript + Vite
 
-Drop these three files into your project at the matching paths (they either
-overwrite an existing file or add a new one):
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-- `public/holocard/index.html`  — NEW. Standalone Three.js card renderer,
-  same pattern as your existing `public/3daura/index.html`. Reads all card
-  data from URL query params.
-- `src/components/HoloCardViewer.tsx` — NEW. Builds the query string from a
-  `Card` row and renders it fullscreen in an iframe (same pattern as
-  `ThreeDAuraPage.tsx`).
-- `src/pages/MyCardsPage.tsx` — MODIFIED. Only the detail modal changed:
-  clicking a card in the grid still opens the modal exactly as before, it
-  just now renders `<HoloCardViewer>` instead of a static `<PokeCard>`. The
-  grid itself is untouched (still the lightweight 2D cards).
+Currently, two official plugins are available:
 
-## Before you test
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-**R2 CORS.** `<img>` tags don't need CORS headers, but loading an image into
-a WebGL texture does. If your R2 bucket doesn't already send
-`Access-Control-Allow-Origin`, add a CORS rule in the Cloudflare dashboard
-for the bucket (allow your app's origin, `GET` only). This is a one-time
-config change, not a cost or egress change.
+## React Compiler
 
-If a card's image fails to load for CORS or any other reason, the card still
-renders (foil, text, logo, dimension window) — you'll just see the black
-starfield room without a floating image, plus a small on-screen error note.
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-## What did NOT change
+## Expanding the ESLint configuration
 
-- Database schema — none needed, your existing `Card` fields map directly.
-- Supabase egress — zero impact. The iframe loads `card.image_url` directly
-  from R2, exactly like the `<img>` tag it replaced. No new Supabase calls.
-- The cards grid — still the fast 2D `PokeCard`. Only the single-card detail
-  view got upgraded, which is also the only place that makes sense to pay
-  the cost of a full WebGL scene.
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
 
-## Known simplification (worth knowing about)
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
 
-Card art is shown as-is (no background removal) but sized a bit smaller than
-the card's window, so the black-starfield "dimension" frame is always
-visible around it. This means it works immediately for every existing card
-with zero image prep — but it's a floating rectangular photo, not a
-die-cut floating character like the rabbit demo. If you want the fuller
-floating-cutout look later, that needs per-image background removal, which
-is a separate, optional follow-up (and won't work equally well on every
-image, since these are teacher-uploaded photos/art with real backgrounds,
-not clean flat-color ones).
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
+
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```
+
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```

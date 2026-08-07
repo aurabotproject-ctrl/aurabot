@@ -5446,55 +5446,73 @@
     const hintEl = document.getElementById('hint');
     hintEl.textContent = 'DRAG to look around · PINCH to zoom · use the on-screen controls to move';
 
-    // ---- Virtual joystick: maps drag position to the same keys{} booleans
-    // the keyboard uses (independent per-axis thresholds so diagonals work
-    // exactly like holding two arrow keys at once). ----
-    const joystickBaseEl = document.getElementById('joystickBase');
-    const joystickKnobEl = document.getElementById('joystickKnob');
-    const JOY_RADIUS = 46; // px the knob can travel from center
-    const JOY_DEADZONE = 0.28; // fraction of radius before a direction registers
-    let joyPointerId = null, joyCenterX = 0, joyCenterY = 0;
+    // ---- Two single-axis joysticks: left = forward/back (keys.w / keys.s),
+    // right = turn left/right (keys.a / keys.d). Splitting the axes this way
+    // (rather than one 2D stick) reads far more clearly on a touchscreen and
+    // matches how the underlying movement code already works — it's a tank
+    // drive (forward/back + turn), not free strafing. ----
+    const JOY_DEADZONE = 0.22; // fraction of travel before a direction registers
 
-    function resetJoystick() {
-      keys.w = false; keys.a = false; keys.s = false; keys.d = false;
-      joystickKnobEl.style.transform = 'translate(-50%, -50%)';
-      joystickBaseEl.classList.remove('active');
+    function makeAxisJoystick({ baseEl, knobEl, axis, onChange, onRelease }) {
+      const RANGE = axis === 'y' ? 60 : 60; // px the knob can travel from center, each direction
+      let pointerId = null, centerX = 0, centerY = 0;
+
+      function setKnob(offset) {
+        knobEl.style.transform = axis === 'y'
+          ? `translate(-50%, calc(-50% + ${offset}px))`
+          : `translate(calc(-50% + ${offset}px), -50%)`;
+      }
+      function reset() {
+        setKnob(0);
+        baseEl.classList.remove('active');
+        onRelease();
+      }
+      function update(clientX, clientY) {
+        let raw = axis === 'y' ? (clientY - centerY) : (clientX - centerX);
+        raw = Math.max(-RANGE, Math.min(RANGE, raw));
+        setKnob(raw);
+        onChange(raw / RANGE);
+      }
+
+      baseEl.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        pointerId = e.pointerId;
+        const rect = baseEl.getBoundingClientRect();
+        centerX = rect.left + rect.width / 2;
+        centerY = rect.top + rect.height / 2;
+        baseEl.classList.add('active');
+        baseEl.setPointerCapture(pointerId);
+        update(e.clientX, e.clientY);
+      });
+      baseEl.addEventListener('pointermove', e => {
+        if (e.pointerId !== pointerId) return;
+        update(e.clientX, e.clientY);
+      });
+      function release(e) {
+        if (e.pointerId !== pointerId) return;
+        pointerId = null;
+        reset();
+      }
+      baseEl.addEventListener('pointerup', release);
+      baseEl.addEventListener('pointercancel', release);
+
+      return { reset, isActive: () => pointerId !== null };
     }
 
-    function updateJoystick(clientX, clientY) {
-      let dx = clientX - joyCenterX, dy = clientY - joyCenterY;
-      const dist = Math.hypot(dx, dy);
-      if (dist > JOY_RADIUS) { dx = (dx / dist) * JOY_RADIUS; dy = (dy / dist) * JOY_RADIUS; }
-      joystickKnobEl.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-
-      const nx = dx / JOY_RADIUS, ny = dy / JOY_RADIUS;
-      keys.w = ny < -JOY_DEADZONE;
-      keys.s = ny > JOY_DEADZONE;
-      keys.a = nx < -JOY_DEADZONE;
-      keys.d = nx > JOY_DEADZONE;
-    }
-
-    joystickBaseEl.addEventListener('pointerdown', e => {
-      e.preventDefault();
-      joyPointerId = e.pointerId;
-      const rect = joystickBaseEl.getBoundingClientRect();
-      joyCenterX = rect.left + rect.width / 2;
-      joyCenterY = rect.top + rect.height / 2;
-      joystickBaseEl.classList.add('active');
-      joystickBaseEl.setPointerCapture(joyPointerId);
-      updateJoystick(e.clientX, e.clientY);
+    const moveJoystick = makeAxisJoystick({
+      baseEl: document.getElementById('moveJoystickBase'),
+      knobEl: document.getElementById('moveJoystickKnob'),
+      axis: 'y',
+      onChange: n => { keys.w = n < -JOY_DEADZONE; keys.s = n > JOY_DEADZONE; },
+      onRelease: () => { keys.w = false; keys.s = false; },
     });
-    joystickBaseEl.addEventListener('pointermove', e => {
-      if (e.pointerId !== joyPointerId) return;
-      updateJoystick(e.clientX, e.clientY);
+    const turnJoystick = makeAxisJoystick({
+      baseEl: document.getElementById('turnJoystickBase'),
+      knobEl: document.getElementById('turnJoystickKnob'),
+      axis: 'x',
+      onChange: n => { keys.a = n < -JOY_DEADZONE; keys.d = n > JOY_DEADZONE; },
+      onRelease: () => { keys.a = false; keys.d = false; },
     });
-    function releaseJoystick(e) {
-      if (e.pointerId !== joyPointerId) return;
-      joyPointerId = null;
-      resetJoystick();
-    }
-    joystickBaseEl.addEventListener('pointerup', releaseJoystick);
-    joystickBaseEl.addEventListener('pointercancel', releaseJoystick);
 
     // ---- Jump / Bag / Pets / Edit buttons: identical actions to the Q/P/E
     // and Space keyboard shortcuts, gated the same way (blocked while placing
@@ -5527,10 +5545,30 @@
     document.getElementById('btnBuildNext').addEventListener('click', () => { cycleBuildType(1); });
     document.getElementById('btnTouchExitBuild').addEventListener('click', () => { exitBuildMode(); });
 
+    // Any other panel/modal that covers the screen (inventory, pets, edit menu,
+    // spray paint, drawing canvas, erase-all confirm, the large map, reset,
+    // settings, or one of the proximity kiosks) — while one of those is open,
+    // the joysticks/buttons would either be hidden underneath it or make no
+    // sense to use, so hide the whole cluster rather than picking apart which
+    // corner is actually covered.
+    const HIDDEN_TOGGLE_PANEL_IDS = ['inventoryPanel', 'petPanel', 'adoptionPanel', 'kioskPanel', 'eftposPanel', 'snackPanel', 'naturePanel', 'buildPanel', 'spraypaintPanel'];
+    const SHOW_TOGGLE_MODAL_IDS = ['editMenuModal', 'paintCanvasModal', 'eraseAllConfirmModal', 'largeMapModal', 'resetModal', 'settingsModal'];
+    function isAnyOverlayOpen() {
+      for (const id of HIDDEN_TOGGLE_PANEL_IDS) {
+        const el = document.getElementById(id);
+        if (el && !el.classList.contains('hidden')) return true;
+      }
+      for (const id of SHOW_TOGGLE_MODAL_IDS) {
+        const el = document.getElementById(id);
+        if (el && el.classList.contains('show')) return true;
+      }
+      return false;
+    }
+
     // ---- Per-frame sync: show/hide the contextual panels & disable the
     // menu buttons while placement/build mode owns the input, exactly
     // mirroring the keyboard's own gating logic. Called from animate(). ----
-    let lastPlacementActive = null, lastBuildActive = null;
+    let lastPlacementActive = null, lastBuildActive = null, lastControlsHidden = null;
     window.syncTouchControls = function syncTouchControls() {
       if (placementMode.active !== lastPlacementActive) {
         placementTouchPanelEl.classList.toggle('hidden', !placementMode.active);
@@ -5547,14 +5585,26 @@
         const qty = inventory[buildMode.selectedType] || 0;
         document.getElementById('buildTouchMaterial').textContent = `${buildMode.selectedType || '-'} (x${qty})`;
       }
+
+      // Hide the joysticks/action buttons whenever placement/build mode owns
+      // input (their own dedicated panels are shown instead) or any other
+      // panel/modal is covering the screen.
+      const shouldHide = placementMode.active || buildMode.active || isAnyOverlayOpen();
+      if (shouldHide !== lastControlsHidden) {
+        mobileControlsEl.classList.toggle('hidden', shouldHide);
+        lastControlsHidden = shouldHide;
+      }
       const blockMenus = placementMode.active || buildMode.active;
       document.getElementById('btnTouchInventory').disabled = blockMenus;
       document.getElementById('btnTouchPets').disabled = blockMenus;
       document.getElementById('btnTouchEdit').disabled = blockMenus;
       // If a menu/mode closed elsewhere (e.g. Escape via a connected keyboard,
-      // or running out of inventory mid-placement) make sure the joystick
-      // doesn't get stuck mid-drag driving stale movement keys.
-      if (blockMenus && joyPointerId !== null) { joyPointerId = null; resetJoystick(); }
+      // or running out of inventory mid-placement) make sure the joysticks
+      // don't get stuck mid-drag driving stale movement keys.
+      if (shouldHide) {
+        if (moveJoystick.isActive()) moveJoystick.reset();
+        if (turnJoystick.isActive()) turnJoystick.reset();
+      }
     };
   }
 

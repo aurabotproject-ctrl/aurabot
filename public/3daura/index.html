@@ -457,12 +457,21 @@
 <!-- ═══════════════════════════════════════════════════════════════
      TOUCH CONTROLS (iPad / touchscreen)
      Only shown automatically on touch devices — see main.js IS_TOUCH.
-     Movement joystick + jump/menu buttons are always available;
-     the placement/build panels appear only while those modes are active.
+     Two single-axis joysticks, vertically centred on the left/right edges
+     so they never overlap the minimap (bottom-left) or side panels
+     (bottom-right); the placement/build panels appear only while those
+     modes are active.
 ═══════════════════════════════════════════════════════════════ -->
 <div id="mobileControls" class="hidden">
-  <div id="joystickBase" title="Drag to move AURA">
-    <div id="joystickKnob"></div>
+  <div id="moveJoystickBase" class="joy-base joy-vertical" title="Drag up/down to walk forward/back">
+    <span class="joy-arrow joy-arrow-up">▲</span>
+    <div id="moveJoystickKnob" class="joy-knob"></div>
+    <span class="joy-arrow joy-arrow-down">▼</span>
+  </div>
+  <div id="turnJoystickBase" class="joy-base joy-horizontal" title="Drag left/right to turn">
+    <span class="joy-arrow joy-arrow-left">◀</span>
+    <div id="turnJoystickKnob" class="joy-knob"></div>
+    <span class="joy-arrow joy-arrow-right">▶</span>
   </div>
   <div id="mobileActionButtons">
     <button id="btnTouchJump" class="mobile-action-btn" title="Jump">⤴<span>Jump</span></button>
