@@ -5545,26 +5545,20 @@
     document.getElementById('btnBuildNext').addEventListener('click', () => { cycleBuildType(1); });
     document.getElementById('btnTouchExitBuild').addEventListener('click', () => { exitBuildMode(); });
 
-    // Any other panel/modal that covers the screen (inventory, pets, edit menu,
-    // spray paint, drawing canvas, erase-all confirm, the large map, reset,
-    // settings, or one of the proximity kiosks) — while one of those is open,
-    // the joysticks/buttons would either be hidden underneath it or make no
-    // sense to use, so hide the whole cluster rather than picking apart which
-    // corner is actually covered.
-    const HIDDEN_TOGGLE_PANEL_IDS = ['inventoryPanel', 'petPanel', 'adoptionPanel', 'kioskPanel', 'eftposPanel', 'snackPanel', 'naturePanel', 'buildPanel', 'spraypaintPanel'];
-    const SHOW_TOGGLE_MODAL_IDS = ['editMenuModal', 'paintCanvasModal', 'eraseAllConfirmModal', 'largeMapModal', 'resetModal', 'settingsModal'];
-    function isAnyOverlayOpen() {
-      for (const id of HIDDEN_TOGGLE_PANEL_IDS) {
-        const el = document.getElementById(id);
-        if (el && !el.classList.contains('hidden')) return true;
-      }
-      for (const id of SHOW_TOGGLE_MODAL_IDS) {
-        const el = document.getElementById(id);
-        if (el && el.classList.contains('show')) return true;
-      }
-      return false;
-    }
-
+    // Only two things should ever hide the movement controls:
+    //  1) placement/build mode — they get their own dedicated touch panel instead
+    //  2) edit mode — movement is genuinely disabled while editMode.active (see
+    //     the animate() loop), and the edit menu has its own ✕ close button
+    //     (#closeEditMenu) that isn't part of mobileControls, so touch users
+    //     always have a way out.
+    // Crucially, the dispenser panels (kiosk/snack/nature/eftpos/adoption/build)
+    // are PROXIMITY-GATED — they open automatically when AURA walks close and
+    // close automatically when AURA walks away. They do NOT disable movement.
+    // Hiding the joysticks while one of those is open would strand the player
+    // right in front of it with no way to walk back out, so they must never be
+    // included here. Same logic for inventory/pet — those are just plain toggle
+    // panels that don't touch movement, and the same Bag/Pets button that opened
+    // them closes them again, so the controls stay visible and usable throughout.
     // ---- Per-frame sync: show/hide the contextual panels & disable the
     // menu buttons while placement/build mode owns the input, exactly
     // mirroring the keyboard's own gating logic. Called from animate(). ----
@@ -5586,10 +5580,11 @@
         document.getElementById('buildTouchMaterial').textContent = `${buildMode.selectedType || '-'} (x${qty})`;
       }
 
-      // Hide the joysticks/action buttons whenever placement/build mode owns
-      // input (their own dedicated panels are shown instead) or any other
-      // panel/modal is covering the screen.
-      const shouldHide = placementMode.active || buildMode.active || isAnyOverlayOpen();
+      // Hide the joysticks/action buttons only while movement is actually
+      // disabled (placement/build/edit mode). Proximity dispenser panels and
+      // the inventory/pet panels never disable movement, so they never hide
+      // the controls — see the big comment above.
+      const shouldHide = placementMode.active || buildMode.active || editMode.active;
       if (shouldHide !== lastControlsHidden) {
         mobileControlsEl.classList.toggle('hidden', shouldHide);
         lastControlsHidden = shouldHide;
