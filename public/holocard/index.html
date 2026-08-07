@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Holographic Card</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet" />
+    <style>
+        html, body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0a0a0a;
+            font-family: sans-serif;
+            width: 100%;
+            height: 100%;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            z-index: 10;
+            font-size: 0.85rem;
+            opacity: 0.85;
+        }
+        #err {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: #ffb3b3;
+            font-family: 'Nunito', sans-serif;
+            font-weight: 700;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">Drag to rotate · Scroll / pinch to zoom</div>
+    <div id="err"></div>
+
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+        // ==========================================
+        // READ CARD DATA FROM URL PARAMS
+        // The React app builds this URL from a Card row (see supabase.ts):
+        // rarity, card_name, hp, type, description, stat1-3, move1-2, image_url
+        // ==========================================
+        const qs = new URLSearchParams(window.location.search);
+        function q(key, fallback = '') { const v = qs.get(key); return v === null ? fallback : v; }
+
+        const cardData = {
+            name: q('name', 'Unknown'),
+            hp: q('hp', '??'),
+            type: q('type', ''),
+            description: q('desc', ''),
+            stats: [
+                [q('s1n', ''), q('s1v', '')],
+                [q('s2n', ''), q('s2v', '')],
+                [q('s3n', ''), q('s3v', '')],
+            ],
+            moves: [
+                [q('m1n', ''), q('m1v', '')],
+                [q('m2n', ''), q('m2v', '')],
+            ],
+            imageUrl: q('img', ''),
+            rarityRaw: q('rarity', 'gold-rare')
+        };
+
+        // DB rarity values -> our internal rarity keys
+        const RARITY_KEY_MAP = { 'common': 'bronze', 'silver': 'silver', 'gold-rare': 'gold', 'prismatic': 'prismatic' };
+        const currentRarity = RARITY_KEY_MAP[cardData.rarityRaw] || 'gold';
+
+        function showError(msg) {
+            const el = document.getElementById('err');
+            el.textContent = msg;
+            el.style.display = 'flex';
+        }
+
+        // 1. Scene & Camera Setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 0, 9);
+
+        // A glowing background baked into the render itself, tinted to loosely
+        // match the rarity so the whole scene feels cohesive.
+        function buildGlowBackground(hex) {
+            const c = document.createElement('canvas');
+            c.width = 512; c.height = 512;
+            const g = c.getContext('2d');
+            const grad = g.createRadialGradient(256, 256, 0, 256, 256, 380);
+            grad.addColorStop(0, hex.bright);
+            grad.addColorStop(0.5, hex.mid);
+            grad.addColorStop(1, hex.dark);
+            g.fillStyle = grad;
+            g.fillRect(0, 0, 512, 512);
+            return c;
+        }
+
+        // 2. Renderer Setup
+        const renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        // 2b. Environment map so the foil actually has something to reflect
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+
+        // 3. Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 4;
+        controls.maxDistance = 16;
+
+        // 4. Main Lighting
+        scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 3);
+        dirLight.position.set(5, 5, 5);
+        scene.add(dirLight);
+
+        // ==========================================
+        // MASTER GROUP
+        // ==========================================
+        const cardGroup = new THREE.Group();
+        scene.add(cardGroup);
+
+        // ==========================================
+        // RARITY DEFINITIONS (colors from the app's real card gradients)
+        // ==========================================
+        const RARITIES = {
+            bronze: {
+                gradientAngle: 160,
+                gradientStops: [[0.0, '#d2a679'], [0.4, '#a9744a'], [0.7, '#c9986a'], [1.0, '#8b5a2b']],
+                cardColor: 0xa9744a, backColor: 0x5a3a1c,
+                nameColor: '#2a1808', hpColor: '#5a2a0a', statLabelColor: '#3a2410', statValueColor: '#241206',
+                bodyTextColor: '#2a1808', badgeTextColor: '#ffffff', footerColor: '#3a2410',
+                trimColor: '#8b5a2b', tag: 'COMMON',
+                glow: { bright: '#ffb877', mid: '#7a4a1e', dark: '#160a00' }
+            },
+            silver: {
+                gradientAngle: 160,
+                gradientStops: [[0.0, '#d8e4ee'], [0.4, '#a8bfcf'], [0.7, '#e0eaf2'], [1.0, '#c0d4e4']],
+                cardColor: 0xa8bfcf, backColor: 0x3d4f5c,
+                nameColor: '#16232c', hpColor: '#2f4d5c', statLabelColor: '#26404c', statValueColor: '#16232c',
+                bodyTextColor: '#20343e', badgeTextColor: '#ffffff', footerColor: '#26404c',
+                trimColor: '#7a9ab0', tag: 'SILVER',
+                glow: { bright: '#a9d8ff', mid: '#3a5a70', dark: '#00080f' }
+            },
+            gold: {
+                gradientAngle: 160,
+                gradientStops: [[0.0, '#ffe090'], [0.3, '#f0b020'], [0.6, '#ffd060'], [0.8, '#e89010'], [1.0, '#ffdc80']],
+                cardColor: 0xf0b020, backColor: 0x7a4a10,
+                nameColor: '#1a1000', hpColor: '#8b0000', statLabelColor: '#5a3a00', statValueColor: '#1a0800',
+                bodyTextColor: '#2a1800', badgeTextColor: '#ffffff', footerColor: '#3a2200',
+                trimColor: '#c07800', tag: 'GOLD',
+                glow: { bright: '#ff5a3c', mid: '#c4001e', dark: '#1a0004' }
+            },
+            prismatic: {
+                gradientAngle: 135,
+                gradientStops: [[0.0, '#ffb3b3'], [0.14, '#ffd9a0'], [0.28, '#ffffa0'], [0.42, '#b3ffb3'], [0.57, '#a0e8ff'], [0.71, '#b3b3ff'], [0.85, '#e8b3ff'], [1.0, '#ffb3e8']],
+                cardColor: 0xd7b3ff, backColor: 0x5a3a7a,
+                nameColor: '#2a1030', hpColor: '#7a1050', statLabelColor: '#40204a', statValueColor: '#240a2a',
+                bodyTextColor: '#2a1030', badgeTextColor: '#ffffff', footerColor: '#40204a',
+                trimColor: '#c080ff', tag: 'PRISMATIC',
+                glow: { bright: '#ff9dfb', mid: '#7a1e9c', dark: '#0a0012' }
+            }
+        };
+        const rarity = RARITIES[currentRarity];
+        scene.background = new THREE.CanvasTexture(buildGlowBackground(rarity.glow));
+
+        // ==========================================
+        // STEP A: CARD GEOMETRY (matches the original physical card's
+        // 260 x 375px proportions)
+        // ==========================================
+        const cardWidth = 3;
+        const cardHeight = 3 * (375 / 260);
+
+        const holeWidth = cardWidth * (252 / 260);
+        const holeHeight = cardHeight * (120 / 375);
+        const holeYOffset = cardHeight * (97.5 / 375);
+
+        const cardCornerRadius = cardWidth * 0.045;
+        const holeCornerRadius = holeWidth * 0.04;
+
+        function traceRoundedRect(target, cx, cy, w, h, r) {
+            const x = cx - w / 2, y = cy - h / 2;
+            target.moveTo(x, y + r);
+            target.lineTo(x, y + h - r);
+            target.quadraticCurveTo(x, y + h, x + r, y + h);
+            target.lineTo(x + w - r, y + h);
+            target.quadraticCurveTo(x + w, y + h, x + w, y + h - r);
+            target.lineTo(x + w, y + r);
+            target.quadraticCurveTo(x + w, y, x + w - r, y);
+            target.lineTo(x + r, y);
+            target.quadraticCurveTo(x, y, x, y + r);
+        }
+
+        const cardShape = new THREE.Shape();
+        traceRoundedRect(cardShape, 0, 0, cardWidth, cardHeight, cardCornerRadius);
+        const holePath = new THREE.Path();
+        traceRoundedRect(holePath, 0, holeYOffset, holeWidth, holeHeight, holeCornerRadius);
+        cardShape.holes.push(holePath);
+
+        const extrudeSettings = { depth: 0.1, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: 0.02, bevelThickness: 0.02 };
+        const cardGeometry = new THREE.ExtrudeGeometry(cardShape, extrudeSettings);
+        cardGeometry.computeBoundingBox();
+        const zOffset = -0.5 * (cardGeometry.boundingBox.max.z - cardGeometry.boundingBox.min.z);
+        cardGeometry.translate(0, 0, zOffset);
+        const zBack = cardGeometry.boundingBox.min.z;
+        const zFront = cardGeometry.boundingBox.max.z;
+
+        const cardMaterial = new THREE.MeshPhysicalMaterial({
+            color: rarity.cardColor, metalness: 0.85, roughness: 0.12,
+            iridescence: 1.0, iridescenceIOR: 1.5, iridescenceThicknessRange: [100, 400],
+            clearcoat: 1.0, clearcoatRoughness: 0.05, envMapIntensity: 1.8
+        });
+        const cardMesh = new THREE.Mesh(cardGeometry, cardMaterial);
+        cardMesh.renderOrder = 3;
+        cardGroup.add(cardMesh);
+
+        // ==========================================
+        // STEP B: SOLID BACK
+        // ==========================================
+        const backShape = new THREE.Shape();
+        traceRoundedRect(backShape, 0, 0, cardWidth + extrudeSettings.bevelSize * 2, cardHeight + extrudeSettings.bevelSize * 2, cardCornerRadius);
+        const backGeometry = new THREE.ShapeGeometry(backShape);
+        const backMaterial = new THREE.MeshStandardMaterial({ color: rarity.backColor, roughness: 0.6, metalness: 0.1, side: THREE.BackSide });
+        const solidBack = new THREE.Mesh(backGeometry, backMaterial);
+        solidBack.position.set(0, 0, zBack - 0.005);
+        solidBack.renderOrder = 3;
+        cardMesh.add(solidBack);
+
+        // ==========================================
+        // STEP B2: BACK LOGO (Aurabot Project emblem, recolored to trim color)
+        // ==========================================
+        function buildLogoSvgMarkup(color) {
+            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="35 24 138 135">
+                <rect fill="none" stroke="${color}" stroke-width="1" stroke-linecap="round" width="87.778603" height="56.002117" x="59.462925" y="67.328384" rx="15" ry="15" />
+                <rect fill="none" stroke="${color}" stroke-width="0.693015" stroke-linecap="round" width="64.489189" height="36.609184" x="71.303329" y="77.739212" rx="11.020201" ry="9.8056622" />
+                <ellipse fill="${color}" stroke="none" cx="90.295555" cy="95.149773" rx="7.1844864" ry="11.768816" />
+                <ellipse fill="${color}" stroke="none" cx="117.34321" cy="95.2593" rx="7.1844864" ry="11.768816" />
+                <g>
+                    <rect fill="none" stroke="${color}" stroke-width="0.634071" stroke-linecap="round" width="2.8828781" height="16.910398" x="116.22594" y="50.470634" />
+                    <rect fill="none" stroke="${color}" stroke-width="1" stroke-linecap="round" width="11.011652" height="11.011652" x="112.15261" y="39.243645" rx="11.029812" ry="8.2714472" />
+                </g>
+                <g transform="translate(-30.377356,-0.15338031)">
+                    <rect fill="none" stroke="${color}" stroke-width="0.634071" stroke-linecap="round" width="2.8828781" height="16.910398" x="116.22594" y="50.470634" />
+                    <rect fill="none" stroke="${color}" stroke-width="1" stroke-linecap="round" width="11.011652" height="11.011652" x="112.15261" y="39.243645" rx="11.029812" ry="8.2714472" />
+                </g>
+                <text xml:space="preserve" text-anchor="middle" x="114.01734" y="123.1462" transform="scale(0.91163356,1.096932)" style="font-weight:800;font-size:11.6px;font-family:Nunito,sans-serif;letter-spacing:0px;" fill="${color}" stroke="none"><tspan x="114.01734" y="123.1462">AURABOT PROJECT</tspan></text>
+                <g transform="translate(1.3348139,-1.7797518)">
+                    <ellipse fill="none" stroke="${color}" stroke-width="0.805779" stroke-linecap="round" cx="102.33572" cy="93.2145" rx="60.608669" ry="59.49633" />
+                    <ellipse fill="none" stroke="${color}" stroke-width="0.850229" stroke-linecap="round" cx="102.4607" cy="93.319054" rx="64.14595" ry="62.588669" />
+                </g>
+            </svg>`;
+        }
+        function loadLogoCanvas(color) {
+            return new Promise((resolve) => {
+                const svgUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(buildLogoSvgMarkup(color));
+                const img = new Image();
+                img.onload = () => {
+                    const size = 512;
+                    const c = document.createElement('canvas');
+                    c.width = size; c.height = size;
+                    const g = c.getContext('2d');
+                    g.save(); g.translate(size, 0); g.scale(-1, 1);
+                    g.drawImage(img, 0, 0, size, size);
+                    g.restore();
+                    resolve(c);
+                };
+                img.src = svgUrl;
+            });
+        }
+        loadLogoCanvas(rarity.trimColor).then(canvas => {
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            const logoMaterial = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.BackSide, depthWrite: false });
+            const logoAspect = 138 / 135;
+            const logoW = cardWidth * 0.78;
+            const logoH = logoW / logoAspect;
+            const logoMesh = new THREE.Mesh(new THREE.PlaneGeometry(logoW, logoH), logoMaterial);
+            logoMesh.position.set(0, 0, zBack - 0.01);
+            logoMesh.renderOrder = 4;
+            cardMesh.add(logoMesh);
+        });
+
+        // ==========================================
+        // STEP C: STENCIL MASK (unconditional - see note on voidMaterialProps)
+        // ==========================================
+        const maskShape = new THREE.Shape();
+        traceRoundedRect(maskShape, 0, 0, holeWidth, holeHeight, holeCornerRadius);
+        const maskGeometry = new THREE.ShapeGeometry(maskShape);
+        const maskMaterial = new THREE.MeshBasicMaterial({
+            colorWrite: false, depthWrite: false, depthTest: false,
+            stencilWrite: true, stencilRef: 1,
+            stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp,
+            side: THREE.FrontSide
+        });
+        const maskMesh = new THREE.Mesh(maskGeometry, maskMaterial);
+        maskMesh.position.set(0, holeYOffset, zFront - 0.01);
+        maskMesh.renderOrder = 1;
+        cardMesh.add(maskMesh);
+
+        // ==========================================
+        // STEP D: THE DIMENSION (STARFIELD ROOM / CUBOID)
+        // Always solid black + white stars, unlit, regardless of rarity.
+        // ==========================================
+        function buildStarfieldCanvas(count) {
+            const c = document.createElement('canvas');
+            c.width = 512; c.height = 512;
+            const g = c.getContext('2d');
+            const stars = [];
+            g.fillStyle = '#000000';
+            g.fillRect(0, 0, 512, 512);
+            for (let i = 0; i < count; i++) {
+                stars.push({ x: Math.random() * 512, y: Math.random() * 512, r: 0.6 + Math.random() * 1.8, phase: Math.random() * Math.PI * 2, speed: 0.4 + Math.random() * 1.4 });
+            }
+            return { canvas: c, ctx: g, stars };
+        }
+        function drawStarfield(sf) {
+            const { canvas: c, ctx: g, stars } = sf;
+            g.fillStyle = '#000000';
+            g.fillRect(0, 0, c.width, c.height);
+            stars.forEach(st => {
+                const tw = 0.4 + 0.6 * Math.abs(Math.sin(clock.getElapsedTime() * st.speed + st.phase));
+                g.beginPath();
+                g.fillStyle = `rgba(255,255,255,${tw})`;
+                g.arc(st.x, st.y, st.r, 0, Math.PI * 2);
+                g.fill();
+            });
+        }
+        const clock = new THREE.Clock();
+        const starfieldData = buildStarfieldCanvas(140);
+        const starfieldTexture = new THREE.CanvasTexture(starfieldData.canvas);
+        starfieldTexture.wrapS = THREE.RepeatWrapping;
+        starfieldTexture.wrapT = THREE.RepeatWrapping;
+        starfieldTexture.repeat.set(2, 2);
+
+        const voidMaterialProps = { stencilWrite: true, stencilRef: 1, stencilFunc: THREE.EqualStencilFunc };
+        const voidGroup = new THREE.Group();
+        cardGroup.add(voidGroup);
+
+        const roomWidth = holeWidth * 1.4;
+        const roomHeight = holeHeight * 2.4;
+        const roomDepth = 3.2;
+        const voidBoxGeo = new THREE.BoxGeometry(roomWidth, roomHeight, roomDepth);
+        voidBoxGeo.index.array.fill(0, 24, 30); // remove the +Z (open/near-camera) face
+
+        const voidBoxMat = new THREE.MeshBasicMaterial({
+            map: starfieldTexture, side: THREE.BackSide,
+            depthTest: false, depthWrite: false,
+            ...voidMaterialProps
+        });
+        const voidBoxMesh = new THREE.Mesh(voidBoxGeo, voidBoxMat);
+        voidBoxMesh.position.set(0, holeYOffset, -0.2 - roomDepth / 2 + 0.3);
+        voidBoxMesh.renderOrder = 2;
+        voidGroup.add(voidBoxMesh);
+
+        // ==========================================
+        // STEP E: THE CARD'S ARTWORK, FLOATING INSIDE THE ROOM
+        // Shown as-is (no background removal needed) but sized smaller than
+        // the window so the starfield frame stays visible around it - this
+        // is what makes it work for ANY uploaded image, not just cutouts.
+        // ==========================================
+        let cardImageMesh = null;
+        if (cardData.imageUrl) {
+            const textureLoader = new THREE.TextureLoader();
+            textureLoader.setCrossOrigin('anonymous');
+            textureLoader.load(
+                cardData.imageUrl,
+                (tex) => {
+                    tex.colorSpace = THREE.SRGBColorSpace;
+                    const imgAspect = (tex.image && tex.image.width && tex.image.height) ? tex.image.width / tex.image.height : 4 / 3;
+                    const maxW = holeWidth * 0.8;
+                    const maxH = holeHeight * 1.85;
+                    let w = maxW, h = w / imgAspect;
+                    if (h > maxH) { h = maxH; w = h * imgAspect; }
+
+                    const geo = new THREE.PlaneGeometry(w, h);
+                    const mat = new THREE.MeshBasicMaterial({
+                        map: tex, side: THREE.DoubleSide, transparent: true,
+                        stencilWrite: true, stencilRef: 1, stencilFunc: THREE.EqualStencilFunc,
+                        depthTest: false, depthWrite: false
+                    });
+                    cardImageMesh = new THREE.Mesh(geo, mat);
+                    cardImageMesh.position.set(0, holeYOffset, -0.7);
+                    cardImageMesh.renderOrder = 3;
+                    voidGroup.add(cardImageMesh);
+                },
+                undefined,
+                () => showError('Could not load this card\'s image.')
+            );
+        }
+
+        // ==========================================
+        // STEP F: CARD FACE ARTWORK (canvas texture)
+        // ==========================================
+        function truncate(str, max) {
+            if (!str) return '';
+            return str.length > max ? str.slice(0, max - 1).trimEnd() + '…' : str;
+        }
+
+        function buildCardFaceTexture() {
+            const s = 3;
+            const W = 260 * s, H = 375 * s;
+            const c = document.createElement('canvas');
+            c.width = W; c.height = H;
+            const g = c.getContext('2d');
+            const rects = [];
+
+            const angle = (rarity.gradientAngle * Math.PI) / 180;
+            const gx = Math.cos(angle) * W * 0.5, gy = Math.sin(angle) * H * 0.5;
+            const grad = g.createLinearGradient(W / 2 - gx, H / 2 - gy, W / 2 + gx, H / 2 + gy);
+            rarity.gradientStops.forEach(([pos, color]) => grad.addColorStop(pos, color));
+            g.fillStyle = grad;
+            g.fillRect(0, 0, W, H);
+
+            g.fillStyle = rarity.nameColor;
+            g.font = `700 ${13 * s}px Cinzel, serif`;
+            g.textBaseline = 'middle';
+            g.fillText(truncate(cardData.name, 16), 12 * s, 18 * s);
+            rects.push({ x: 6 * s, y: 5 * s, w: 130 * s, h: 22 * s });
+
+            g.font = `800 ${11 * s}px Nunito, sans-serif`;
+            const hpText = `${cardData.hp} HP`;
+            const hpW = g.measureText(hpText).width + 14 * s;
+            g.fillStyle = 'rgba(255,255,255,0.35)';
+            roundRect(g, W - 12 * s - hpW, 9 * s, hpW, 18 * s, 9 * s);
+            g.fill();
+            g.fillStyle = rarity.hpColor;
+            g.textAlign = 'center';
+            g.fillText(hpText, W - 12 * s - hpW / 2, 18 * s);
+            g.textAlign = 'left';
+            rects.push({ x: W - 12 * s - hpW, y: 9 * s, w: hpW, h: 18 * s });
+
+            const holeW_px = 252 * s, holeH_px = 120 * s;
+            const holeX_px = (W - holeW_px) / 2, holeY_px = 28 * s;
+            g.strokeStyle = 'rgba(255,255,255,0.85)';
+            g.lineWidth = 2 * s;
+            roundRect(g, holeX_px, holeY_px, holeW_px, holeH_px, 10 * s);
+            g.stroke();
+
+            if (cardData.type) {
+                g.font = `800 ${7 * s}px Nunito, sans-serif`;
+                const badgeText = cardData.type.toUpperCase();
+                const badgeW = g.measureText(badgeText).width + 10 * s;
+                g.fillStyle = 'rgba(0,0,0,0.35)';
+                roundRect(g, holeX_px + holeW_px - 7 * s - badgeW, holeY_px + holeH_px - 7 * s - 14 * s, badgeW, 14 * s, 6 * s);
+                g.fill();
+                g.fillStyle = rarity.badgeTextColor;
+                g.fillText(badgeText, holeX_px + holeW_px - 7 * s - badgeW + 5 * s, holeY_px + holeH_px - 7 * s - 7 * s + 1);
+            }
+
+            let y = holeY_px + holeH_px + 9 * s;
+
+            g.font = `italic ${8 * s}px Nunito, sans-serif`;
+            g.fillStyle = 'rgba(255,255,255,0.5)';
+            const descH = 40 * s;
+            roundRect(g, 4 * s, y, W - 8 * s, descH, 6 * s);
+            g.fill();
+            g.fillStyle = rarity.bodyTextColor;
+            wrapText(g, truncate(cardData.description, 180), 10 * s, y + 11 * s, W - 16 * s, 10 * s);
+            rects.push({ x: 4 * s, y: y, w: W - 8 * s, h: descH });
+            y += descH + 6 * s;
+
+            const statW = (W - 8 * s - 2 * (3 * s)) / 3;
+            const statH = 34 * s;
+            cardData.stats.forEach((st, i) => {
+                if (!st[0]) return;
+                const x = 4 * s + i * (statW + 3 * s);
+                g.fillStyle = 'rgba(255,255,255,0.55)';
+                roundRect(g, x, y, statW, statH, 5 * s);
+                g.fill();
+                g.fillStyle = rarity.statLabelColor;
+                g.font = `800 ${6 * s}px Nunito, sans-serif`;
+                g.textAlign = 'center';
+                g.fillText(truncate(st[0], 14), x + statW / 2, y + 9 * s);
+                g.fillStyle = rarity.statValueColor;
+                g.font = `900 ${15 * s}px Cinzel, serif`;
+                g.fillText(String(st[1]), x + statW / 2, y + 23 * s);
+                g.textAlign = 'left';
+                rects.push({ x, y, w: statW, h: statH });
+            });
+            y += statH + 5 * s;
+
+            cardData.moves.forEach(mv => {
+                if (!mv[0]) return;
+                const moveH = 16 * s;
+                g.fillStyle = 'rgba(255,255,255,0.5)';
+                roundRect(g, 4 * s, y, W - 8 * s, moveH, 7 * s);
+                g.fill();
+                g.fillStyle = rarity.bodyTextColor;
+                g.font = `700 ${9 * s}px Nunito, sans-serif`;
+                g.textAlign = 'left';
+                g.fillText(truncate(mv[0], 22), 10 * s, y + moveH / 2 + 1);
+                g.fillStyle = rarity.hpColor;
+                g.font = `900 ${14 * s}px Cinzel, serif`;
+                g.textAlign = 'right';
+                g.fillText(String(mv[1]), W - 10 * s, y + moveH / 2 + 1);
+                g.textAlign = 'left';
+                rects.push({ x: 4 * s, y, w: W - 8 * s, h: moveH });
+                y += moveH + 3 * s;
+            });
+
+            y = H - 12 * s;
+            g.fillStyle = rarity.footerColor;
+            g.font = `700 ${7.5 * s}px Nunito, sans-serif`;
+            g.fillText(rarity.tag, 8 * s, y);
+            rects.push({ x: 4 * s, y: y - 10 * s, w: 60 * s, h: 18 * s });
+
+            return { canvas: c, rects, W, H };
+        }
+
+        function roundRect(g, x, y, w, h, r) {
+            g.beginPath();
+            g.moveTo(x + r, y);
+            g.arcTo(x + w, y, x + w, y + h, r);
+            g.arcTo(x + w, y + h, x, y + h, r);
+            g.arcTo(x, y + h, x, y, r);
+            g.arcTo(x, y, x + w, y, r);
+            g.closePath();
+        }
+        function wrapText(g, text, x, y, maxWidth, lineHeight) {
+            const words = text.split(' ');
+            let line = '';
+            for (let n = 0; n < words.length; n++) {
+                const testLine = line + words[n] + ' ';
+                if (g.measureText(testLine).width > maxWidth && n > 0) {
+                    g.fillText(line, x, y);
+                    line = words[n] + ' ';
+                    y += lineHeight;
+                } else {
+                    line = testLine;
+                }
+            }
+            g.fillText(line, x, y);
+        }
+
+        const frontFaceGeo = new THREE.ShapeGeometry(cardShape);
+        const posAttr = frontFaceGeo.attributes.position;
+        const uvArr = new Float32Array(posAttr.count * 2);
+        for (let i = 0; i < posAttr.count; i++) {
+            const x = posAttr.getX(i), y = posAttr.getY(i);
+            uvArr[i * 2] = (x + cardWidth / 2) / cardWidth;
+            uvArr[i * 2 + 1] = (y + cardHeight / 2) / cardHeight;
+        }
+        frontFaceGeo.setAttribute('uv', new THREE.BufferAttribute(uvArr, 2));
+
+        let starsData = null, sparkleTexture = null, sparkleMaterial = null;
+        let sheenTexture = null, sheenMaterial = null;
+
+        document.fonts.ready.then(() => {
+            const { canvas: faceCanvas, rects: textRects, W: texW, H: texH } = buildCardFaceTexture();
+            const faceTexture = new THREE.CanvasTexture(faceCanvas);
+            faceTexture.colorSpace = THREE.SRGBColorSpace;
+            const frontFaceMat = new THREE.MeshStandardMaterial({ map: faceTexture, roughness: 0.4, metalness: 0.15 });
+            const frontFaceMesh = new THREE.Mesh(frontFaceGeo, frontFaceMat);
+            frontFaceMesh.position.set(0, 0, zFront + 0.015);
+            frontFaceMesh.renderOrder = 4;
+            cardMesh.add(frontFaceMesh);
+
+            // Sparkle overlay - twinkling stars on the foil, avoiding all text
+            starsData = buildStarsTexture(texW, texH, 70, textRects);
+            sparkleTexture = new THREE.CanvasTexture(starsData.canvas);
+            sparkleTexture.wrapS = THREE.ClampToEdgeWrapping;
+            sparkleTexture.wrapT = THREE.ClampToEdgeWrapping;
+            sparkleMaterial = new THREE.MeshBasicMaterial({ map: sparkleTexture, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.85 });
+            const sparkleMesh = new THREE.Mesh(frontFaceGeo, sparkleMaterial);
+            sparkleMesh.position.set(0, 0, zFront + 0.02);
+            sparkleMesh.renderOrder = 5;
+            cardMesh.add(sparkleMesh);
+
+            // Sweeping foil sheen
+            const sheenCanvas = buildSheenTexture(256);
+            sheenTexture = new THREE.CanvasTexture(sheenCanvas);
+            sheenTexture.wrapS = THREE.RepeatWrapping;
+            sheenTexture.wrapT = THREE.RepeatWrapping;
+            sheenMaterial = new THREE.MeshBasicMaterial({ map: sheenTexture, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0 });
+            const sheenMesh = new THREE.Mesh(frontFaceGeo, sheenMaterial);
+            sheenMesh.position.set(0, 0, zFront + 0.025);
+            sheenMesh.renderOrder = 6;
+            cardMesh.add(sheenMesh);
+        });
+
+        function buildStarsTexture(w, h, count, excludeRects) {
+            const c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            const g = c.getContext('2d');
+            const pad = w * 0.01;
+            const stars = [];
+            let attempts = 0;
+            while (stars.length < count && attempts < count * 40) {
+                attempts++;
+                const x = Math.random() * w, y = Math.random() * h;
+                const blocked = excludeRects.some(r => x > r.x - pad && x < r.x + r.w + pad && y > r.y - pad && y < r.y + r.h + pad);
+                if (blocked) continue;
+                stars.push({ x, y, r: 0.8 + Math.random() * 2.2, phase: Math.random() * Math.PI * 2, speed: 0.6 + Math.random() * 2.0 });
+            }
+            return { canvas: c, ctx: g, stars };
+        }
+        function drawStars(sd, t) {
+            const { canvas: c, ctx: g, stars } = sd;
+            g.clearRect(0, 0, c.width, c.height);
+            stars.forEach(st => {
+                const tw = 0.2 + 0.8 * Math.abs(Math.sin(t * st.speed + st.phase));
+                const glowR = st.r * 5;
+                const grad = g.createRadialGradient(st.x, st.y, 0, st.x, st.y, glowR);
+                grad.addColorStop(0, `rgba(255,255,255,${0.95 * tw})`);
+                grad.addColorStop(0.35, `rgba(255,250,220,${0.45 * tw})`);
+                grad.addColorStop(1, 'rgba(255,255,255,0)');
+                g.fillStyle = grad;
+                g.beginPath(); g.arc(st.x, st.y, glowR, 0, Math.PI * 2); g.fill();
+                g.strokeStyle = `rgba(255,255,255,${0.85 * tw})`;
+                g.lineWidth = 1;
+                g.beginPath();
+                g.moveTo(st.x - st.r * 3.2, st.y); g.lineTo(st.x + st.r * 3.2, st.y);
+                g.moveTo(st.x, st.y - st.r * 3.2); g.lineTo(st.x, st.y + st.r * 3.2);
+                g.stroke();
+            });
+        }
+        function buildSheenTexture(size) {
+            const c = document.createElement('canvas');
+            c.width = size; c.height = size;
+            const g = c.getContext('2d');
+            const grad = g.createLinearGradient(0, 0, size, size);
+            grad.addColorStop(0.0, 'rgba(255,255,255,0)');
+            grad.addColorStop(0.42, 'rgba(255,255,255,0)');
+            grad.addColorStop(0.5, 'rgba(255,255,255,1)');
+            grad.addColorStop(0.58, 'rgba(255,255,255,0)');
+            grad.addColorStop(1.0, 'rgba(255,255,255,0)');
+            g.fillStyle = grad;
+            g.fillRect(0, 0, size, size);
+            return c;
+        }
+
+        // ==========================================
+        // ANIMATION LOOP
+        // ==========================================
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const t = clock.getElapsedTime();
+
+            if (cardImageMesh) {
+                cardImageMesh.position.y = holeYOffset + Math.sin(t * 2) * 0.04;
+                cardImageMesh.rotation.y = Math.sin(t * 0.7) * 0.12;
+            }
+
+            drawStarfield(starfieldData);
+            starfieldTexture.needsUpdate = true;
+
+            const camLocal = camera.position.clone();
+            cardMesh.worldToLocal(camLocal);
+            const camLen = camLocal.length() || 1;
+            const angleX = camLocal.x / camLen;
+            const angleY = camLocal.y / camLen;
+            const tilt = Math.min(1, Math.abs(angleX) + Math.abs(angleY));
+
+            if (sparkleTexture) {
+                drawStars(starsData, t);
+                sparkleTexture.needsUpdate = true;
+                sparkleTexture.offset.x = angleX * 0.35;
+                sparkleTexture.offset.y = angleY * 0.35;
+                sparkleMaterial.opacity = 0.3 + 0.7 * tilt;
+            }
+            if (sheenTexture) {
+                sheenTexture.offset.x = -0.6 + angleX * 1.5;
+                sheenTexture.offset.y = -0.6 + angleY * 1.5;
+                sheenMaterial.opacity = 0.9 * Math.pow(tilt, 1.3);
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>

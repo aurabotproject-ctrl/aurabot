@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { sb } from '../lib/supabase';
 import { Dashboard } from '../lib/dashboard';
 import PokeCard from '../components/PokeCard';
+import HoloCardViewer from '../components/HoloCardViewer';
 import type { Session } from '../lib/auth';
 import type { Card } from '../lib/supabase';
 
@@ -166,14 +167,9 @@ export default function MyCardsPage({ session, onBack }: { session: NonNullable<
         )}
       </div>
 
-      {/* Detail modal */}
+      {/* Detail modal - full 3D holographic card */}
       {detailCard && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-          onClick={() => setDetailCard(null)}>
-          <div onClick={e => e.stopPropagation()}>
-            <PokeCard card={detailCard} showShimmerBtn />
-          </div>
-        </div>
+        <HoloCardViewer card={detailCard} onClose={() => setDetailCard(null)} />
       )}
     </div>
   );
