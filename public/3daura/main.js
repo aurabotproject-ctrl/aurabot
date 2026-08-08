@@ -95,14 +95,32 @@
   scene.fog = new THREE.Fog(COLORS.bg, 110, 195);
 
   const camera = new THREE.PerspectiveCamera(38, window.innerWidth/window.innerHeight, 0.1, 900);
-  const renderer = new THREE.WebGLRenderer({ antialias:true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  // Detected up-front (not just for the on-screen controls further down) so it
+  // can also inform the renderer settings below - iPad/touch GPUs are
+  // meaningfully weaker than a typical desktop, and the touch camera drag/pinch
+  // feels laggy far more from dropped render frames than from anything in the
+  // input handling itself, so touch devices get a lighter rendering profile.
+  const IS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  // Capping the pixel ratio lower on touch is the single biggest performance
+  // lever here: an iPad's native devicePixelRatio (2-3x) means "cap at 2"
+  // still renders 4x the shaded pixels of 1x, which a phone/tablet GPU
+  // struggles to push at 60fps once shadows + antialiasing are added on top -
+  // that's what reads as "laggy" while dragging the camera. 1.5 keeps things
+  // visibly sharp on a Retina screen while cutting the pixel count substantially.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_TOUCH ? 1.5 : 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // PCFSoftShadowMap does extra filtering taps per shadowed pixel; PCFShadowMap
+  // looks nearly identical at this scene's scale but is noticeably cheaper, so
+  // touch devices get the lighter one.
+  renderer.shadowMap.type = IS_TOUCH ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
+  renderer.domElement.style.touchAction = 'none'; // belt-and-suspenders alongside the CSS rule below
   document.body.appendChild(renderer.domElement);
 
   window.addEventListener('resize', () => {
@@ -5344,7 +5362,11 @@
     if (e.key === 'ArrowRight') keys.d = false;
   });
 
-  let camDist = 64, camAngleX = 0, camAngleY = 0.45;
+  // camDist is the value actually rendered every frame; targetCamDist is what
+  // wheel/pinch set instantly. Easing camDist toward the target (see animate())
+  // smooths out the small frame-to-frame jitter inherent in raw two-finger
+  // touch coordinates, without adding any perceptible input delay.
+  let camDist = 64, targetCamDist = 64, camAngleX = 0, camAngleY = 0.45;
   let isDragging = false, prevMouseX = 0, prevMouseY = 0;
   let dragStartX = 0, dragStartY = 0;
   
@@ -5376,7 +5398,7 @@
     if (activePointers.size >= 2) {
       isDragging = false;
       pinchStartDist = currentPinchDist();
-      pinchStartCamDist = camDist;
+      pinchStartCamDist = targetCamDist;
     } else {
       isDragging = true;
       prevMouseX = e.clientX; prevMouseY = e.clientY;
@@ -5387,7 +5409,7 @@
     if (activePointers.has(e.pointerId)) activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (activePointers.size >= 2) {
       const d = currentPinchDist();
-      if (d && pinchStartDist) camDist = Math.max(8, Math.min(120, pinchStartCamDist * (pinchStartDist / d)));
+      if (d && pinchStartDist) targetCamDist = Math.max(8, Math.min(120, pinchStartCamDist * (pinchStartDist / d)));
       return;
     }
     if (!isDragging) return;
@@ -5422,7 +5444,7 @@
   window.addEventListener('pointerup', endWorldPointer);
   window.addEventListener('pointercancel', endWorldPointer);
   
-  window.addEventListener('wheel', e => { camDist = Math.max(8, Math.min(120, camDist + e.deltaY * 0.02)); });
+  window.addEventListener('wheel', e => { targetCamDist = Math.max(8, Math.min(120, targetCamDist + e.deltaY * 0.02)); });
 
   // ═══════════════════════════════════════════════════════════════
   // TOUCH CONTROLS (iPad / touchscreen) — joystick, action buttons,
@@ -5432,7 +5454,8 @@
   // keyboard handlers above already use, so behaviour stays identical
   // regardless of input method.
   // ═══════════════════════════════════════════════════════════════
-  const IS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
+  // IS_TOUCH is detected up near the renderer setup above (it also informs
+  // the render-quality settings there).
 
   const mobileControlsEl = document.getElementById('mobileControls');
   const placementTouchPanelEl = document.getElementById('placementTouchPanel');
@@ -6237,6 +6260,12 @@
 
     // --- CAMERA SMOOTH ORBIT TRACKING ---
     smoothFocus.lerp(new THREE.Vector3(robot.position.x, robot.position.y + 2.1, robot.position.z), 0.12);
+    // Ease the actual render distance toward whatever pinch/wheel just set,
+    // instead of snapping straight to it - irons out the small per-frame
+    // noise in raw touch coordinates so pinch-zoom feels smooth rather than
+    // jittery, while still tracking the target almost instantly (0.35 of the
+    // remaining distance per frame).
+    camDist += (targetCamDist - camDist) * 0.35;
     const camX = smoothFocus.x + camDist * Math.sin(camAngleX) * Math.cos(camAngleY);
     const camY = smoothFocus.y + camDist * Math.sin(camAngleY);
     const camZ = smoothFocus.z + camDist * Math.cos(camAngleX) * Math.cos(camAngleY);

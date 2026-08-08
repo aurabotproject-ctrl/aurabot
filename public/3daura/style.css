@@ -1,4 +1,14 @@
-  html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#F4E8D6; }
+  html, body {
+    margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#F4E8D6;
+    /* Long-press on iOS otherwise pops up the text-selection magnifier/callout
+       mid-drag, which is exactly what makes camera-dragging on a touchscreen
+       feel like it's fighting you. Re-enabled specifically for the two real
+       text inputs below so typing a name / a paint word still works normally. */
+    -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+  }
+  input[type="text"] {
+    -webkit-touch-callout: default; -webkit-user-select: text; user-select: text;
+  }
   
   /* Top Controls Container */
   #palette {
@@ -567,7 +577,7 @@
   .pet-swatch.selected { border-color: #fff; box-shadow: 0 0 0 2px #000, 0 0 0 3.5px #fff; }
   .pet-hint { text-align: center; color: #777; font-size: 10px; font-weight: 700; padding: 12px 0 2px; text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.5; }
 
-  canvas { display:block; }
+  canvas { display:block; touch-action: none; }
 
   /* ═══════════════════════════════════════════════════════════════
      TOUCH CONTROLS (iPad / touchscreen)
