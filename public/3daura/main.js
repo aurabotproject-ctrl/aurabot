@@ -5604,7 +5604,11 @@
   }
 
   let moveSpeed = 0, turnSpeed = 0, walkPhase = 0;
-  const maxSpeed = 0.22, maxTurn = 0.05, accel = 0.019, friction = 0.88;
+  // Base walk speed doubled from the original 0.22. Acceleration is doubled
+  // right along with it so AURA still reaches top walking speed in about the
+  // same amount of time as before (just covering twice the distance) - it
+  // simply feels uniformly faster rather than sluggish-to-spin-up-then-fast.
+  const maxSpeed = 0.44, maxTurn = 0.05, accel = 0.038, friction = 0.88;
 
   // ---------- JUMP (Space bar) ----------
   // Jump height is 1.5x a block's stacking height, comfortably enough to land on
@@ -6043,7 +6047,9 @@
 
     // --- MOVEMENT & ROBOT ANIMATION ---
     if (!placementMode.active && !buildMode.active && !editMode.active) {
-      const currentMaxSpeed = isTurbo ? maxSpeed * 1.65 : maxSpeed;
+      // Cola gives 3x the (now-doubled) base walk speed - i.e. 6x AURA's
+      // original walk speed from before this speed pass.
+      const currentMaxSpeed = isTurbo ? maxSpeed * 3 : maxSpeed;
       if (keys.w) moveSpeed = Math.min(currentMaxSpeed, moveSpeed + accel);
       else if (keys.s) moveSpeed = Math.max(-currentMaxSpeed * 0.6, moveSpeed - accel);
       else moveSpeed *= friction;
