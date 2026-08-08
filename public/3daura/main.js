@@ -1,18 +1,166 @@
 // AURA Robot Activity — Main Application Logic
-// Load order matters (see index.html): three.min.js, then quiz-questions.js, then this file.
-// LANDMARK_QUESTIONS comes from quiz-questions.js, loaded as a plain script just before this one.
+// Load order matters (see index.html): supabase-js UMD, then supabaseClient.js
+// (defines the global `sb` client, shared session with the main app), then
+// three.min.js, then quiz-questions.js, then this file.
 
-(function(){
+(async function(){
   const WORLD_SIZE = 1620;
   const BOUNDARY_LIMIT = WORLD_SIZE / 2 - 2;
   const GRID_SIZE = 6; // Grid cell size in world units for Nature Placement
 
-  const paletteEl = document.getElementById('palette');
-  const toggleBtn = document.getElementById('toggleBtn');
-  toggleBtn.addEventListener('click', () => {
-    paletteEl.classList.toggle('collapsed');
-    toggleBtn.textContent = paletteEl.classList.contains('collapsed') ? '►' : '◄';
-    toggleBtn.title = paletteEl.classList.contains('collapsed') ? 'Expand Toolbar' : 'Collapse Toolbar';
+  // ═══════════════════════════════════════════════════════════════
+  // CLOUD SYNC — there is no more student-facing toolbar (color picker,
+  // name field, save/reset/settings buttons). Instead: robot colour comes
+  // from the student's avatar colour set in the main app, the chest
+  // monitor shows their real name, world settings are set once by their
+  // teacher and apply to everyone, and progress saves to their account
+  // instead of this one browser's storage.
+  //
+  // This whole thing degrades gracefully: if there's no logged-in session
+  // (e.g. the file is opened directly during development) every piece of
+  // this is skipped and the game behaves exactly as it always has, reading
+  // and writing plain localStorage.
+  // ═══════════════════════════════════════════════════════════════
+
+  // Mirrors BASE_COLOR_THEMES + EXTRA_COLOR_THEMES from the main app's
+  // BotAvatar.tsx (same order, same colourIndex) so a student's 3D robot is
+  // always the same colour as their 2D card avatar. Uses each theme's `mid`
+  // (main colour) and `dark` (shadow/trim colour) tones.
+  const AURA_COLOR_THEMES = [
+    { mid: 0x90caf9, dark: 0x42a5f5, special: false }, // Sky
+    { mid: 0xf8bbd0, dark: 0xf48fb1, special: false }, // Bubblegum
+    { mid: 0xc5e1a5, dark: 0x8bc34a, special: false }, // Minty
+    { mid: 0xfff176, dark: 0xfdd835, special: false }, // Lemon
+    { mid: 0xce93d8, dark: 0xab47bc, special: false }, // Grape
+    { mid: 0x80deea, dark: 0x00bcd4, special: false }, // Ocean
+    { mid: 0xffcc80, dark: 0xff9800, special: false }, // Tangerine
+    { mid: 0xef9a9a, dark: 0xe53935, special: false }, // Crimson
+    { mid: 0xffe082, dark: 0xffc107, special: true },  // ✨ Gold
+    { mid: 0xe0e0e0, dark: 0x9e9e9e, special: true },  // ✨ Silver
+    { mid: 0xa78bfa, dark: 0x38bdf8, special: true },  // 🌈 Chrome
+    { mid: 0x111118, dark: 0x1a1a2e, special: true },  // 🖤 Black Chrome
+  ];
+
+  // These three string literals must stay in sync with SAVE_KEY,
+  // PET_SETTINGS_KEY, and SETTINGS_KEY further down the file - duplicated
+  // here (rather than reordering the whole file) so cloud data can be
+  // written into localStorage before any of the normal load*() functions
+  // read from it, using the exact shapes they already expect.
+  const SAVE_KEY_LITERAL = 'aura_robot_save_v1';
+  const PET_SETTINGS_KEY_LITERAL = 'aura_pets_v1';
+  const SETTINGS_KEY_LITERAL = 'aura_settings_v1';
+
+  let cloudStudentId = null, cloudTeacherId = null;
+
+  async function bootstrapCloudData() {
+    const result = { authenticated: false, name: null, colorIndex: 0, wallet: null, build: null, teacherSettings: null };
+    if (typeof sb === 'undefined') return result; // supabaseClient.js didn't load - stay fully local
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session || !session.user) return result;
+
+      const { data: profile } = await sb.from('profiles').select('id, name, role, student_id').eq('id', session.user.id).maybeSingle();
+      if (!profile || profile.role !== 'student' || !profile.student_id) return result;
+
+      result.authenticated = true;
+      cloudStudentId = profile.student_id;
+
+      const { data: student } = await sb.from('students')
+        .select('name, teacher_id, robot_color_index, aura3d_wallet, aura3d_build')
+        .eq('id', cloudStudentId).maybeSingle();
+      if (student) {
+        cloudTeacherId = student.teacher_id || null;
+        result.name = profile.name || student.name || null;
+        result.colorIndex = typeof student.robot_color_index === 'number' ? student.robot_color_index : 0;
+        result.wallet = student.aura3d_wallet || null;
+        result.build = student.aura3d_build || null;
+      }
+
+      if (cloudTeacherId) {
+        try {
+          const { data: settingsRow } = await sb.from('aura3d_teacher_settings').select('settings').eq('teacher_id', cloudTeacherId).maybeSingle();
+          result.teacherSettings = (settingsRow && settingsRow.settings) ? settingsRow.settings : null;
+        } catch (err) { /* settings table may not exist yet - defaults apply, nothing to do */ }
+      }
+    } catch (err) {
+      console.error('AURA cloud bootstrap failed, continuing in local-only mode:', err);
+    }
+    return result;
+  }
+
+  // Writes the cloud state into the exact localStorage shapes loadState() /
+  // loadPetSettings() / loadSettingsFromStorage() already expect. Only runs
+  // when a student session was actually found - if nobody's logged in this
+  // leaves localStorage untouched (so opening the file directly still works
+  // for development). When a session WAS found, this always overwrites all
+  // three keys (even with empty defaults) rather than leaving stale data in
+  // place, since classroom iPads are shared between different students and
+  // must never bleed one student's world/money into another's session.
+  function applyCloudDataToLocalStorage(cloud) {
+    if (!cloud || !cloud.authenticated) return;
+    const wallet = cloud.wallet || {};
+    const build = cloud.build || {};
+    const saveBlob = {
+      version: 1,
+      bankBalance: typeof wallet.bankBalance === 'number' ? wallet.bankBalance : 0,
+      inventory: (wallet.inventory && typeof wallet.inventory === 'object') ? wallet.inventory : {},
+      userText: cloud.name || 'AURA',
+      worldGrid: Array.isArray(build.worldGrid) ? build.worldGrid : [],
+      buildGrid: Array.isArray(build.buildGrid) ? build.buildGrid : [],
+    };
+    try { localStorage.setItem(SAVE_KEY_LITERAL, JSON.stringify(saveBlob)); } catch (err) {}
+    try {
+      const pets = wallet.pets || { owned: [], active: [], inactive: [], names: {}, colors: {} };
+      localStorage.setItem(PET_SETTINGS_KEY_LITERAL, JSON.stringify(pets));
+    } catch (err) {}
+    try { localStorage.setItem(SETTINGS_KEY_LITERAL, JSON.stringify(cloud.teacherSettings || {})); } catch (err) {}
+  }
+
+  const __cloud = await bootstrapCloudData();
+  applyCloudDataToLocalStorage(__cloud);
+
+  // ---- Cloud autosave ----
+  // saveState()/savePetSettings() (defined further down) already run at every
+  // natural checkpoint - buying something, placing a block, adopting a pet,
+  // etc. - and already write to localStorage. scheduleCloudSave() piggybacks
+  // on those exact same call sites (each of those functions calls it as its
+  // last step) rather than needing its own trigger points scattered through
+  // the file. It's debounced so rapid-fire actions (e.g. stacking several
+  // build blocks in a row) collapse into one network write, and there's also
+  // a periodic safety-net push plus one on page hide/close so nothing is lost.
+  let cloudSaveTimer = null;
+  function scheduleCloudSave() {
+    if (!cloudStudentId) return; // no session - stay purely local (dev/offline mode)
+    if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
+    cloudSaveTimer = setTimeout(pushCloudSave, 1500);
+  }
+  async function pushCloudSave() {
+    if (!cloudStudentId) return;
+    if (cloudSaveTimer) { clearTimeout(cloudSaveTimer); cloudSaveTimer = null; }
+    try {
+      let saveRaw, petRaw;
+      try { saveRaw = localStorage.getItem(SAVE_KEY_LITERAL); } catch (err) {}
+      try { petRaw = localStorage.getItem(PET_SETTINGS_KEY_LITERAL); } catch (err) {}
+      const save = saveRaw ? JSON.parse(saveRaw) : {};
+      const pets = petRaw ? JSON.parse(petRaw) : null;
+
+      const wallet = { bankBalance: save.bankBalance || 0, inventory: save.inventory || {}, pets };
+      const build = { worldGrid: save.worldGrid || [], buildGrid: save.buildGrid || [] };
+
+      await sb.from('students').update({
+        aura3d_wallet: wallet,
+        aura3d_build: build,
+        aura3d_saved_at: new Date().toISOString(),
+      }).eq('id', cloudStudentId);
+    } catch (err) {
+      console.error('AURA cloud save failed (progress is still safe locally, will retry):', err);
+    }
+  }
+  // Safety net in case something is missed by the checkpoint-triggered saves above.
+  setInterval(() => { if (cloudStudentId) pushCloudSave(); }, 30000);
+  window.addEventListener('beforeunload', () => { if (cloudStudentId) pushCloudSave(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && cloudStudentId) pushCloudSave();
   });
 
   const COLORS = { bg: 0xF4E8D6, orange: 0xFF5E13, orangeDk: 0xDF3C00, outline: 0x000000, grey: 0x33353D, greyLt: 0x4A4D57 };
@@ -415,8 +563,11 @@
   }
   redrawFace(1.0);
 
+  // Defaults to "BIG AURA" until loadState() runs at the bottom of this file
+  // and overwrites it with the student's real name (from applyCloudDataToLocalStorage
+  // above, or from a plain local save if nobody's logged in). There's no
+  // student-facing name field any more - it's just whoever's logged in.
   let userText = "BIG AURA";
-  document.getElementById('nameInput').addEventListener('input', e => { userText = e.target.value.trim() !== "" ? e.target.value : "AURA"; });
 
   const chestCanvas = document.createElement('canvas'); chestCanvas.width = 512; chestCanvas.height = 700; 
   const chestCtx = chestCanvas.getContext('2d'); const chestTex = new THREE.CanvasTexture(chestCanvas);
@@ -2965,6 +3116,7 @@
         active: petActiveOrder, inactive: petInactiveOrder, names: petNames, colors: petColors
       }));
     } catch (err) { console.error('AURA pet settings save failed:', err); }
+    scheduleCloudSave();
   }
   function loadPetSettings() {
     let raw;
@@ -5663,25 +5815,20 @@
     jumpVelocity = JUMP_INITIAL_VELOCITY;
     jumpY = ROBOT_GROUND_BASE_Y + getStandingSurfaceOffset(robot.position.x, robot.position.z);
   }
+  // currentTheme is now just a display label for the kiosk "THEME:" readout -
+  // actual colour is set once at boot by applyRobotColorFromCloud() (see the
+  // very bottom of this file) from the student's avatar colour, not chosen
+  // by the student in-game any more.
   let currentTheme = "original";
 
-  document.querySelectorAll('#palette button[data-theme]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#palette button[data-theme]').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const theme = btn.dataset.theme;
-      let cMain = COLORS.orange, cDk = COLORS.orangeDk;
-      if (theme === 'blue') { cMain = 0x1E88E5; cDk = 0x0D47A1; }
-      else if (theme === 'silver') { cMain = 0xD0D5DD; cDk = 0x64748B; }
-      else if (theme === 'gold') { cMain = 0xFFD700; cDk = 0xB8860B; }
-      else if (theme === 'prismatic') { cMain = 0xFF80BF; cDk = 0x9c27b0; }
-      else if (theme === 'blackChrome') { cMain = 0x22222A; cDk = 0x08080C; }
-      
-      matOrange.color.setHex(cMain); matOrangeDk.color.setHex(cDk);
-      currentTheme = theme;
-      sparkleGroup.visible = (theme === 'silver' || theme === 'gold' || theme === 'prismatic' || theme === 'blackChrome');
-    });
-  });
+  function applyRobotColorFromCloud(colorIndex) {
+    const i = ((colorIndex % AURA_COLOR_THEMES.length) + AURA_COLOR_THEMES.length) % AURA_COLOR_THEMES.length;
+    const theme = AURA_COLOR_THEMES[i];
+    matOrange.color.setHex(theme.mid);
+    matOrangeDk.color.setHex(theme.dark);
+    sparkleGroup.visible = theme.special;
+    currentTheme = ['sky','bubblegum','minty','lemon','grape','ocean','tangerine','crimson','gold','silver','chrome','blackChrome'][i] || 'original';
+  }
 
   const kioskPanel = document.getElementById('kioskPanel');
   const eftposPanel = document.getElementById('eftposPanel');
@@ -5739,21 +5886,16 @@
         bankBalance,
         inventory,
         userText,
-        currentTheme,
         worldGrid: serializeWorldGrid(),
         buildGrid: serializeBuildGrid()
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+      scheduleCloudSave();
       return true;
     } catch (err) {
       console.error('AURA save failed:', err);
       return false;
     }
-  }
-
-  function applyTheme(theme) {
-    const btn = document.querySelector(`#palette button[data-theme="${theme}"]`);
-    if (btn) btn.click();
   }
 
   function loadState() {
@@ -5772,9 +5914,7 @@
 
     if (data.userText) {
       userText = data.userText;
-      document.getElementById('nameInput').value = data.userText;
     }
-    if (data.currentTheme) applyTheme(data.currentTheme);
 
     if (Array.isArray(data.worldGrid)) {
       data.worldGrid.forEach(t => {
@@ -5796,62 +5936,21 @@
     return true;
   }
 
-  document.getElementById('btnSaveGame').addEventListener('click', () => {
-    if (saveState()) logTransaction('GAME SAVED', 'credit');
-    else logTransaction('ERR: SAVE FAILED', 'debit');
-  });
+  // Manual save/reset are gone - saving happens automatically (see
+  // scheduleCloudSave() calls inside saveState()/savePetSettings() and the
+  // autosave timer/beforeunload hook near the bottom of this file), and
+  // resets are now a teacher-only action from the Teacher page, applied
+  // directly to the student's saved data in the cloud rather than through
+  // any button in the game itself.
 
-  const resetModalEl = document.getElementById('resetModal');
-  document.getElementById('btnResetGame').addEventListener('click', () => {
-    if (buildMode.active) exitBuildMode();
-    if (placementMode.active) exitPlacementMode();
-    resetModalEl.classList.add('show');
-  });
-  function closeResetModal() { resetModalEl.classList.remove('show'); }
-  document.getElementById('btnResetCancel').addEventListener('click', closeResetModal);
-  resetModalEl.addEventListener('click', e => { if (e.target === resetModalEl) closeResetModal(); });
-
-  document.getElementById('btnResetBuildsOnly').addEventListener('click', () => {
-    clearAllNature();
-    clearAllBuilds();
-    saveState();
-    logTransaction('RESET: BUILDS CLEARED', 'debit');
-    closeResetModal();
-  });
-
-  document.getElementById('btnResetAll').addEventListener('click', () => {
-    clearAllNature();
-    clearAllBuilds();
-    bankBalance = 0;
-    Object.keys(inventory).forEach(k => delete inventory[k]);
-    updateBankUI();
-    updateInventoryUI();
-
-    // Send every pet back to "unadopted" too, so a full reset really does put
-    // AURA back to having zero pets - matching a fresh install.
-    petAdoptionAnim = null;
-    ALL_PET_IDS.forEach(id => { petOwned[id] = false; });
-    petActiveOrder = [];
-    petInactiveOrder = [];
-    applyPetVisibility();
-    renderPetLists();
-    savePetSettings();
-
-    saveState();
-    logTransaction('RESET: EVERYTHING CLEARED', 'debit');
-    closeResetModal();
-  });
-
-  // ---------- SETTINGS: persistence + modal wiring ----------
-  // Kept as its own localStorage key (separate from the map/money save) since these are
-  // user preferences rather than game state. New settings can follow the same pattern:
-  // add a field to `settings`, a .settings-row in index.html, load/apply it below, and
-  // save it whenever its control changes.
+  // ---------- SETTINGS: persistence ----------
+  // These are no longer editable in-game - they're set once by the teacher
+  // (see the "3D Aura Settings" panel on the Teacher page) and apply to every
+  // student under that teacher. loadSettingsFromStorage() still reads from
+  // the same local key, but that key is now populated by
+  // applyCloudDataToLocalStorage() from the teacher's cloud settings at boot,
+  // rather than from a student-facing settings modal.
   const SETTINGS_KEY = 'aura_settings_v1';
-
-  function saveSettings() {
-    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (err) { console.error('AURA settings save failed:', err); }
-  }
 
   function loadSettingsFromStorage() {
     let raw;
@@ -5881,71 +5980,6 @@
   LAMB_FOLLOW_DIST = settings.petGapLamb;
   scene.fog.far = settings.fogFar;
   scene.fog.near = Math.max(5, settings.fogFar - 85);
-
-  const settingsModalEl = document.getElementById('settingsModal');
-  document.getElementById('btnSettings').addEventListener('click', () => { settingsModalEl.classList.add('show'); });
-  function closeSettingsModal() { settingsModalEl.classList.remove('show'); }
-  document.getElementById('closeSettingsModal').addEventListener('click', closeSettingsModal);
-  settingsModalEl.addEventListener('click', e => { if (e.target === settingsModalEl) closeSettingsModal(); });
-
-  const toggleDayNightEl = document.getElementById('toggleDayNight');
-  const dayNightSpeedSliderEl = document.getElementById('dayNightSpeedSlider');
-  const dayNightSpeedValueEl = document.getElementById('dayNightSpeedValue');
-
-  toggleDayNightEl.checked = settings.dayNightEnabled;
-  dayNightSpeedSliderEl.value = settings.dayNightSpeed;
-  dayNightSpeedValueEl.textContent = settings.dayNightSpeed.toFixed(2) + 'x';
-
-  toggleDayNightEl.addEventListener('change', () => {
-    settings.dayNightEnabled = toggleDayNightEl.checked;
-    saveSettings();
-  });
-  dayNightSpeedSliderEl.addEventListener('input', () => {
-    settings.dayNightSpeed = parseFloat(dayNightSpeedSliderEl.value);
-    dayNightSpeedValueEl.textContent = settings.dayNightSpeed.toFixed(2) + 'x';
-    saveSettings();
-  });
-
-  const fogFarSliderEl = document.getElementById('fogFarSlider');
-  const fogFarValueEl = document.getElementById('fogFarValue');
-  fogFarSliderEl.value = settings.fogFar;
-  fogFarValueEl.textContent = Math.round(settings.fogFar);
-  fogFarSliderEl.addEventListener('input', () => {
-    const v = parseFloat(fogFarSliderEl.value);
-    settings.fogFar = v;
-    fogFarValueEl.textContent = Math.round(v);
-    scene.fog.far = v;
-    scene.fog.near = Math.max(5, v - 85);
-    saveSettings();
-  });
-
-  // ---- Pet Gaps: one slider per pet, each wired to its own settings key + live follow-distance variable ----
-  const PET_GAP_SLIDERS = [
-    { key: 'petGapDog',    slider: 'petGapDogSlider',    value: 'petGapDogValue',    apply: v => { DOG_FOLLOW_DIST = v; } },
-    { key: 'petGapCat',    slider: 'petGapCatSlider',    value: 'petGapCatValue',    apply: v => { CAT_FOLLOW_DIST = v; } },
-    { key: 'petGapBird',   slider: 'petGapBirdSlider',   value: 'petGapBirdValue',   apply: v => { BIRD_FOLLOW_DIST = v; } },
-    { key: 'petGapAlpaca', slider: 'petGapAlpacaSlider', value: 'petGapAlpacaValue', apply: v => { ALPACA_FOLLOW_DIST = v; } },
-    { key: 'petGapBunny',  slider: 'petGapBunnySlider',  value: 'petGapBunnyValue',  apply: v => { BUNNY_FOLLOW_DIST = v; } },
-    { key: 'petGapFrog',   slider: 'petGapFrogSlider',   value: 'petGapFrogValue',   apply: v => { FROG_FOLLOW_DIST = v; } },
-    { key: 'petGapMonkey', slider: 'petGapMonkeySlider', value: 'petGapMonkeyValue', apply: v => { MONKEY_FOLLOW_DIST = v; } },
-    { key: 'petGapPanda',  slider: 'petGapPandaSlider',  value: 'petGapPandaValue',  apply: v => { PANDA_FOLLOW_DIST = v; } },
-    { key: 'petGapOwl',    slider: 'petGapOwlSlider',    value: 'petGapOwlValue',    apply: v => { OWL_FOLLOW_DIST = v; } },
-    { key: 'petGapDragon', slider: 'petGapDragonSlider', value: 'petGapDragonValue', apply: v => { DRAGON_FOLLOW_DIST = v; } },
-    { key: 'petGapLamb',   slider: 'petGapLambSlider',   value: 'petGapLambValue',   apply: v => { LAMB_FOLLOW_DIST = v; } },
-  ];
-  PET_GAP_SLIDERS.forEach(({ key, slider, value, apply }) => {
-    const sliderEl = document.getElementById(slider);
-    const valueEl = document.getElementById(value);
-    sliderEl.value = settings[key];
-    valueEl.textContent = settings[key].toFixed(1);
-    sliderEl.addEventListener('input', () => {
-      const v = parseFloat(sliderEl.value);
-      settings[key] = v;
-      valueEl.textContent = v.toFixed(1);
-      apply(v);
-      saveSettings();
-    });
-  });
 
   const clock = new THREE.Clock();
   function animate() {
@@ -6285,5 +6319,6 @@
   }
 
   loadState();
+  applyRobotColorFromCloud(__cloud.colorIndex || 0);
   animate();
 })();

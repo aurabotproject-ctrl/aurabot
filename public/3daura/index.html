@@ -8,20 +8,6 @@
 </head>
 <body>
 
-<div id="palette">
-  <button id="toggleBtn" title="Collapse Toolbar">◄</button>
-  <button data-theme="original" class="active" style="background:#FF5E13; color:#fff;">Original</button>
-  <button data-theme="blue" style="background:#1E88E5; color:#fff;">Blue</button>
-  <button data-theme="silver" style="background:linear-gradient(135deg, #f0f0f5, #a0a5b0); color:#000;">✨ Silver</button>
-  <button data-theme="gold" style="background:linear-gradient(135deg, #ffe066, #c59b27); color:#000;">⚡ Gold</button>
-  <button data-theme="prismatic" style="background:linear-gradient(135deg, #a0f0ff, #ffb0e0, #d0a0ff); color:#000;">✨ Prismatic</button>
-  <button data-theme="blackChrome" style="background:linear-gradient(135deg, #2a2a35, #08080c); color:#fff;">✨ Black Chrome</button>
-  <input type="text" id="nameInput" value="BIG AURA" placeholder="TYPE NAME..." maxlength="20" />
-  <button id="btnSaveGame" title="Save map & money" style="background:#00C853; color:#fff;">💾 Save</button>
-  <button id="btnResetGame" title="Reset map and/or money" style="background:#FF5A5F; color:#fff;">♻ Reset</button>
-  <button id="btnSettings" title="Settings" style="background:#673AB7; color:#fff;">⚙ Settings</button>
-</div>
-
 <div id="hint">ARROW KEYS move · [SPACE] jump · drag orbit · scroll zoom · press [Q] for inventory · [P] for pets · [E] to edit</div>
 
 <!-- BOTTOM-LEFT RADAR MINIMAP -->
@@ -192,22 +178,6 @@
 </div>
 
 <!-- RESET CONFIRMATION MODAL -->
-<div id="resetModal">
-  <div id="resetModalBox">
-    <div id="resetModalHeader">
-      <span>♻ Reset AURA World</span>
-    </div>
-    <div id="resetModalBody">
-      <p>What would you like to reset?</p>
-      <div id="resetModalActions">
-        <button id="btnResetAll">🔥 Reset Everything<br><small>Builds + Money + Inventory</small></button>
-        <button id="btnResetBuildsOnly">🧹 Reset Builds Only<br><small>Keeps Money + Inventory</small></button>
-        <button id="btnResetCancel">✖ Cancel</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- EDIT MENU MODAL (press E) -->
 <div id="editMenuModal">
   <div id="editMenuBox">
@@ -313,147 +283,6 @@
   </div>
 </div>
 
-<!-- SETTINGS MODAL -->
-<div id="settingsModal">
-  <div id="settingsModalBox">
-    <div id="settingsModalHeader">
-      <span>⚙ Settings</span>
-      <button id="closeSettingsModal" title="Close">✕</button>
-    </div>
-    <div id="settingsModalBody">
-
-      <div class="settings-row">
-        <div class="settings-row-label">
-          <span>🌗 Day/Night Cycle</span>
-          <small>Toggle the sky, lighting, and sun position cycling over time</small>
-        </div>
-        <label class="toggle-switch">
-          <input type="checkbox" id="toggleDayNight" checked>
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-
-      <div class="settings-row">
-        <div class="settings-row-label">
-          <span>🕐 Cycle Speed</span>
-          <small>Drag left for a longer day, right for a quicker one</small>
-        </div>
-        <div class="settings-slider-wrap">
-          <input type="range" id="dayNightSpeedSlider" min="0.25" max="4" step="0.05" value="1">
-          <span id="dayNightSpeedValue">1.00x</span>
-        </div>
-      </div>
-
-      <div class="settings-row">
-        <div class="settings-row-label">
-          <span>🌫️ Fog Distance</span>
-          <small>Drag left for thick, close-in fog · right to see much further</small>
-        </div>
-        <div class="settings-slider-wrap">
-          <input type="range" id="fogFarSlider" min="60" max="400" step="5" value="195">
-          <span id="fogFarValue">195</span>
-        </div>
-      </div>
-
-      <div class="settings-section-title">🐾 Pet Gaps</div>
-      <div class="settings-row-label" style="margin-top:-10px;">
-        <small>How far behind their leader each pet trails while following</small>
-      </div>
-
-      <div class="settings-row pet-gap-row">
-        <div class="settings-row-label"><span>🐶 Dog</span></div>
-        <div class="settings-slider-wrap">
-          <input type="range" id="petGapDogSlider" min="0.5" max="15" step="0.1" value="6.8">
-          <span id="petGapDogValue">6.8</span>
-        </div>
-      </div>
-
-      <div class="settings-row pet-gap-row">
-        <div class="settings-row-label"><span>🐱 Cat</span></div>
-        <div class="settings-slider-wrap">
-          <input type="range" id="petGapCatSlider" min="0.5" max="15" step="0.1" value="4.4">
-          <span id="petGapCatValue">4.4</span>
-        </div>
-      </div>
-
-      <div class="settings-row pet-gap-row">
-        <div class="settings-row-label"><span>🐦 Bird</span></div>
-        <div class="settings-slider-wrap">
-          <input type="range" id="petGapBirdSlider" min="0.5" max="15" step="0.1" value="4.0">
-          <span id="petGapBirdValue">4.0</span>
-        </div>
-      </div>
-
-      <div class="settings-row pet-gap-row">
-        <div class="settings-row-label"><span>🦙 Alpaca</span></div>
-        <div class="settings-slider-wrap">
-          <input type="range" id="petGapAlpacaSlider" min="0.5" max="15" step="0.1" value="4.0">
-          <span id="petGapAlpacaValue">4.0</span>
-        </div>
-      </div>
-
-      <div class="settings-row pet-gap-row">
-        <div class="settings-row-label"><span>🐰 Bunny</span></div>
-        <div class="settings-slider-wrap">
-          <input type="range" id="petGapBunnySlider" min="0.5" max="15" step="0.1" value="3.2">
-          <span id="petGapBunnyValue">3.2</span>
-        </div>
-      </div>
-
-      <div class="settings-row pet-gap-row">
-        <div class="settings-row-label"><span>🐸 Frog</span></div>
-        <div class="settings-slider-wrap">
-          <input type="range" id="petGapFrogSlider" min="0.5" max="15" step="0.1" value="2.6">
-          <span id="petGapFrogValue">2.6</span>
-        </div>
-      </div>
-
-      <div class="settings-row pet-gap-row">
-        <div class="settings-row-label"><span>🐒 Monkey</span></div>
-        <div class="settings-slider-wrap">
-          <input type="range" id="petGapMonkeySlider" min="0.5" max="15" step="0.1" value="2.0">
-          <span id="petGapMonkeyValue">2.0</span>
-        </div>
-      </div>
-
-      <div class="settings-row pet-gap-row">
-        <div class="settings-row-label"><span>🐼 Panda</span></div>
-        <div class="settings-slider-wrap">
-          <input type="range" id="petGapPandaSlider" min="0.5" max="15" step="0.1" value="3.0">
-          <span id="petGapPandaValue">3.0</span>
-        </div>
-      </div>
-
-      <div class="settings-row pet-gap-row">
-        <div class="settings-row-label"><span>🦉 Owl</span></div>
-        <div class="settings-slider-wrap">
-          <input type="range" id="petGapOwlSlider" min="0.5" max="15" step="0.1" value="5.0">
-          <span id="petGapOwlValue">5.0</span>
-        </div>
-      </div>
-
-      <div class="settings-row pet-gap-row">
-        <div class="settings-row-label"><span>🐉 Dragon</span></div>
-        <div class="settings-slider-wrap">
-          <input type="range" id="petGapDragonSlider" min="0.5" max="15" step="0.1" value="4.6">
-          <span id="petGapDragonValue">4.6</span>
-        </div>
-      </div>
-
-      <div class="settings-row pet-gap-row">
-        <div class="settings-row-label"><span>🐑 Lamb</span></div>
-        <div class="settings-slider-wrap">
-          <input type="range" id="petGapLambSlider" min="0.5" max="15" step="0.1" value="3.6">
-          <span id="petGapLambValue">3.6</span>
-        </div>
-      </div>
-
-      <!-- More settings can be added here later, following the same .settings-row pattern -->
-
-    </div>
-  </div>
-</div>
-
 <!-- ═══════════════════════════════════════════════════════════════
      TOUCH CONTROLS (iPad / touchscreen)
      Only shown automatically on touch devices — see main.js IS_TOUCH.
@@ -507,6 +336,11 @@
   <button id="btnTouchExitBuild" class="mc-btn mc-btn-outline">✖ Exit Build</button>
 </div>
 
+<!-- Supabase client: shares the same project + auth session as the main app
+     (same origin, same localStorage-persisted session), so whichever student
+     is already logged in there is automatically recognised here too. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/supabaseClient.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="quiz-questions.js"></script>
 <script src="main.js"></script>

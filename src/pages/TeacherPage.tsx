@@ -10,6 +10,13 @@ import { AI } from '../lib/ai';
 import { sb } from '../lib/supabase';
 import type { Session } from '../lib/auth';
 import type { Student, Card } from '../lib/supabase';
+import {
+  resetStudentAura3dBuild,
+  loadAura3dTeacherSettings,
+  saveAura3dTeacherSettings,
+  AURA3D_SETTINGS_DEFAULTS,
+} from '../lib/supabase';
+import type { Aura3dTeacherSettings } from '../lib/supabase';
 
 type TabKey = 'generate' | 'weekly' | 'cards' | 'students' | 'stars' | 'homecomms' | 'settings';
 
@@ -92,6 +99,10 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
   const [modalError, setModalError] = useState('');
   const [detailCard, setDetailCard] = useState<Card | null>(null);
   const [specialPackLabel, setSpecialPackLabel] = useState<string | null>(null); // custom name for the "special" deck, if not in Lucky Dip mode
+  const [aura3dSettings, setAura3dSettings] = useState<Aura3dTeacherSettings>(AURA3D_SETTINGS_DEFAULTS);
+  const [aura3dLoaded, setAura3dLoaded] = useState(false);
+  const [aura3dSaving, setAura3dSaving] = useState(false);
+  const [aura3dSavedMsg, setAura3dSavedMsg] = useState(false);
 
   // Home Communications state
   type HomeComm = { id: string; teacher_id: string; event_date: string; comment: string; created_at: string };
@@ -288,6 +299,36 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
     AI.setGeminiKey(geminiKey);
   };
 
+  // ── 3D Aura universal settings (loaded lazily the first time the Settings
+  // tab is opened, since they're not needed anywhere else on this page) ──
+  useEffect(() => {
+    if (tab !== 'settings' || aura3dLoaded) return;
+    (async () => {
+      try {
+        const loaded = await loadAura3dTeacherSettings(session.user.id);
+        setAura3dSettings(loaded);
+      } catch (err) {
+        console.error('Failed to load 3D Aura settings:', err);
+      } finally {
+        setAura3dLoaded(true);
+      }
+    })();
+  }, [tab, aura3dLoaded, session.user.id]);
+
+  const handleSaveAura3dSettings = async () => {
+    setAura3dSaving(true);
+    setAura3dSavedMsg(false);
+    try {
+      await saveAura3dTeacherSettings(session.user.id, aura3dSettings);
+      setAura3dSavedMsg(true);
+      setTimeout(() => setAura3dSavedMsg(false), 2500);
+    } catch (err: any) {
+      alert('Could not save 3D Aura settings: ' + (err?.message || err) + '\n\nHas the 3D Aura database migration been run yet?');
+    } finally {
+      setAura3dSaving(false);
+    }
+  };
+
   function renderModal() {
     if (!modal) return null;
 
@@ -376,6 +417,32 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
               <button onClick={async () => { await Dashboard.deleteStudent(modal.data.id); loadData(); setModal(null); }} className="tp-btn-danger">Yes, Delete Everything</button>
               <button onClick={() => setModal(null)} className="tp-btn-outline">Cancel</button>
             </div>
+          </ModalWrapper>
+        );
+      case 'resetAura3d':
+        return (
+          <ModalWrapper title="🤖 Reset Build" onClose={() => setModal(null)}>
+            <p className="text-sm mb-2" style={{ color: 'var(--tp-text)' }}>
+              Clear everything <strong>{modal.data.name}</strong> has built in 3D Aura?
+            </p>
+            <p className="text-sm mb-4" style={{ color: 'var(--tp-muted)' }}>
+              Their money, inventory, and pets are kept — only the world (trees, flowers, water, and any stacked blocks) is cleared. This takes effect next time they open 3D Aura.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={async () => {
+                  try {
+                    await resetStudentAura3dBuild(modal.data.id);
+                    setModal(null);
+                  } catch (err: any) {
+                    setModalError(err?.message || 'Reset failed');
+                  }
+                }}
+                className="tp-btn-primary"
+              >Yes, Reset Their Build</button>
+              <button onClick={() => setModal(null)} className="tp-btn-outline">Cancel</button>
+            </div>
+            {modalError && <p className="text-sm mt-3" style={{ color: '#c82020' }}>{modalError}</p>}
           </ModalWrapper>
         );
       case 'downloadCards': {
@@ -733,6 +800,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                           >{downloadLoading === s.id ? '…' : '⬇ Cards'}</button>
                           <button onClick={() => setModal({ type: 'editStudent', data: s })} className="tp-btn-outline">✏ Edit</button>
                           <button onClick={() => { setModalError(''); setModal({ type: 'resetPassword', data: s }); }} className="tp-btn-outline" style={{ borderColor:'rgba(80,200,120,0.35)', color:'#2a7a50' }}>🔑 Reset PIN</button>
+                          <button onClick={() => { setModalError(''); setModal({ type: 'resetAura3d', data: s }); }} className="tp-btn-outline" style={{ borderColor:'rgba(100,140,255,0.35)', color:'#3050c0' }} title="Clears everything this student has built in 3D Aura, but keeps their money, inventory, and pets">🤖 Reset Build</button>
                           <button onClick={() => setModal({ type: 'deleteStudent', data: s })} className="tp-btn-danger">🗑</button>
                         </div>
                       </td>
@@ -934,6 +1002,61 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
               </div>
               <button onClick={handleSaveKey} className="tp-btn-primary">Save Key</button>
             </div>
+
+            <div className="tp-section">🤖 3D Aura Settings</div>
+            <div className="tp-panel" style={{ marginBottom:16 }}>
+              <p style={{ fontSize:'0.78rem', color:'var(--tp-muted)', marginBottom:16, lineHeight:1.5 }}>
+                These apply to every student's 3D Aura world — there's no per-student settings menu any more, this is the one place that controls it.
+              </p>
+
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+                <label className="tp-label" style={{ margin:0 }}>🌗 Day/Night Cycle</label>
+                <input
+                  type="checkbox"
+                  checked={aura3dSettings.dayNightEnabled ?? true}
+                  onChange={e => setAura3dSettings(s => ({ ...s, dayNightEnabled: e.target.checked }))}
+                  style={{ width:20, height:20 }}
+                />
+              </div>
+
+              <Aura3dSliderRow
+                label="Day/Night Speed"
+                value={aura3dSettings.dayNightSpeed ?? AURA3D_SETTINGS_DEFAULTS.dayNightSpeed}
+                min={0.05} max={3} step={0.05}
+                onChange={v => setAura3dSettings(s => ({ ...s, dayNightSpeed: v }))}
+              />
+              <Aura3dSliderRow
+                label="Fog Distance"
+                value={aura3dSettings.fogFar ?? AURA3D_SETTINGS_DEFAULTS.fogFar}
+                min={60} max={500} step={5}
+                onChange={v => setAura3dSettings(s => ({ ...s, fogFar: v }))}
+              />
+
+              <div style={{ fontSize:'0.72rem', fontWeight:800, color:'var(--tp-label-color)', textTransform:'uppercase', letterSpacing:'0.06em', margin:'18px 0 8px' }}>
+                🐾 Pet Follow Distances
+              </div>
+              {([
+                ['petGapDog', '🐶 Dog'], ['petGapCat', '🐱 Cat'], ['petGapBird', '🐦 Bird'],
+                ['petGapAlpaca', '🦙 Alpaca'], ['petGapBunny', '🐰 Bunny'], ['petGapFrog', '🐸 Frog'],
+                ['petGapMonkey', '🐵 Monkey'], ['petGapPanda', '🐼 Panda'], ['petGapOwl', '🦉 Owl'],
+                ['petGapDragon', '🐉 Dragon'], ['petGapLamb', '🐑 Lamb'],
+              ] as [Exclude<keyof Aura3dTeacherSettings, 'dayNightEnabled'>, string][]).map(([key, label]) => (
+                <Aura3dSliderRow
+                  key={key}
+                  label={label}
+                  value={aura3dSettings[key] ?? AURA3D_SETTINGS_DEFAULTS[key]}
+                  min={0.5} max={15} step={0.1}
+                  onChange={v => setAura3dSettings(s => ({ ...s, [key]: v }))}
+                />
+              ))}
+
+              <div style={{ display:'flex', alignItems:'center', gap:12, marginTop:16 }}>
+                <button onClick={handleSaveAura3dSettings} className="tp-btn-primary" disabled={aura3dSaving}>
+                  {aura3dSaving ? 'Saving…' : 'Save 3D Aura Settings'}
+                </button>
+                {aura3dSavedMsg && <span style={{ fontSize:'0.8rem', color:'#22c55e', fontWeight:700 }}>✓ Saved</span>}
+              </div>
+            </div>
           </div>
         )}
         </div>{/* inner container */}
@@ -987,6 +1110,26 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
 }
 
 // ── Modal Components ──
+
+// Small labelled range slider used throughout the 3D Aura settings panel.
+function Aura3dSliderRow({ label, value, min, max, step, onChange }: {
+  label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void;
+}) {
+  return (
+    <div style={{ marginBottom:10 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.78rem', color:'var(--tp-text)', marginBottom:3 }}>
+        <span>{label}</span>
+        <span style={{ fontWeight:700, color:'var(--tp-muted)' }}>{value.toFixed(2).replace(/\.?0+$/, '') || '0'}</span>
+      </div>
+      <input
+        type="range"
+        min={min} max={max} step={step} value={value}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width:'100%' }}
+      />
+    </div>
+  );
+}
 
 function ModalWrapper({ title, children, onClose, danger }: { title: string; children: React.ReactNode; onClose: () => void; danger?: boolean }) {
   return (

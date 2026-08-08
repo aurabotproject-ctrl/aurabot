@@ -214,3 +214,82 @@ export async function loadStudentRobotSettings(
   };
 }
 
+// ── 3D Aura helpers ─────────────────────────────────────────────────────────
+// 3D Aura itself (public/3daura) talks to Supabase directly as a plain static
+// page sharing the same session, since its save data (world/build grids) can
+// get large and doesn't need to round-trip through this React app. These
+// helpers are for the two things the *teacher* controls from here: resetting
+// a student's build (keeping their money/inventory/pets), and the one set of
+// world settings that applies to every student under that teacher.
+
+export type Aura3dTeacherSettings = {
+  dayNightEnabled?: boolean;
+  dayNightSpeed?: number;
+  fogFar?: number;
+  petGapDog?: number;
+  petGapCat?: number;
+  petGapBird?: number;
+  petGapAlpaca?: number;
+  petGapBunny?: number;
+  petGapFrog?: number;
+  petGapMonkey?: number;
+  petGapPanda?: number;
+  petGapOwl?: number;
+  petGapDragon?: number;
+  petGapLamb?: number;
+};
+
+export const AURA3D_SETTINGS_DEFAULTS: Required<Aura3dTeacherSettings> = {
+  dayNightEnabled: true,
+  dayNightSpeed: 1,
+  fogFar: 240,
+  petGapDog: 6.8,
+  petGapCat: 4.4,
+  petGapBird: 4,
+  petGapAlpaca: 4,
+  petGapBunny: 3.2,
+  petGapFrog: 2.6,
+  petGapMonkey: 2,
+  petGapPanda: 3,
+  petGapOwl: 5,
+  petGapDragon: 4.6,
+  petGapLamb: 3.6,
+};
+
+/**
+ * Resets a student's 3D Aura BUILD only (everything they've placed/built in
+ * the world) while leaving their wallet (money, inventory, pets) untouched.
+ * This is the "Reset Build/AuraBot" action from the Teacher page.
+ */
+export async function resetStudentAura3dBuild(studentId: string): Promise<void> {
+  const { error } = await sb
+    .from('students')
+    .update({ aura3d_build: { worldGrid: [], buildGrid: [] }, aura3d_saved_at: new Date().toISOString() })
+    .eq('id', studentId);
+  if (error) throw error;
+}
+
+/** Loads the current teacher's universal 3D Aura settings (or defaults if none saved yet). */
+export async function loadAura3dTeacherSettings(teacherId: string): Promise<Aura3dTeacherSettings> {
+  const { data, error } = await sb
+    .from('aura3d_teacher_settings')
+    .select('settings')
+    .eq('teacher_id', teacherId)
+    .maybeSingle();
+  if (error) {
+    // Table may not exist yet if the migration hasn't been run - degrade to
+    // defaults rather than breaking the Teacher page.
+    console.error('Could not load 3D Aura settings (has the migration been run?):', error);
+    return { ...AURA3D_SETTINGS_DEFAULTS };
+  }
+  return { ...AURA3D_SETTINGS_DEFAULTS, ...(data?.settings ?? {}) };
+}
+
+/** Saves the teacher's universal 3D Aura settings - every student under them picks these up next load. */
+export async function saveAura3dTeacherSettings(teacherId: string, settings: Aura3dTeacherSettings): Promise<void> {
+  const { error } = await sb
+    .from('aura3d_teacher_settings')
+    .upsert({ teacher_id: teacherId, settings, updated_at: new Date().toISOString() }, { onConflict: 'teacher_id' });
+  if (error) throw error;
+}
+
