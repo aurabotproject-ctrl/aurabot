@@ -302,8 +302,11 @@
     <div id="turnJoystickKnob" class="joy-knob"></div>
     <span class="joy-arrow joy-arrow-right">▶</span>
   </div>
+  <!-- Jump sits below/between the two joysticks since it's a movement action,
+       not a menu item - grouped with the rest of movement instead of with
+       Bag/Pets/Edit up in the top-left corner. -->
+  <button id="btnTouchJump" class="mobile-action-btn mobile-jump-btn" title="Jump">⤴<span>Jump</span></button>
   <div id="mobileActionButtons">
-    <button id="btnTouchJump" class="mobile-action-btn" title="Jump">⤴<span>Jump</span></button>
     <button id="btnTouchInventory" class="mobile-action-btn" title="Inventory (Q)">🎒<span>Bag</span></button>
     <button id="btnTouchPets" class="mobile-action-btn" title="Pets (P)">🐾<span>Pets</span></button>
     <button id="btnTouchEdit" class="mobile-action-btn" title="Edit (E)">🛠️<span>Edit</span></button>
@@ -339,8 +342,11 @@
 <!-- Supabase client: shares the same project + auth session as the main app
      (same origin, same localStorage-persisted session), so whichever student
      is already logged in there is automatically recognised here too. -->
+<!-- Supabase JS library only - the actual client is built at runtime once
+     this page receives its project URL/anon key + session from the parent
+     app via postMessage (see the "CLOUD SYNC" section of main.js). This
+     avoids keeping a second, easy-to-drift copy of those credentials here. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="/supabaseClient.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="quiz-questions.js"></script>
 <script src="main.js"></script>

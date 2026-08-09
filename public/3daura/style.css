@@ -617,9 +617,11 @@
   }
   .joy-base.active .joy-knob { background: #ffb066; }
 
-  /* ---- Action button cluster (jump / bag / pets / edit) — top-left,
-     clear of the minimap, the top-centre palette, and the panels that
-     default to the right side of the screen. ---- */
+  /* ---- Action button cluster (bag / pets / edit) — top-left, clear of the
+     minimap, the top-centre palette, and the panels that default to the
+     right side of the screen. Jump is deliberately NOT in this cluster
+     any more - it's a movement action, not a menu item, so it lives with
+     the joysticks instead (see .mobile-jump-btn below). ---- */
   #mobileActionButtons {
     position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); left: 16px;
     display: flex; flex-direction: row; gap: 8px; align-items: center;
@@ -637,8 +639,16 @@
   .mobile-action-btn:active { transform: scale(0.9); background: #FF5E13; }
   .mobile-action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
   .mobile-action-btn:disabled:active { transform: none; background: rgba(255,255,255,0.88); }
-  #btnTouchJump { background: rgba(46,226,250,0.9); }
-  #btnTouchJump:active { background: #2EE2FA; }
+
+  /* ---- Jump: centred at the bottom of the screen, below/between the two
+     joysticks (which are vertically centred on the left/right edges) -
+     reachable by either thumb without sitting on top of either stick. ---- */
+  .mobile-jump-btn {
+    position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    background: rgba(46,226,250,0.9);
+  }
+  .mobile-jump-btn:active { background: #2EE2FA; }
 
   /* ---- Placement mode (dispenser items) touch panel ---- */
   #placementTouchPanel {

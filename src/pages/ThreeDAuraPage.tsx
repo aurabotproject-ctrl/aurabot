@@ -1,13 +1,46 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { sb } from '../lib/supabase';
 
 /* ─────────────────────────────────────────────
    3D Aura — embeds the standalone 3dAura Three.js
    app (served as static files from /public/3daura)
    inside the main ClassCard app via an iframe.
+
+   Auth handshake: 3D Aura is a plain static page and can't read
+   import.meta.env, so it can't know the Supabase project URL/anon key on
+   its own, and relying on it independently finding a shared session via
+   localStorage is fragile (it silently breaks if anything about how the
+   client is constructed ever differs). Instead, once the iframe has
+   loaded, this component - which already has a guaranteed-working,
+   authenticated `sb` client - hands it the URL/key and the current
+   session's tokens directly via postMessage. 3D Aura builds its own
+   Supabase client from those exact values, so it's always talking to the
+   same project this app just authenticated with.
 ───────────────────────────────────────────── */
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 export default function ThreeDAuraPage() {
   const [loaded, setLoaded] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    if (!loaded) return;
+    const iframeWindow = iframeRef.current?.contentWindow;
+    if (!iframeWindow) return;
+
+    (async () => {
+      const { data: { session } } = await sb.auth.getSession();
+      iframeWindow.postMessage({
+        type: 'AURA3D_INIT',
+        supabaseUrl: SUPABASE_URL,
+        supabaseAnonKey: SUPABASE_ANON_KEY,
+        accessToken: session?.access_token ?? null,
+        refreshToken: session?.refresh_token ?? null,
+      }, window.location.origin);
+    })();
+  }, [loaded]);
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#05070f', overflow: 'hidden' }}>
@@ -53,6 +86,7 @@ export default function ThreeDAuraPage() {
       )}
 
       <iframe
+        ref={iframeRef}
         title="3D Aura"
         src="/3daura/index.html"
         onLoad={() => setLoaded(true)}
@@ -70,3 +104,4 @@ export default function ThreeDAuraPage() {
     </div>
   );
 }
+

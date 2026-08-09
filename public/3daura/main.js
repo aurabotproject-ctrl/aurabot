@@ -1,7 +1,9 @@
 // AURA Robot Activity — Main Application Logic
-// Load order matters (see index.html): supabase-js UMD, then supabaseClient.js
-// (defines the global `sb` client, shared session with the main app), then
-// three.min.js, then quiz-questions.js, then this file.
+// Load order matters (see index.html): supabase-js UMD, then three.min.js,
+// then quiz-questions.js, then this file. The actual Supabase client is
+// built at runtime (see bootstrapCloudData()/waitForAuthHandshake() below)
+// once the parent app hands over its project URL/key + session via
+// postMessage - see ThreeDAuraPage.tsx.
 
 (async function(){
   const WORLD_SIZE = 1620;
@@ -51,11 +53,47 @@
   const SETTINGS_KEY_LITERAL = 'aura_settings_v1';
 
   let cloudStudentId = null, cloudTeacherId = null;
+  let sb = null; // built dynamically once the parent hands us project URL/key + session (see below)
+
+  // Waits for the parent page (ThreeDAuraPage.tsx) to postMessage the
+  // Supabase project URL/anon key and the current session's tokens. Only
+  // trusts messages from our own origin. If nothing arrives within a few
+  // seconds - e.g. this file was opened directly rather than inside the
+  // main app's iframe - resolves with null and everything falls back to
+  // local-only mode, exactly as if no session existed.
+  function waitForAuthHandshake(timeoutMs) {
+    return new Promise(resolve => {
+      let settled = false;
+      function finish(value) {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener('message', onMessage);
+        resolve(value);
+      }
+      function onMessage(event) {
+        if (event.origin !== window.location.origin) return;
+        if (!event.data || event.data.type !== 'AURA3D_INIT') return;
+        finish(event.data);
+      }
+      window.addEventListener('message', onMessage);
+      setTimeout(() => finish(null), timeoutMs);
+    });
+  }
 
   async function bootstrapCloudData() {
     const result = { authenticated: false, name: null, colorIndex: 0, wallet: null, build: null, teacherSettings: null };
-    if (typeof sb === 'undefined') return result; // supabaseClient.js didn't load - stay fully local
+    if (typeof window.supabase === 'undefined') return result; // supabase-js CDN didn't load - stay fully local
+
+    const auth = await waitForAuthHandshake(4000);
+    if (!auth || !auth.supabaseUrl || !auth.supabaseAnonKey) return result; // not embedded in the main app - stay fully local
+
     try {
+      sb = window.supabase.createClient(auth.supabaseUrl, auth.supabaseAnonKey);
+
+      if (auth.accessToken && auth.refreshToken) {
+        await sb.auth.setSession({ access_token: auth.accessToken, refresh_token: auth.refreshToken });
+      }
+
       const { data: { session } } = await sb.auth.getSession();
       if (!session || !session.user) return result;
 
@@ -104,7 +142,7 @@
       version: 1,
       bankBalance: typeof wallet.bankBalance === 'number' ? wallet.bankBalance : 0,
       inventory: (wallet.inventory && typeof wallet.inventory === 'object') ? wallet.inventory : {},
-      userText: cloud.name || 'AURA',
+      userText: cloud.name ? `${cloud.name} Aura` : 'AURA',
       worldGrid: Array.isArray(build.worldGrid) ? build.worldGrid : [],
       buildGrid: Array.isArray(build.buildGrid) ? build.buildGrid : [],
     };
