@@ -101,9 +101,25 @@ export const Dashboard = {
   },
 
   async deleteStudent(id: string) {
-    await sb.from('cards').delete().eq('student_id', id);
-    const { error } = await sb.from('students').delete().eq('id', id);
-    if (error) throw error;
+    // Deletes the student's cards + students row + profile + their actual
+    // Supabase Auth login, via a server-side function (deleting an auth user
+    // requires the service role key, which can't be used from the browser).
+    // Without removing the auth user too, its email stays registered forever
+    // and creating a new account for that student later fails with
+    // "User already registered".
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch('/.netlify/functions/delete-student', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token ?? ''}`,
+      },
+      body: JSON.stringify({ student_id: id }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete student');
+    }
   },
 
   // Welcome card — the special Aura-Bot founder card given to every new student

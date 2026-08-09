@@ -412,11 +412,24 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         return (
           <ModalWrapper title="🗑 Delete Student" onClose={() => setModal(null)} danger>
             <p className="text-sm mb-2" style={{ color: 'var(--tp-text)' }}>Delete <strong>{modal.data.name}</strong>?</p>
-            <p className="text-sm mb-4" style={{ color: '#c82020' }}>This will also delete all their cards and cannot be undone.</p>
+            <p className="text-sm mb-4" style={{ color: '#c82020' }}>This will also delete all their cards and their login, and cannot be undone.</p>
             <div className="flex gap-3">
-              <button onClick={async () => { await Dashboard.deleteStudent(modal.data.id); loadData(); setModal(null); }} className="tp-btn-danger">Yes, Delete Everything</button>
+              <button
+                onClick={async () => {
+                  try {
+                    await Dashboard.deleteStudent(modal.data.id);
+                    loadData();
+                    setModal(null);
+                    setModalError('');
+                  } catch (err: any) {
+                    setModalError(err?.message || 'Delete failed');
+                  }
+                }}
+                className="tp-btn-danger"
+              >Yes, Delete Everything</button>
               <button onClick={() => setModal(null)} className="tp-btn-outline">Cancel</button>
             </div>
+            {modalError && <p className="text-sm mt-3" style={{ color: '#c82020' }}>{modalError}</p>}
           </ModalWrapper>
         );
       case 'resetAura3d':
@@ -801,7 +814,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                           <button onClick={() => setModal({ type: 'editStudent', data: s })} className="tp-btn-outline">✏ Edit</button>
                           <button onClick={() => { setModalError(''); setModal({ type: 'resetPassword', data: s }); }} className="tp-btn-outline" style={{ borderColor:'rgba(80,200,120,0.35)', color:'#2a7a50' }}>🔑 Reset PIN</button>
                           <button onClick={() => { setModalError(''); setModal({ type: 'resetAura3d', data: s }); }} className="tp-btn-outline" style={{ borderColor:'rgba(100,140,255,0.35)', color:'#3050c0' }} title="Clears everything this student has built in 3D Aura, but keeps their money, inventory, and pets">🤖 Reset Build</button>
-                          <button onClick={() => setModal({ type: 'deleteStudent', data: s })} className="tp-btn-danger">🗑</button>
+                          <button onClick={() => { setModalError(''); setModal({ type: 'deleteStudent', data: s }); }} className="tp-btn-danger">🗑</button>
                         </div>
                       </td>
                     </tr>
