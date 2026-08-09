@@ -61,6 +61,35 @@
   let cloudStudentId = null, cloudTeacherId = null;
   let sb = null; // built dynamically once the parent hands us project URL/key + session (see below)
 
+  // ---- Stars (teacher-given, spent on card packs/unlocks in the main app) ----
+  // Pets are bought with these instead of in-game money now - the same
+  // `student_star_points` table/row the main app's Shop page already reads
+  // and writes, so a star spent here is a star gone everywhere else too.
+  const PET_ADOPTION_STAR_COST = 5;
+
+  async function fetchStarPoints() {
+    if (!sb || !cloudStudentId) return null; // not logged in via the main app - can't buy pets at all
+    try {
+      const { data } = await sb.from('student_star_points').select('points').eq('student_id', cloudStudentId).maybeSingle();
+      return data?.points ?? 0;
+    } catch (err) {
+      console.error('AURA: failed to read star points:', err);
+      return null;
+    }
+  }
+
+  // Re-reads the balance right before spending (rather than trusting
+  // whatever was on screen) so two rapid clicks - or stars spent elsewhere
+  // in the meantime - can't let a purchase go through without enough stars.
+  async function spendStars(cost) {
+    const current = await fetchStarPoints();
+    if (current === null || current < cost) return { ok: false, remaining: current };
+    const remaining = current - cost;
+    const { error } = await sb.from('student_star_points').update({ points: remaining }).eq('student_id', cloudStudentId);
+    if (error) { console.error('AURA: failed to spend stars:', error); return { ok: false, remaining: current }; }
+    return { ok: true, remaining };
+  }
+
   // Waits for the parent page (ThreeDAuraPage.tsx) to postMessage the
   // Supabase project URL/anon key and the current session's tokens. Only
   // trusts messages from our own origin. If nothing arrives within a few
@@ -3927,22 +3956,12 @@
   const ADOPT_ANIM_WALK_START = 800, ADOPT_ANIM_WALK_DUR = 1500;
   const ADOPT_ANIM_TOTAL = ADOPT_ANIM_WALK_START + ADOPT_ANIM_WALK_DUR + 200;
 
-  function triggerPetAdoption() {
-    if (petAdoptionAnim) return; // a purchase is already mid-animation
+  // The actual pet-spawn/reveal-animation logic, unchanged from before -
+  // split into its own function so it can run after the star purchase is
+  // confirmed and paid for, rather than immediately on click.
+  function finalizePetAdoption() {
     const unowned = ALL_PET_IDS.filter(id => !petOwned[id]);
-    if (unowned.length === 0) {
-      logTransaction('ALL PETS ALREADY ADOPTED!', 'credit');
-      return;
-    }
-    if (bankBalance < 5) {
-      logTransaction('ERR: INSUFFICIENT FUNDS', 'debit');
-      const btn = document.getElementById('btnAdoptPet');
-      btn.style.background = '#FF5A5F'; btn.style.color = '#fff';
-      setTimeout(() => { btn.style.background = ''; btn.style.color = ''; }, 600);
-      return;
-    }
-    bankBalance -= 5; updateBankUI();
-    logTransaction('PET ADOPTION: -$5.00', 'debit');
+    if (unowned.length === 0) return; // shouldn't happen (checked before paying), but stay safe
 
     const id = unowned[Math.floor(Math.random() * unowned.length)];
     const pet = petTypes[id];
@@ -3961,7 +3980,69 @@
 
     spawnAdoptSparkles(new THREE.Vector3(ADOPT_X, -4.65 + ADOPT_BOX_TOP_Y + 0.4, ADOPT_Z));
   }
+
+  function flashAdoptButtonError() {
+    const btn = document.getElementById('btnAdoptPet');
+    btn.style.background = '#FF5A5F'; btn.style.color = '#fff';
+    setTimeout(() => { btn.style.background = ''; btn.style.color = ''; }, 600);
+  }
+
+  const petAdoptConfirmModalEl = document.getElementById('petAdoptConfirmModal');
+  function closePetAdoptConfirm() { petAdoptConfirmModalEl.classList.remove('show'); }
+
+  async function triggerPetAdoption() {
+    if (petAdoptionAnim) return; // a purchase is already mid-animation
+    const unowned = ALL_PET_IDS.filter(id => !petOwned[id]);
+    if (unowned.length === 0) {
+      logTransaction('ALL PETS ALREADY ADOPTED!', 'credit');
+      return;
+    }
+    if (!cloudStudentId) {
+      logTransaction('ERR: LOG IN TO ADOPT PETS', 'debit');
+      flashAdoptButtonError();
+      return;
+    }
+
+    const points = await fetchStarPoints();
+    if (points === null) {
+      logTransaction('ERR: COULD NOT CHECK STARS', 'debit');
+      flashAdoptButtonError();
+      return;
+    }
+    if (points < PET_ADOPTION_STAR_COST) {
+      logTransaction('ERR: NOT ENOUGH STARS', 'debit');
+      flashAdoptButtonError();
+      return;
+    }
+
+    // Show the confirm modal with the real, just-checked star balance.
+    document.getElementById('petAdoptConfirmStars').textContent = points;
+    document.getElementById('petAdoptConfirmCost').textContent = `⭐ ${PET_ADOPTION_STAR_COST}`;
+    petAdoptConfirmModalEl.classList.add('show');
+  }
   document.getElementById('btnAdoptPet').addEventListener('click', triggerPetAdoption);
+
+  document.getElementById('btnPetAdoptConfirmNo').addEventListener('click', closePetAdoptConfirm);
+  document.getElementById('closePetAdoptConfirm').addEventListener('click', closePetAdoptConfirm);
+  petAdoptConfirmModalEl.addEventListener('click', e => { if (e.target === petAdoptConfirmModalEl) closePetAdoptConfirm(); });
+
+  document.getElementById('btnPetAdoptConfirmYes').addEventListener('click', async () => {
+    const yesBtn = document.getElementById('btnPetAdoptConfirmYes');
+    yesBtn.disabled = true;
+    const result = await spendStars(PET_ADOPTION_STAR_COST);
+    yesBtn.disabled = false;
+    closePetAdoptConfirm();
+
+    if (!result.ok) {
+      logTransaction('ERR: NOT ENOUGH STARS', 'debit');
+      flashAdoptButtonError();
+      return;
+    }
+
+    logTransaction(`PET ADOPTION: -⭐${PET_ADOPTION_STAR_COST}`, 'debit');
+    updateAdoptionStarsDisplay(result.remaining);
+    finalizePetAdoption();
+  });
 
   let isQuizActive = false, currentQIndex = 0, quizScore = 0;
   let activeQuizQuestions = [];
@@ -4065,8 +4146,16 @@
     snackBalanceEl.textContent = formatted;
     natureBalanceEl.textContent = formatted;
     buildBalanceEl.textContent = formatted;
-    const adoptionBalanceText = document.getElementById('adoptionBalanceText');
-    if (adoptionBalanceText) adoptionBalanceText.textContent = formatted;
+  }
+
+  // Refreshes the "Your Stars" readout on the pet adoption box. Pass a known
+  // value straight through (e.g. right after spending some) to avoid an
+  // extra round-trip; otherwise re-fetches the current balance.
+  async function updateAdoptionStarsDisplay(knownValue) {
+    const el = document.getElementById('adoptionStarsText');
+    if (!el) return;
+    const points = (typeof knownValue === 'number') ? knownValue : await fetchStarPoints();
+    el.textContent = (points === null) ? '--' : `⭐ ${points}`;
   }
 
   document.getElementById('btnBalance').addEventListener('click', () => {
@@ -5880,7 +5969,7 @@
   const naturePanel = document.getElementById('naturePanel');
   const buildPanel = document.getElementById('buildPanel');
   const adoptionPanel = document.getElementById('adoptionPanel');
-  const adoptionBalanceEl = document.getElementById('adoptionBalanceText');
+  let wasNearAdoptBox = false; // tracks the hidden->visible transition so stars only get fetched once per visit, not every frame
   const adoptionCountEl = document.getElementById('adoptionCountText');
   const adoptionStatusEl = document.getElementById('adoptionStatusText');
 
@@ -6287,6 +6376,7 @@
     const distToAdopt = Math.hypot(robot.position.x - ADOPT_X, robot.position.z - ADOPT_Z);
     if (distToAdopt < 16) {
       adoptionPanel.classList.remove('hidden');
+      if (!wasNearAdoptBox) { wasNearAdoptBox = true; updateAdoptionStarsDisplay(); }
       const ownedCount = ALL_PET_IDS.filter(id => petOwned[id]).length;
       adoptionCountEl.textContent = `${ownedCount} / ${ALL_PET_IDS.length}`;
       const btnAdopt = document.getElementById('btnAdoptPet');
@@ -6301,6 +6391,7 @@
         btnAdopt.disabled = false;
       }
     } else {
+      wasNearAdoptBox = false;
       adoptionPanel.classList.add('hidden');
     }
 

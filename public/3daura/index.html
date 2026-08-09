@@ -62,12 +62,12 @@
     <span class="status-badge pink">ONLINE</span>
   </div>
 
-  <div class="stat-row"><span>EFTPOS Balance:</span> <strong class="money" id="adoptionBalanceText">$0.00</strong></div>
+  <div class="stat-row"><span>⭐ Your Stars:</span> <strong class="money" id="adoptionStarsText">--</strong></div>
   <div class="stat-row"><span>Pets Adopted:</span> <strong id="adoptionCountText">0 / 10</strong></div>
   <div class="stat-row"><span>Status:</span> <strong id="adoptionStatusText" style="color:#FF007F;">TAP TO ADOPT</strong></div>
 
   <div class="panel-actions">
-    <button id="btnAdoptPet" class="btn-wide btn-pink">🎁 Adopt Random Pet ($5)</button>
+    <button id="btnAdoptPet" class="btn-wide btn-pink">🎁 Adopt Random Pet (⭐5)</button>
   </div>
 </div>
 
@@ -178,6 +178,23 @@
 </div>
 
 <!-- RESET CONFIRMATION MODAL -->
+<!-- PET ADOPTION CONFIRM MODAL -->
+<div id="petAdoptConfirmModal">
+  <div id="petAdoptConfirmBox">
+    <div id="petAdoptConfirmHeader">
+      <span>🎁 Adopt a Pet?</span>
+      <button id="closePetAdoptConfirm" title="Close">✕</button>
+    </div>
+    <div id="petAdoptConfirmBody">
+      <p id="petAdoptConfirmMessage">You have <strong id="petAdoptConfirmStars">0</strong> ⭐ stars.<br>Adopt a random pet for <strong id="petAdoptConfirmCost">⭐ 5</strong> stars?</p>
+      <div id="petAdoptConfirmActions">
+        <button id="btnPetAdoptConfirmYes">✔ Yes, Adopt!</button>
+        <button id="btnPetAdoptConfirmNo">✖ Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- EDIT MENU MODAL (press E) -->
 <div id="editMenuModal">
   <div id="editMenuBox">
