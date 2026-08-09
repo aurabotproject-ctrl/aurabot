@@ -26,8 +26,14 @@
 
   // Mirrors BASE_COLOR_THEMES + EXTRA_COLOR_THEMES from the main app's
   // BotAvatar.tsx (same order, same colourIndex) so a student's 3D robot is
-  // always the same colour as their 2D card avatar. Uses each theme's `mid`
-  // (main colour) and `dark` (shadow/trim colour) tones.
+  // always the same colour as their 2D card avatar - EXCEPT for the four
+  // "special" shiny themes (Gold/Silver/Chrome/Black Chrome), which instead
+  // use the exact hex values the old in-game theme buttons used to apply.
+  // Those specific saturated tones (rather than the dashboard's softer
+  // pastel versions of the same themes) are what actually read as shiny
+  // metal under this robot's material + sparkle particles + envmap - a
+  // straight pastel swap looked flat and dull by comparison, which is
+  // exactly what this was fixed to restore.
   const AURA_COLOR_THEMES = [
     { mid: 0x90caf9, dark: 0x42a5f5, special: false }, // Sky
     { mid: 0xf8bbd0, dark: 0xf48fb1, special: false }, // Bubblegum
@@ -37,10 +43,10 @@
     { mid: 0x80deea, dark: 0x00bcd4, special: false }, // Ocean
     { mid: 0xffcc80, dark: 0xff9800, special: false }, // Tangerine
     { mid: 0xef9a9a, dark: 0xe53935, special: false }, // Crimson
-    { mid: 0xffe082, dark: 0xffc107, special: true },  // ✨ Gold
-    { mid: 0xe0e0e0, dark: 0x9e9e9e, special: true },  // ✨ Silver
-    { mid: 0xa78bfa, dark: 0x38bdf8, special: true },  // 🌈 Chrome
-    { mid: 0x111118, dark: 0x1a1a2e, special: true },  // 🖤 Black Chrome
+    { mid: 0xFFD700, dark: 0xB8860B, special: true },  // ✨ Gold (original in-game gold)
+    { mid: 0xD0D5DD, dark: 0x64748B, special: true },  // ✨ Silver (original in-game silver)
+    { mid: 0xFF80BF, dark: 0x9c27b0, special: true },  // 🌈 Chrome (original in-game "prismatic")
+    { mid: 0x22222A, dark: 0x08080C, special: true },  // 🖤 Black Chrome (original in-game black chrome)
   ];
 
   // These three string literals must stay in sync with SAVE_KEY,
