@@ -10,6 +10,14 @@
 
 <div id="hint">ARROW KEYS move · [SPACE] jump · drag orbit · scroll zoom · press [Q] for inventory · [P] for pets · [E] to edit</div>
 
+<!-- "Erase Selected" mode has no panel of its own (it's just click-to-erase
+     directly on the world), so unlike every other edit-mode action it had no
+     click/tap way out at all - only the [E] keyboard shortcut, which doesn't
+     exist on a touchscreen. This floating button is shown only while that
+     mode is active (see updateEditHint() in main.js) and always returns
+     fully to normal play, same as pressing [E]. -->
+<button id="btnExitEraseMode" class="hidden" title="Exit Erase Mode">✕ Exit Erase Mode</button>
+
 <!-- BOTTOM-LEFT RADAR MINIMAP -->
 <div id="minimapContainer" title="Click to open Full Area Map">
   <canvas id="minimap" width="150" height="150"></canvas>
@@ -34,7 +42,7 @@
 <div id="inventoryPanel" class="hidden">
   <div class="panel-header">
     <span>🎒 Aurabot Storage</span>
-    <span class="status-badge purple">KEY: Q</span>
+    <button id="btnCloseInventory" class="panel-close-btn" title="Close">✕</button>
   </div>
   <div class="stat-row" style="color:#aaa;"><span>Capacity:</span> <strong>UNLIMITED</strong></div>
   <div id="inventoryList">
@@ -46,7 +54,7 @@
 <div id="petPanel" class="hidden">
   <div class="panel-header">
     <span>🐾 Pet Menu</span>
-    <span class="status-badge purple">KEY: P</span>
+    <button id="btnClosePetPanel" class="panel-close-btn" title="Close">✕</button>
   </div>
   <div class="pet-section-label" id="petActiveHeader">🟢 Following (<span id="petActiveCount">3</span>/3)</div>
   <div id="petActiveList" class="pet-dropzone"></div>
@@ -224,7 +232,7 @@
 <div id="spraypaintPanel" class="hidden">
   <div class="panel-header">
     <span>🪣 Solid Color</span>
-    <span class="status-badge pink">[E] EXIT</span>
+    <button id="btnExitSpraypaint" class="panel-close-btn" title="Exit">✕</button>
   </div>
   <p id="spraypaintHint">Pick a color below, then click any face of a block to paint it.</p>
   <div id="colorWheelWrap">

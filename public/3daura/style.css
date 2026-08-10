@@ -71,6 +71,20 @@
     box-shadow: 0 0 16px rgba(0, 200, 83, 0.6);
   }
 
+  /* Floating exit button for "Erase Selected" mode - see the HTML comment
+     above #btnExitEraseMode. Sits just above the hint bar so both stay
+     readable/tappable without overlapping. */
+  #btnExitEraseMode {
+    position: absolute; bottom: 58px; left: 50%; transform: translateX(-50%);
+    z-index: 6; background: #FF5A5F; color: #fff; border: 2px solid #000;
+    border-radius: 999px; padding: 9px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 12px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase;
+    cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  #btnExitEraseMode:hover { transform: translateX(-50%) scale(1.06); background: #DF3C00; }
+  #btnExitEraseMode.hidden { display: none; }
+
   /* ---------- MINIMAP RADAR HUD ---------- */
   #minimapContainer {
     position: absolute; left: 20px; bottom: 20px; width: 150px; height: 150px;
@@ -458,6 +472,17 @@
   .status-badge.green { background: #00C853; color: #fff; }
   .status-badge.purple { background: #9c27b0; color: #fff; }
   .status-badge.blue { background: #1E88E5; color: #fff; }
+  /* Reusable small circular close/exit button for any floating panel that
+     needs one - every panel that can be entered by clicking something should
+     be closable by clicking something too, never keyboard-only ([E]/[Q]/[P]
+     still work as shortcuts, but are never the *only* way out). */
+  .panel-close-btn {
+    background: #FF5A5F; color: #fff; border: 2px solid #000; border-radius: 50%;
+    width: 26px; height: 26px; font-weight: 900; font-size: 13px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .panel-close-btn:hover { transform: scale(1.15); background: #DF3C00; }
   
   .stat-row {
     display: flex; justify-content: space-between; font-size: 11px;

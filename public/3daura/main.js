@@ -5147,14 +5147,19 @@
 
   function updateEditHint() {
     const hint = document.getElementById('hint');
+    const exitEraseBtn = document.getElementById('btnExitEraseMode');
     if (editMode.eraseArmed) {
       hint.textContent = "[CLICK] ERASE OBJECT · press [E] to exit Edit Mode";
+      exitEraseBtn.classList.remove('hidden');
     } else if (editMode.sprayArmed) {
       hint.textContent = "[CLICK] a block face to paint it · press [E] to exit Edit Mode";
+      exitEraseBtn.classList.add('hidden');
     } else if (editMode.drawApplyArmed) {
       hint.textContent = "[CLICK] a block face to apply your design · press [E] to exit Edit Mode";
+      exitEraseBtn.classList.add('hidden');
     } else {
       hint.textContent = "Edit Mode - choose an action · press [E] to exit";
+      exitEraseBtn.classList.add('hidden');
     }
     hint.classList.add('placement-active');
   }
@@ -5189,6 +5194,7 @@
     document.getElementById('eraseAllConfirmModal').classList.remove('show');
     document.getElementById('spraypaintPanel').classList.add('hidden');
     document.getElementById('paintCanvasModal').classList.remove('show');
+    document.getElementById('btnExitEraseMode').classList.add('hidden');
     showEditMenuMain();
     const hint = document.getElementById('hint');
     hint.textContent = "ARROW KEYS move · [SPACE] jump · drag orbit · scroll zoom · press [Q] for inventory · [P] for pets · [E] to edit";
@@ -5196,6 +5202,14 @@
   }
 
   document.getElementById('closeEditMenu').addEventListener('click', exitEditMode);
+  document.getElementById('btnCloseInventory').addEventListener('click', () => {
+    document.getElementById('inventoryPanel').classList.add('hidden');
+  });
+  document.getElementById('btnClosePetPanel').addEventListener('click', () => {
+    document.getElementById('petPanel').classList.add('hidden');
+  });
+  document.getElementById('btnExitEraseMode').addEventListener('click', exitEditMode);
+  document.getElementById('btnExitSpraypaint').addEventListener('click', exitEditMode);
   document.getElementById('btnEraseSelected').addEventListener('click', () => {
     editMode.eraseArmed = true;
     document.getElementById('editMenuModal').classList.remove('show');
