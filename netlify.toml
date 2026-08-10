@@ -3,6 +3,16 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[build.environment]
+  # Netlify Functions in this repo (reset-pin, delete-student) use the
+  # built-in `fetch` global rather than importing a library for it - that
+  # only exists on Node 18+. Without pinning this, the site can end up on
+  # an older default runtime where every call into one of these functions
+  # throws "fetch is not defined" and Netlify reports it as a bare 502 with
+  # no useful detail, which is exactly what "Reset PIN failing" looks like
+  # from the browser.
+  NODE_VERSION = "20"
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
