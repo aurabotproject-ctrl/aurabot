@@ -1,5 +1,5 @@
 // auth.ts — Authentication & session helpers
-import { sb } from './supabase';
+import { sb, createSignUpClient } from './supabase';
 import type { Profile } from './supabase';
 
 export type Session = {
@@ -15,14 +15,27 @@ export const Auth = {
     return data.user;
   },
 
+  /**
+   * Creates an account for SOMEBODY ELSE — a teacher adding a student, or an
+   * admin adding a teacher. All three callers are that shape; nothing here
+   * signs up the current user for themselves.
+   *
+   * Deliberately runs on an isolated client (see createSignUpClient) rather
+   * than the shared `sb`. Supabase signs the newly created account in on
+   * whichever client calls signUp, so using `sb` would log the teacher out of
+   * their own session and into the student's, halfway through adding them.
+   */
   async signUp(email: string, password: string, role: string, name: string) {
-    const { data, error } = await sb.auth.signUp({
+    const scratch = createSignUpClient();
+    const { data, error } = await scratch.auth.signUp({
       email,
       password,
       options: { data: { role, name } },
     });
     if (error) throw error;
     if (!data.user) throw new Error('Sign-up failed');
+    // Don't leave the new account signed in even on the throwaway client.
+    await scratch.auth.signOut().catch(() => {});
     return data.user;
   },
 

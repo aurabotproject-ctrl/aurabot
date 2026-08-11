@@ -6,6 +6,32 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+/**
+ * A throwaway client used ONLY for creating an account on someone else's
+ * behalf (a teacher adding a student, an admin adding a teacher).
+ *
+ * Supabase's signUp() doesn't just create the account — it signs that new
+ * account in on whichever client made the call. Done on the shared `sb`
+ * client, that silently swaps the teacher's session for the brand-new
+ * student's midway through "Add Student": the page still LOOKS like the
+ * teacher is logged in, because that's React state, but every request from
+ * then on is made as the student. The insert that follows is then rejected,
+ * and unrelated teacher-only queries start failing too.
+ *
+ * persistSession/autoRefreshToken are off and it gets its own storage key,
+ * so nothing it does can reach the real session.
+ */
+export function createSignUpClient() {
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storageKey: 'classcard-signup-scratch',
+    },
+  });
+}
+
 export type Profile = {
   id: string;
   name: string;
