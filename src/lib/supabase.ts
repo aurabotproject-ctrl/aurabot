@@ -260,13 +260,41 @@ export const AURA3D_SETTINGS_DEFAULTS: Required<Aura3dTeacherSettings> = {
  * Resets a student's 3D Aura BUILD only (everything they've placed/built in
  * the world) while leaving their wallet (money, inventory, pets) untouched.
  * This is the "Reset Build/AuraBot" action from the Teacher page.
+ *
+ * If the student is in a shared team world, the build that actually needs
+ * clearing lives on the shared world row, not on their own — resetting only
+ * their own row would silently do nothing. Returns whether a shared world was
+ * cleared so the Teacher page can warn that this affected the whole team.
  */
-export async function resetStudentAura3dBuild(studentId: string): Promise<void> {
+export async function resetStudentAura3dBuild(studentId: string): Promise<{ sharedWorld: boolean }> {
+  const emptyBuild = { worldGrid: [], buildGrid: [] };
+
+  // aura3d_world_id only exists once the shared-worlds migration has been run,
+  // so a failure here just means "no team worlds yet" — fall through to the
+  // original personal-world behaviour rather than breaking the button.
+  let worldId: string | null = null;
+  try {
+    const { data } = await sb.from('students').select('aura3d_world_id').eq('id', studentId).maybeSingle();
+    worldId = (data as { aura3d_world_id?: string | null } | null)?.aura3d_world_id ?? null;
+  } catch {
+    worldId = null;
+  }
+
+  if (worldId) {
+    const { error } = await sb
+      .from('aura3d_worlds')
+      .update({ build: emptyBuild, updated_at: new Date().toISOString() })
+      .eq('id', worldId);
+    if (error) throw error;
+    return { sharedWorld: true };
+  }
+
   const { error } = await sb
     .from('students')
-    .update({ aura3d_build: { worldGrid: [], buildGrid: [] }, aura3d_saved_at: new Date().toISOString() })
+    .update({ aura3d_build: emptyBuild, aura3d_saved_at: new Date().toISOString() })
     .eq('id', studentId);
   if (error) throw error;
+  return { sharedWorld: false };
 }
 
 /** Loads the current teacher's universal 3D Aura settings (or defaults if none saved yet). */
@@ -293,3 +321,202 @@ export async function saveAura3dTeacherSettings(teacherId: string, settings: Aur
   if (error) throw error;
 }
 
+
+/* ─────────────────────────────────────────────────────────────
+   3D AURA — TEACHER-EDITABLE KIOSK QUIZ BANKS
+
+   Four fixed slots in the kiosk. A teacher can replace any of them with
+   their own topic and 10 questions; a slot with no saved row simply falls
+   back to the built-in questions in public/3daura/quiz-questions.js, which
+   is also all "Restore Default" does (it deletes the row).
+───────────────────────────────────────────────────────────── */
+
+export type Aura3dQuestion = {
+  /** The question text. */
+  q: string;
+  /** Exactly four answer options. */
+  o: string[];
+  /** Zero-based index into `o` of the correct answer. */
+  a: number;
+};
+
+export type Aura3dBankKey = 'landmark' | 'words' | 'people' | 'art';
+
+export const AURA3D_BANK_KEYS: Aura3dBankKey[] = ['landmark', 'words', 'people', 'art'];
+
+export type Aura3dQuestionBank = {
+  title: string;
+  questions: Aura3dQuestion[];
+};
+
+/**
+ * Validates a question bank before it's saved or used. Anything malformed is
+ * rejected here rather than being allowed to crash the quiz mid-lesson, and
+ * the returned message is written for a teacher, not a developer.
+ */
+export function validateAura3dQuestions(
+  questions: unknown,
+  { requireTen = true }: { requireTen?: boolean } = {}
+): { ok: true; questions: Aura3dQuestion[] } | { ok: false; error: string } {
+  if (!Array.isArray(questions) || questions.length === 0) {
+    return { ok: false, error: 'No questions found.' };
+  }
+  if (requireTen && questions.length !== 10) {
+    return { ok: false, error: `Found ${questions.length} question${questions.length === 1 ? '' : 's'} — each quiz needs exactly 10.` };
+  }
+  for (let i = 0; i < questions.length; i++) {
+    const item = questions[i] as Aura3dQuestion;
+    const at = `Question ${i + 1}`;
+    if (!item || typeof item !== 'object') return { ok: false, error: `${at} is not formatted correctly.` };
+    if (typeof item.q !== 'string' || !item.q.trim()) return { ok: false, error: `${at} has no question text.` };
+    if (!Array.isArray(item.o) || item.o.length !== 4) return { ok: false, error: `${at} needs exactly 4 answer options.` };
+    if (item.o.some(o => typeof o !== 'string' || !o.trim())) return { ok: false, error: `${at} has a blank answer option.` };
+    if (!Number.isInteger(item.a) || item.a < 0 || item.a > 3) return { ok: false, error: `${at} doesn't say which answer is correct.` };
+  }
+  return {
+    ok: true,
+    questions: (questions as Aura3dQuestion[]).map(item => ({
+      q: item.q.trim(),
+      o: item.o.map(o => o.trim()),
+      a: item.a,
+    })),
+  };
+}
+
+/**
+ * Loads the built-in question banks straight from the game's own
+ * quiz-questions.js, so the Teacher page and the students always see exactly
+ * the same defaults and there's no second copy to keep in sync. The file is
+ * injected as a plain <script> once and cached on window.
+ */
+export async function loadAura3dDefaultBanks(): Promise<Record<Aura3dBankKey, Aura3dQuestionBank>> {
+  const w = window as unknown as { AURA3D_DEFAULT_QUESTION_BANKS?: Record<Aura3dBankKey, Aura3dQuestionBank> };
+  if (w.AURA3D_DEFAULT_QUESTION_BANKS) return w.AURA3D_DEFAULT_QUESTION_BANKS;
+
+  await new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[data-aura3d-defaults]');
+    if (existing) { existing.addEventListener('load', () => resolve()); existing.addEventListener('error', () => reject(new Error('load failed'))); return; }
+    const el = document.createElement('script');
+    el.src = '/3daura/quiz-questions.js';
+    el.dataset.aura3dDefaults = 'true';
+    el.onload = () => resolve();
+    el.onerror = () => reject(new Error('Could not load the default questions.'));
+    document.head.appendChild(el);
+  });
+
+  if (!w.AURA3D_DEFAULT_QUESTION_BANKS) throw new Error('Could not read the default questions.');
+  return w.AURA3D_DEFAULT_QUESTION_BANKS;
+}
+
+/** Loads whichever banks this teacher has customised. Missing keys mean "still using the defaults". */
+export async function loadAura3dQuestionBanks(
+  teacherId: string
+): Promise<Partial<Record<Aura3dBankKey, Aura3dQuestionBank>>> {
+  const { data, error } = await sb
+    .from('aura3d_question_banks')
+    .select('bank_key, title, questions')
+    .eq('teacher_id', teacherId);
+  if (error) {
+    // Table may not exist yet if the migration hasn't been run - degrade to
+    // "no overrides" rather than breaking the Teacher page.
+    console.error('Could not load 3D Aura question banks (has the migration been run?):', error);
+    return {};
+  }
+  const out: Partial<Record<Aura3dBankKey, Aura3dQuestionBank>> = {};
+  (data ?? []).forEach(row => {
+    out[row.bank_key as Aura3dBankKey] = { title: row.title ?? '', questions: row.questions ?? [] };
+  });
+  return out;
+}
+
+/** Replaces one kiosk quiz slot with the teacher's own topic and questions. */
+export async function saveAura3dQuestionBank(
+  teacherId: string,
+  bankKey: Aura3dBankKey,
+  bank: Aura3dQuestionBank
+): Promise<void> {
+  const check = validateAura3dQuestions(bank.questions);
+  if (!check.ok) throw new Error(check.error);
+  if (!bank.title.trim()) throw new Error('Give the quiz a title first.');
+
+  const { error } = await sb
+    .from('aura3d_question_banks')
+    .upsert(
+      {
+        teacher_id: teacherId,
+        bank_key: bankKey,
+        title: bank.title.trim(),
+        questions: check.questions,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'teacher_id,bank_key' }
+    );
+  if (error) throw error;
+}
+
+/** Puts one slot back to the built-in questions by removing the teacher's override. */
+export async function resetAura3dQuestionBank(teacherId: string, bankKey: Aura3dBankKey): Promise<void> {
+  const { error } = await sb
+    .from('aura3d_question_banks')
+    .delete()
+    .eq('teacher_id', teacherId)
+    .eq('bank_key', bankKey);
+  if (error) throw error;
+}
+
+/**
+ * Builds the prompt a teacher copies into Claude. Deliberately asks for a
+ * fenced JSON block in exactly the shape parseAura3dQuestionsFromText()
+ * accepts, so the reply can be pasted straight back in without editing.
+ */
+export function buildAura3dClaudePrompt(title: string, ageLevel: string): string {
+  const topic = title.trim() || '[your topic]';
+  const age = ageLevel.trim() || '[year level or age]';
+  return `Write 10 multiple-choice quiz questions about "${topic}" for students at this level: ${age}.
+
+Rules:
+- Exactly 10 questions.
+- Each question has exactly 4 answer options, and exactly one is correct.
+- Keep the reading level appropriate for ${age}, and keep every question school-appropriate.
+- Make the three wrong options plausible, not silly.
+- Don't number the questions inside the question text.
+
+Reply with ONLY a JSON array in a code block, in exactly this format, where "a" is the 0-based position of the correct option in "o":
+
+\`\`\`json
+[
+  { "q": "Question text here?", "o": ["Option A", "Option B", "Option C", "Option D"], "a": 0 }
+]
+\`\`\``;
+}
+
+/**
+ * Parses whatever the teacher pastes back from Claude. Tolerant on purpose:
+ * accepts the raw JSON array, a ```json fenced block, or the array buried in
+ * surrounding chat text, because teachers will paste all three.
+ */
+export function parseAura3dQuestionsFromText(
+  text: string
+): { ok: true; questions: Aura3dQuestion[] } | { ok: false; error: string } {
+  const raw = (text ?? '').trim();
+  if (!raw) return { ok: false, error: 'Paste Claude’s answer into the box first.' };
+
+  const candidates: string[] = [];
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced) candidates.push(fenced[1]);
+  const bracketed = raw.match(/\[[\s\S]*\]/);
+  if (bracketed) candidates.push(bracketed[0]);
+  candidates.push(raw);
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate.trim());
+      const check = validateAura3dQuestions(parsed);
+      if (check.ok) return check;
+      return { ok: false, error: check.error };
+    } catch {
+      // Try the next candidate shape.
+    }
+  }
+  return { ok: false, error: 'That doesn’t look like the JSON list Claude was asked for. Copy the whole code block from Claude’s reply and paste it again.' };
+}
