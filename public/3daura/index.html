@@ -18,6 +18,106 @@
      fully to normal play, same as pressing [E]. -->
 <button id="btnExitEraseMode" class="hidden" title="Exit Erase Mode">✕ Exit Erase Mode</button>
 
+<!-- ══════════════ SHARED (CO-OP) WORLDS ══════════════
+     Top-left launcher + its modal. Hidden entirely (the `hidden` class stays
+     on until bootstrap finishes) when 3D Aura is opened outside the main app,
+     because with no logged-in student there is no world to share. -->
+<button id="btnWorldMenu" class="hidden" title="Team World">🌍 <span id="worldMenuLabel">My World</span></button>
+
+<div id="worldModal">
+  <div id="worldBox">
+    <div id="worldHeader">
+      <span>🌍 Team World</span>
+      <button id="closeWorldModal" title="Close">✕</button>
+    </div>
+    <div id="worldBody">
+
+      <!-- ── View A: playing solo, able to create/join ── -->
+      <div id="worldViewSolo" class="world-view">
+        <p class="world-lead">You're building your <strong>own world</strong> right now.</p>
+        <p class="world-note">A team world lets up to <strong>5 people</strong> build one world together and share the same money and materials.</p>
+
+        <div class="world-warning">
+          <strong>⚠️ Think carefully before you join.</strong>
+          <ul>
+            <li>You can only ever be in <strong>one</strong> team world.</li>
+            <li>When you join, your own world is <strong>deleted</strong> — money, builds and all.</li>
+            <li>If you ever leave a team world, you start again from scratch and you can <strong>never join another one</strong>.</li>
+          </ul>
+        </div>
+
+        <button id="btnCreateWorld" class="world-btn world-btn-green">➕ Start a Team World<br><small>Keeps everything you've already built, and gives you a code to invite friends</small></button>
+
+        <div class="world-divider"><span>or join one</span></div>
+
+        <label class="world-label" for="worldJoinCode">Enter a friend's invite code</label>
+        <input id="worldJoinCode" type="text" maxlength="6" placeholder="ABC123" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+        <button id="btnJoinWorld" class="world-btn world-btn-cyan">🤝 Join This World</button>
+      </div>
+
+      <!-- ── View B: currently in a shared world ── -->
+      <div id="worldViewMember" class="world-view hidden">
+        <p class="world-lead">You're in a <strong>team world</strong>.</p>
+
+        <div class="world-code-block">
+          <div class="world-code-label">Invite code — share this to invite a friend</div>
+          <div id="worldInviteCode">------</div>
+          <button id="btnCopyInvite" class="world-btn world-btn-cyan">📋 Copy Invite Code</button>
+          <div id="worldCopyMsg" class="world-copy-msg"></div>
+        </div>
+
+        <div class="world-members-label">👥 Builders in this world (<span id="worldMemberCount">1</span>/5)</div>
+        <div id="worldMemberList"></div>
+        <p id="worldFullNote" class="world-note hidden">This world is full — no more people can join.</p>
+
+        <div class="world-divider"><span>danger zone</span></div>
+
+        <div class="world-warning">
+          <strong>⚠️ Leaving is permanent.</strong>
+          <ul>
+            <li>You'll go back to your own world, <strong>completely from scratch</strong> — no money, no builds, no pets.</li>
+            <li>You will <strong>never be able to join another team world</strong>.</li>
+            <li>The team world keeps everything — you just won't be in it.</li>
+          </ul>
+        </div>
+        <button id="btnLeaveWorld" class="world-btn world-btn-red">🚪 Leave This Team World</button>
+      </div>
+
+      <!-- ── View C: has already left a world once, permanently solo ── -->
+      <div id="worldViewLocked" class="world-view hidden">
+        <p class="world-lead">You're building your <strong>own world</strong>.</p>
+        <div class="world-warning">
+          <strong>🔒 Team worlds are closed for you.</strong>
+          <ul>
+            <li>You left a team world, so you can't join or start another one.</li>
+            <li>This world is yours to keep — build it up however you like!</li>
+          </ul>
+        </div>
+      </div>
+
+      <div id="worldStatusMsg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmation step for the two irreversible actions (join / leave). -->
+<div id="worldConfirmModal">
+  <div id="worldConfirmBox">
+    <div id="worldConfirmHeader">
+      <span id="worldConfirmTitle">Are you sure?</span>
+      <button id="closeWorldConfirm" title="Close">✕</button>
+    </div>
+    <div id="worldConfirmBody">
+      <p id="worldConfirmMessage"></p>
+      <div id="worldConfirmActions">
+        <button id="btnWorldConfirmYes">✔ Yes, I'm sure</button>
+        <button id="btnWorldConfirmNo">✖ Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <!-- BOTTOM-LEFT RADAR MINIMAP -->
 <div id="minimapContainer" title="Click to open Full Area Map">
   <canvas id="minimap" width="150" height="150"></canvas>

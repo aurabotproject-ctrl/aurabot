@@ -61,6 +61,29 @@
   let cloudStudentId = null, cloudTeacherId = null;
   let sb = null; // built dynamically once the parent hands us project URL/key + session (see below)
 
+  // ---- Shared (co-op) team worlds ----
+  // cloudWorldId is the single switch that decides WHERE this student's world
+  // lives: null means "my own world", saved on my own students row exactly as
+  // before; a uuid means "our team world", saved on the shared aura3d_worlds
+  // row that up to 5 students all read and write.
+  //
+  // Pets deliberately never live in either wallet blob - they're bought with
+  // star points (a real classroom reward) so they stay personal and travel
+  // with the student into a team world. See students.aura3d_pets.
+  let cloudWorldId = null;
+  let cloudWorldLocked = false;   // true once they've left a team world - blocks joining another, forever
+  let cloudWorldInfo = null;      // { inviteCode, isOwner, members: [{id,name,isOwner}], memberCount }
+  let gameReady = false;          // flipped on at the very bottom of this file, once every `let` below is initialised
+  let teamSyncPending = false;    // a merge arrived while the student was mid-build; apply it as soon as they're idle
+
+  // Snapshot of money/inventory as of the last successful team sync. Everything
+  // a student earns or spends is pushed to the shared world as a DELTA against
+  // this baseline rather than as an absolute value - otherwise two students
+  // spending at the same moment would each overwrite the other's balance and
+  // the team would get money for free (or lose it).
+  let teamBaseline = { bankBalance: 0, inventory: {} };
+  const QUESTION_BANK_KEYS = ['landmark', 'words', 'people', 'art'];
+
   // ---- Stars (teacher-given, spent on card packs/unlocks in the main app) ----
   // Pets are bought with these instead of in-game money now - the same
   // `student_star_points` table/row the main app's Shop page already reads
@@ -139,7 +162,7 @@
       cloudStudentId = profile.student_id;
 
       const { data: student } = await sb.from('students')
-        .select('name, teacher_id, robot_color_index, aura3d_wallet, aura3d_build')
+        .select('name, teacher_id, robot_color_index, aura3d_wallet, aura3d_build, aura3d_pets')
         .eq('id', cloudStudentId).maybeSingle();
       if (student) {
         cloudTeacherId = student.teacher_id || null;
@@ -147,6 +170,36 @@
         result.colorIndex = typeof student.robot_color_index === 'number' ? student.robot_color_index : 0;
         result.wallet = student.aura3d_wallet || null;
         result.build = student.aura3d_build || null;
+        // Pets moved out of the wallet blob when team worlds were added. Older
+        // saves still have them nested inside aura3d_wallet.pets, so fall back
+        // to that - no data migration needed, it heals itself on first save.
+        result.pets = student.aura3d_pets || (student.aura3d_wallet && student.aura3d_wallet.pets) || null;
+      }
+
+      // If this student is in a team world, its wallet/build REPLACE the
+      // personal ones fetched above - that shared row is now their only world.
+      try {
+        const { data: ws } = await sb.rpc('aura3d_world_state');
+        if (ws && ws.ok) {
+          result.worldFeatureReady = true;
+          cloudWorldLocked = !!ws.locked;
+          if (ws.inWorld) {
+            cloudWorldId = ws.worldId;
+            cloudWorldInfo = {
+              inviteCode: ws.inviteCode,
+              isOwner: !!ws.isOwner,
+              members: Array.isArray(ws.members) ? ws.members : [],
+              memberCount: ws.memberCount || 1,
+            };
+            result.wallet = ws.wallet || null;
+            result.build = ws.build || null;
+          }
+        }
+      } catch (err) {
+        // The shared-worlds migration hasn't been run yet. Everything below
+        // still works exactly as it did before - students just each get their
+        // own world and the Team World button stays hidden.
+        console.warn('AURA: shared worlds unavailable (has migration_aura3d_shared_worlds.sql been run?)', err);
       }
 
       if (cloudTeacherId) {
@@ -154,6 +207,13 @@
           const { data: settingsRow } = await sb.from('aura3d_teacher_settings').select('settings').eq('teacher_id', cloudTeacherId).maybeSingle();
           result.teacherSettings = (settingsRow && settingsRow.settings) ? settingsRow.settings : null;
         } catch (err) { /* settings table may not exist yet - defaults apply, nothing to do */ }
+
+        // Teacher's replacement kiosk quiz banks (if they've made any).
+        try {
+          const { data: bankRows } = await sb.from('aura3d_question_banks')
+            .select('bank_key, title, questions').eq('teacher_id', cloudTeacherId);
+          if (Array.isArray(bankRows) && bankRows.length) result.questionBanks = bankRows;
+        } catch (err) { /* banks table may not exist yet - built-in defaults apply */ }
       }
     } catch (err) {
       console.error('AURA cloud bootstrap failed, continuing in local-only mode:', err);
@@ -182,8 +242,18 @@
       buildGrid: Array.isArray(build.buildGrid) ? build.buildGrid : [],
     };
     try { localStorage.setItem(SAVE_KEY_LITERAL, JSON.stringify(saveBlob)); } catch (err) {}
+
+    // The team sync pushes CHANGES against this baseline, so it has to start
+    // out equal to whatever we just loaded. Leaving it at zero would make the
+    // first sync look like the student had earned the entire shared balance
+    // from scratch, and the team's money would double on every login.
+    if (cloudWorldId) {
+      teamBaseline = { bankBalance: saveBlob.bankBalance, inventory: Object.assign({}, saveBlob.inventory) };
+    }
     try {
-      const pets = wallet.pets || { owned: [], active: [], inactive: [], names: {}, colors: {} };
+      // Pets come from the student's OWN row even inside a team world - they're
+      // bought with star points, so they belong to the child, not the team.
+      const pets = cloud.pets || wallet.pets || { owned: [], active: [], inactive: [], names: {}, colors: {} };
       localStorage.setItem(PET_SETTINGS_KEY_LITERAL, JSON.stringify(pets));
     } catch (err) {}
     try { localStorage.setItem(SETTINGS_KEY_LITERAL, JSON.stringify(cloud.teacherSettings || {})); } catch (err) {}
@@ -207,9 +277,12 @@
     if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
     cloudSaveTimer = setTimeout(pushCloudSave, 1500);
   }
+  let cloudSaveInFlight = false;
   async function pushCloudSave() {
     if (!cloudStudentId) return;
+    if (cloudSaveInFlight) return; // never let two syncs overlap - they'd merge against each other
     if (cloudSaveTimer) { clearTimeout(cloudSaveTimer); cloudSaveTimer = null; }
+    cloudSaveInFlight = true;
     try {
       let saveRaw, petRaw;
       try { saveRaw = localStorage.getItem(SAVE_KEY_LITERAL); } catch (err) {}
@@ -217,20 +290,161 @@
       const save = saveRaw ? JSON.parse(saveRaw) : {};
       const pets = petRaw ? JSON.parse(petRaw) : null;
 
-      const wallet = { bankBalance: save.bankBalance || 0, inventory: save.inventory || {}, pets };
+      const wallet = { bankBalance: save.bankBalance || 0, inventory: save.inventory || {} };
       const build = { worldGrid: save.worldGrid || [], buildGrid: save.buildGrid || [] };
 
-      await sb.from('students').update({
-        aura3d_wallet: wallet,
-        aura3d_build: build,
-        aura3d_saved_at: new Date().toISOString(),
-      }).eq('id', cloudStudentId);
+      if (cloudWorldId) {
+        await syncTeamWorld(wallet, build, pets);
+      } else {
+        await sb.from('students').update({
+          aura3d_wallet: wallet,
+          aura3d_build: build,
+          aura3d_pets: pets,
+          aura3d_saved_at: new Date().toISOString(),
+        }).eq('id', cloudStudentId);
+      }
     } catch (err) {
       console.error('AURA cloud save failed (progress is still safe locally, will retry):', err);
+    } finally {
+      cloudSaveInFlight = false;
     }
   }
+
+  // ── TEAM WORLD SYNC ───────────────────────────────────────────
+  // Read-merge-write rather than a plain overwrite. Five students all saving
+  // the whole world blob would otherwise mean last-one-to-save wins and
+  // everyone else's blocks quietly vanish. Instead:
+  //   • builds/nature  → union of theirs and ours (a block someone else placed
+  //                      while we were playing is kept, and so is ours)
+  //   • money/items    → our CHANGE since the last sync is applied on top of
+  //                      whatever the shared total is now
+  // The merged result is then written back AND applied to our running game, so
+  // this same function doubles as the periodic "see what my team built" refresh.
+  async function syncTeamWorld(localWallet, localBuild, pets) {
+    const { data: remote, error } = await sb.from('aura3d_worlds')
+      .select('wallet, build').eq('id', cloudWorldId).maybeSingle();
+    if (error) throw error;
+    if (!remote) {
+      // The world was deleted (last member left). Fall back to a personal world.
+      cloudWorldId = null; cloudWorldInfo = null;
+      renderWorldPanel();
+      return;
+    }
+
+    const remoteWallet = remote.wallet || {};
+    const remoteBuild = remote.build || {};
+
+    const merged = {
+      wallet: mergeTeamWallet(remoteWallet, localWallet),
+      build: mergeTeamBuild(remoteBuild, localBuild),
+    };
+
+    const { error: upErr } = await sb.from('aura3d_worlds').update({
+      wallet: merged.wallet,
+      build: merged.build,
+      updated_at: new Date().toISOString(),
+    }).eq('id', cloudWorldId);
+    if (upErr) throw upErr;
+
+    await sb.from('students').update({
+      aura3d_pets: pets,
+      aura3d_saved_at: new Date().toISOString(),
+    }).eq('id', cloudStudentId);
+
+    teamBaseline = {
+      bankBalance: merged.wallet.bankBalance,
+      inventory: Object.assign({}, merged.wallet.inventory),
+    };
+
+    // Write the merged truth back into localStorage so the next save starts
+    // from it, then push it into the live scene if the game is up and running.
+    try {
+      const blob = JSON.parse(localStorage.getItem(SAVE_KEY_LITERAL) || '{}');
+      blob.bankBalance = merged.wallet.bankBalance;
+      blob.inventory = merged.wallet.inventory;
+      blob.worldGrid = merged.build.worldGrid;
+      blob.buildGrid = merged.build.buildGrid;
+      localStorage.setItem(SAVE_KEY_LITERAL, JSON.stringify(blob));
+    } catch (err) {}
+
+    if (gameReady) applyTeamMergeToGame(merged, localBuild);
+  }
+
+  function mergeTeamWallet(remoteWallet, localWallet) {
+    const remoteBalance = typeof remoteWallet.bankBalance === 'number' ? remoteWallet.bankBalance : 0;
+    const localBalance = typeof localWallet.bankBalance === 'number' ? localWallet.bankBalance : 0;
+    const myDelta = localBalance - (teamBaseline.bankBalance || 0);
+    const bankBalance = Math.max(0, Math.round((remoteBalance + myDelta) * 100) / 100);
+
+    const remoteInv = remoteWallet.inventory || {};
+    const localInv = localWallet.inventory || {};
+    const baseInv = teamBaseline.inventory || {};
+    const inventory = {};
+    const allNames = new Set([...Object.keys(remoteInv), ...Object.keys(localInv), ...Object.keys(baseInv)]);
+    allNames.forEach(name => {
+      const delta = (localInv[name] || 0) - (baseInv[name] || 0);
+      const qty = (remoteInv[name] || 0) + delta;
+      if (qty > 0) inventory[name] = qty;
+    });
+
+    return { bankBalance, inventory };
+  }
+
+  // Union by grid key. If both sides have the same cell, ours wins (it may
+  // carry paint we just applied). Erasing is intentionally NOT propagated:
+  // in a shared classroom world it's far better for a block to survive an
+  // accidental sync race than for one child to be able to wipe the team's
+  // work from another device without anyone seeing it happen.
+  function mergeTeamBuild(remoteBuild, localBuild) {
+    const byKey = (arr, keyFn) => {
+      const m = new Map();
+      (Array.isArray(arr) ? arr : []).forEach(item => m.set(keyFn(item), item));
+      return m;
+    };
+    const tileKey = t => `${t.gx},${t.gz}`;
+    const blockKey = b => `${b.gx},${b.gz},${b.level}`;
+
+    const tiles = byKey(remoteBuild.worldGrid, tileKey);
+    byKey(localBuild.worldGrid, tileKey).forEach((v, k) => tiles.set(k, v));
+
+    const blocks = byKey(remoteBuild.buildGrid, blockKey);
+    byKey(localBuild.buildGrid, blockKey).forEach((v, k) => blocks.set(k, v));
+
+    return { worldGrid: Array.from(tiles.values()), buildGrid: Array.from(blocks.values()) };
+  }
+
+  // Applies a merge result to the running game. Money and inventory update
+  // instantly; the world itself is only rebuilt when teammates actually added
+  // something we don't have, and never while the student is mid-placement,
+  // mid-build or mid-edit (yanking the scene out from under them there would
+  // cancel whatever they were doing).
+  function applyTeamMergeToGame(merged, localBuild) {
+    setBankBalance(merged.wallet.bankBalance);
+    replaceInventory(merged.wallet.inventory);
+
+    const localTiles = (localBuild.worldGrid || []).length;
+    const localBlocks = (localBuild.buildGrid || []).length;
+    const worldChanged = merged.build.worldGrid.length !== localTiles
+                      || merged.build.buildGrid.length !== localBlocks;
+    if (!worldChanged) { teamSyncPending = false; return; }
+
+    if (isBusyBuilding()) { teamSyncPending = true; return; }
+    rebuildWorldFrom(merged.build);
+    teamSyncPending = false;
+    logTransaction('TEAM WORLD UPDATED', 'credit');
+  }
+
+  function rebuildWorldFrom(build) {
+    clearAllBuilds();
+    clearAllNature();
+    hydrateWorldGrids(build);
+  }
+
   // Safety net in case something is missed by the checkpoint-triggered saves above.
   setInterval(() => { if (cloudStudentId) pushCloudSave(); }, 30000);
+  // Team worlds refresh more often so teammates' building shows up reasonably
+  // promptly without needing a reload.
+  setInterval(() => { if (cloudWorldId && gameReady) pushCloudSave(); }, 20000);
   window.addEventListener('beforeunload', () => { if (cloudStudentId) pushCloudSave(); });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden' && cloudStudentId) pushCloudSave();
@@ -3250,6 +3464,18 @@
   // (and skipped in updateAllPets below). A pet mid-adoption-animation (see the
   // Pet Adoption Box further down) manages its own group.visible directly and
   // is skipped here so the reveal/walk-in animation isn't stomped on.
+  // Wipes the student's entire pet roster back to "none adopted". Used only by
+  // the permanent "leave a team world" reset, which promises a fresh start
+  // "money, pets and all".
+  function resetAllPets() {
+    ALL_PET_IDS.forEach(id => { petOwned[id] = false; });
+    petActiveOrder = [];
+    petInactiveOrder = [];
+    applyPetVisibility();
+    renderPetLists();
+    savePetSettings();
+  }
+
   function applyPetVisibility() {
     ALL_PET_IDS.forEach(id => {
       if (petAdoptionAnim && petAdoptionAnim.id === id) return;
@@ -4092,6 +4318,7 @@
       bankBalance += 1.00;
       updateBankUI();
       logTransaction('QUIZ REWARD: +$1.00', 'credit');
+      saveState();
     } else {
       buttonEl.classList.add('wrong');
       // Options are shuffled on-screen, so find the correct button by its
@@ -4117,10 +4344,56 @@
     }
   }
 
-  document.getElementById('btnQuizLandmark').addEventListener('click', () => startQuiz(LANDMARK_QUESTIONS, "🌍 Landmark"));
-  document.getElementById('btnQuizWords').addEventListener('click', () => startQuiz(WORDS_QUESTIONS, "📚 Great Words"));
-  document.getElementById('btnQuizPeople').addEventListener('click', () => startQuiz(FAMOUS_PEOPLE_QUESTIONS, "🌟 Famous People"));
-  document.getElementById('btnQuizArt').addEventListener('click', () => startQuiz(ART_QUESTIONS, "🎨 Famous Art"));
+  // ---------- KIOSK QUIZ BANKS ----------
+  // Four fixed slots. Each one shows the built-in questions from
+  // quiz-questions.js unless this student's teacher has replaced that slot
+  // with their own topic and 10 questions (Teacher page → Settings → Kiosk
+  // Quiz Questions). "Restore Default" on the Teacher page simply deletes the
+  // teacher's row, and the slot falls straight back to the built-ins below.
+  const QUIZ_BUTTON_IDS = {
+    landmark: 'btnQuizLandmark',
+    words:    'btnQuizWords',
+    people:   'btnQuizPeople',
+    art:      'btnQuizArt',
+  };
+  const QUIZ_BANKS = {};
+  QUESTION_BANK_KEYS.forEach(key => {
+    const def = AURA3D_DEFAULT_QUESTION_BANKS[key];
+    QUIZ_BANKS[key] = { title: def.title, questions: def.questions, btnId: QUIZ_BUTTON_IDS[key] };
+  });
+
+  // Never trust a stored bank blindly - a half-saved or hand-edited row would
+  // otherwise crash the quiz mid-lesson. Anything malformed is ignored and the
+  // built-in questions are used for that slot instead.
+  function isValidQuestionBank(list) {
+    return Array.isArray(list) && list.length > 0 && list.every(item =>
+      item && typeof item.q === 'string' && item.q.trim() !== ''
+      && Array.isArray(item.o) && item.o.length === 4
+      && item.o.every(opt => typeof opt === 'string' && opt.trim() !== '')
+      && Number.isInteger(item.a) && item.a >= 0 && item.a <= 3
+    );
+  }
+
+  if (Array.isArray(__cloud.questionBanks)) {
+    __cloud.questionBanks.forEach(row => {
+      const bank = QUIZ_BANKS[row && row.bank_key];
+      if (!bank) return;
+      if (isValidQuestionBank(row.questions)) {
+        bank.questions = row.questions;
+        if (row.title && String(row.title).trim()) bank.title = String(row.title).trim();
+      } else if (row && row.questions) {
+        console.warn(`AURA: teacher's "${row.bank_key}" question bank looks malformed - using the built-in questions instead.`);
+      }
+    });
+  }
+
+  QUESTION_BANK_KEYS.forEach(key => {
+    const bank = QUIZ_BANKS[key];
+    const btn = document.getElementById(bank.btnId);
+    if (!btn) return;
+    btn.textContent = `${bank.title} Quiz (+$1 / Correct)`;
+    btn.addEventListener('click', () => startQuiz(bank.questions, bank.title));
+  });
   document.getElementById('btnCloseQuiz').addEventListener('click', () => endQuiz(false));
 
   // ---------- BANK EFTPOS & DISPENSER PURCHASING ----------
@@ -4168,6 +4441,7 @@
       bankBalance -= 1; 
       updateBankUI(); 
       logTransaction('TRANSFER TO VAULT -$1.00', 'debit'); 
+      saveState();
     } else { 
       logTransaction('ERR: INSUFFICIENT FUNDS', 'debit'); 
     }
@@ -4578,6 +4852,7 @@
       exitPlacementMode();
     }
     updateInventoryUI();
+    saveState();
   }
 
   function animateScaleUp(meshGroup) {
@@ -4868,6 +5143,7 @@
     }
     updateInventoryUI();
     logTransaction(`PLACED: ${type}`, 'debit');
+    saveState();
   }
 
   function clearAllBuilds() {
@@ -5269,6 +5545,7 @@
     inventory[name]--;
     if (inventory[name] === 0) delete inventory[name];
     updateInventoryUI();
+    saveState();
 
     if (name.includes("Cola")) {
       isTurbo = true;
@@ -5336,6 +5613,7 @@
         bankBalance -= price; updateBankUI();
         logTransaction(`SNACK PURCHASE: -$${price}.00`, 'debit');
         dispenseSnack3D(color, name, 'snack');
+        saveState();
       } else {
         logTransaction(`ERR: INSUFFICIENT FUNDS`, 'debit');
         btn.style.background = '#FF5A5F'; btn.style.color = '#fff';
@@ -5353,6 +5631,7 @@
         bankBalance -= price; updateBankUI();
         logTransaction(`NATURE SEED: -$${price}.00`, 'debit');
         dispenseSnack3D(color, name, 'nature');
+        saveState();
       } else {
         logTransaction(`ERR: INSUFFICIENT FUNDS`, 'debit');
         btn.style.background = '#FF5A5F'; btn.style.color = '#fff';
@@ -5370,6 +5649,7 @@
         bankBalance -= price; updateBankUI();
         logTransaction(`BUILD MATERIAL: -$${price}.00`, 'debit');
         dispenseSnack3D(color, name, 'build');
+        saveState();
       } else {
         logTransaction(`ERR: INSUFFICIENT FUNDS`, 'debit');
         btn.style.background = '#FF5A5F'; btn.style.color = '#fff';
@@ -6063,6 +6343,17 @@
       userText = data.userText;
     }
 
+    hydrateWorldGrids(data);
+
+    logTransaction('SAVED GAME LOADED', 'credit');
+    return true;
+  }
+
+  // Rebuilds every tile and block described by a serialized world blob.
+  // Split out of loadState() so the team-world sync can reuse the exact same
+  // code path when teammates' building needs to appear mid-session.
+  function hydrateWorldGrids(data) {
+    if (!data) return;
     if (Array.isArray(data.worldGrid)) {
       data.worldGrid.forEach(t => {
         if (t.base === 'grass') createTileVisual('🌱 Grass Seed', t.gx, t.gz);
@@ -6078,9 +6369,28 @@
       data.buildGrid.slice().sort((a, b) => a.level - b.level)
         .forEach(b => createBuildBlockMesh(b.type, b.gx, b.gz, b.level, false, b.faceColors || null, b.faceTextures || null));
     }
+  }
 
-    logTransaction('SAVED GAME LOADED', 'credit');
-    return true;
+  // ---- Small setters used by the team-world merge ----
+  // The merge runs outside the normal game flow, so it needs a supported way
+  // to write money/items back in and refresh the HUD, rather than reaching
+  // into the variables directly from three different places.
+  function setBankBalance(value) {
+    if (typeof value !== 'number' || !isFinite(value)) return;
+    bankBalance = value;
+    updateBankUI();
+  }
+
+  function replaceInventory(next) {
+    Object.keys(inventory).forEach(k => delete inventory[k]);
+    Object.keys(next || {}).forEach(k => { if (next[k] > 0) inventory[k] = next[k]; });
+    updateInventoryUI();
+  }
+
+  // True while the student is actively placing, building or editing - the one
+  // time it would be disruptive to rebuild the scene underneath them.
+  function isBusyBuilding() {
+    return !!(placementMode.active || buildMode.active || editMode.active);
   }
 
   // Manual save/reset are gone - saving happens automatically (see
@@ -6438,6 +6748,7 @@
         inventory[snack.name] += countToAdd;
         updateInventoryUI();
         logTransaction(`RECEIVED: ${snack.name} (x${countToAdd})`, 'credit');
+        saveState();
       }
     }
 
@@ -6469,5 +6780,268 @@
 
   loadState();
   applyRobotColorFromCloud(__cloud.colorIndex || 0);
+
+  // ═══════════════════════════════════════════════════════════════
+  // TEAM WORLD PANEL
+  // Everything here is deliberately wired up at the very bottom: by this
+  // point every `let` above is initialised, loadState() has run, and the
+  // scene exists - so the panel can safely read and change live game state.
+  // ═══════════════════════════════════════════════════════════════
+  const worldMenuBtn = document.getElementById('btnWorldMenu');
+  const worldMenuLabel = document.getElementById('worldMenuLabel');
+  const worldModal = document.getElementById('worldModal');
+  const worldStatusMsg = document.getElementById('worldStatusMsg');
+  const worldViewSolo = document.getElementById('worldViewSolo');
+  const worldViewMember = document.getElementById('worldViewMember');
+  const worldViewLocked = document.getElementById('worldViewLocked');
+  const worldJoinInput = document.getElementById('worldJoinCode');
+  const worldConfirmModal = document.getElementById('worldConfirmModal');
+
+  let pendingConfirmAction = null;
+
+  function setWorldStatus(text, ok) {
+    if (!worldStatusMsg) return;
+    worldStatusMsg.textContent = text || '';
+    worldStatusMsg.classList.toggle('ok', !!ok);
+  }
+
+  // Turns an RPC failure reason into something a child can actually act on.
+  function worldErrorText(reason) {
+    switch (reason) {
+      case 'bad_code':        return "That code didn't match any world. Check every letter and try again.";
+      case 'world_full':      return 'That world is already full (5 builders). Ask them to start another one.';
+      case 'locked':          return "You've already left a team world, so you can't join another one.";
+      case 'already_in_world':return "You're already in a team world.";
+      case 'not_in_world':    return "You're not in a team world.";
+      case 'not_a_student':   return 'Only student accounts can use team worlds.';
+      default:                return 'Something went wrong. Try again in a moment.';
+    }
+  }
+
+  function renderWorldPanel() {
+    // gameReady also guards against this being reached from a background sync
+    // before the DOM references below have been initialised.
+    if (!gameReady || !worldMenuBtn) return;
+
+    // No logged-in student (e.g. this file opened directly) = no teams at all.
+    if (!cloudStudentId || !__cloud.worldFeatureReady) { worldMenuBtn.classList.add('hidden'); return; }
+    worldMenuBtn.classList.remove('hidden');
+
+    const inTeam = !!cloudWorldId;
+    worldMenuBtn.classList.toggle('in-team', inTeam);
+    if (worldMenuLabel) worldMenuLabel.textContent = inTeam ? 'Team World' : 'My World';
+
+    worldViewSolo.classList.toggle('hidden', inTeam || cloudWorldLocked);
+    worldViewMember.classList.toggle('hidden', !inTeam);
+    worldViewLocked.classList.toggle('hidden', inTeam || !cloudWorldLocked);
+
+    if (inTeam && cloudWorldInfo) {
+      document.getElementById('worldInviteCode').textContent = cloudWorldInfo.inviteCode || '------';
+      const members = cloudWorldInfo.members || [];
+      document.getElementById('worldMemberCount').textContent = members.length || 1;
+      document.getElementById('worldFullNote').classList.toggle('hidden', members.length < 5);
+
+      const list = document.getElementById('worldMemberList');
+      list.innerHTML = '';
+      members.forEach(m => {
+        const row = document.createElement('div');
+        row.className = 'world-member' + (m.id === cloudStudentId ? ' is-you' : '');
+        const nameEl = document.createElement('span');
+        nameEl.textContent = m.name || 'Builder';
+        const tagEl = document.createElement('span');
+        tagEl.className = 'world-member-tag';
+        tagEl.textContent = [m.id === cloudStudentId ? 'You' : '', m.isOwner ? 'Started it' : ''].filter(Boolean).join(' · ');
+        row.appendChild(nameEl); row.appendChild(tagEl);
+        list.appendChild(row);
+      });
+    }
+  }
+
+  // Re-reads membership from the server (who's joined since we opened the panel).
+  async function refreshWorldState() {
+    if (!sb || !cloudStudentId) return;
+    try {
+      const { data: ws } = await sb.rpc('aura3d_world_state');
+      if (!ws || !ws.ok) return;
+      cloudWorldLocked = !!ws.locked;
+      if (ws.inWorld) {
+        cloudWorldId = ws.worldId;
+        cloudWorldInfo = {
+          inviteCode: ws.inviteCode,
+          isOwner: !!ws.isOwner,
+          members: Array.isArray(ws.members) ? ws.members : [],
+          memberCount: ws.memberCount || 1,
+        };
+      } else {
+        cloudWorldId = null;
+        cloudWorldInfo = null;
+      }
+      renderWorldPanel();
+    } catch (err) { console.error('AURA: could not refresh world state:', err); }
+  }
+
+  function openWorldModal() {
+    setWorldStatus('');
+    renderWorldPanel();
+    worldModal.classList.add('show');
+    refreshWorldState();
+  }
+  function closeWorldModal() { worldModal.classList.remove('show'); }
+
+  function askConfirm(title, messageHtml, onYes) {
+    document.getElementById('worldConfirmTitle').textContent = title;
+    document.getElementById('worldConfirmMessage').innerHTML = messageHtml;
+    pendingConfirmAction = onYes;
+    worldConfirmModal.classList.add('show');
+  }
+  function closeConfirm() { worldConfirmModal.classList.remove('show'); pendingConfirmAction = null; }
+
+  if (worldMenuBtn) worldMenuBtn.addEventListener('click', openWorldModal);
+  document.getElementById('closeWorldModal').addEventListener('click', closeWorldModal);
+  worldModal.addEventListener('click', e => { if (e.target === worldModal) closeWorldModal(); });
+  document.getElementById('closeWorldConfirm').addEventListener('click', closeConfirm);
+  document.getElementById('btnWorldConfirmNo').addEventListener('click', closeConfirm);
+  document.getElementById('btnWorldConfirmYes').addEventListener('click', () => {
+    const action = pendingConfirmAction;
+    closeConfirm();
+    if (action) action();
+  });
+
+  // ---- Start a team world ----
+  document.getElementById('btnCreateWorld').addEventListener('click', () => {
+    askConfirm('Start a team world?',
+      'Your world becomes a <strong>team world</strong> that up to 4 friends can join.<br><br>' +
+      'You keep everything you\'ve built and all your money — but from now on you can only ever be in <strong>this one</strong> team world.',
+      async () => {
+      setWorldStatus('Creating your team world…');
+      // Make sure everything currently on screen is saved into the personal
+      // world first, because that's exactly what gets copied into the new
+      // shared world - anything unsaved would be lost at the handover.
+      await pushCloudSave();
+      try {
+        const { data, error } = await sb.rpc('aura3d_create_world');
+        if (error) throw error;
+        if (!data || !data.ok) { setWorldStatus(worldErrorText(data && data.reason)); return; }
+        cloudWorldId = data.worldId;
+        teamBaseline = { bankBalance, inventory: Object.assign({}, inventory) };
+        await refreshWorldState();
+        setWorldStatus('Team world created! Share your code: ' + (data.inviteCode || ''), true);
+        logTransaction('TEAM WORLD STARTED', 'credit');
+      } catch (err) {
+        console.error('AURA: create world failed:', err);
+        setWorldStatus(worldErrorText());
+      }
+    });
+  });
+
+  // ---- Join someone else's world ----
+  if (worldJoinInput) {
+    worldJoinInput.addEventListener('input', () => {
+      worldJoinInput.value = worldJoinInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    });
+  }
+  document.getElementById('btnJoinWorld').addEventListener('click', () => {
+    const code = (worldJoinInput.value || '').trim().toUpperCase();
+    if (code.length < 4) { setWorldStatus('Type the 6-letter code your friend gave you.'); return; }
+    setWorldStatus('');
+    askConfirm('Join this world? This cannot be undone.',
+      'Your own world will be <strong>deleted right now</strong> — every block, all your money and all your items.<br><br>' +
+      'After this you can <strong>never join a different team world</strong>. If you ever leave this one, you start again from nothing.<br><br>' +
+      'Are you completely sure?',
+      async () => {
+      setWorldStatus('Joining…');
+      try {
+        const { data, error } = await sb.rpc('aura3d_join_world', { p_code: code });
+        if (error) throw error;
+        if (!data || !data.ok) { setWorldStatus(worldErrorText(data && data.reason)); return; }
+        cloudWorldId = data.worldId;
+        // We arrive with nothing; the world's own contents load below.
+        teamBaseline = { bankBalance: 0, inventory: {} };
+        setBankBalance(0);
+        replaceInventory({});
+        clearAllBuilds();
+        clearAllNature();
+        try { localStorage.setItem(SAVE_KEY_LITERAL, JSON.stringify({ version: 1, bankBalance: 0, inventory: {}, worldGrid: [], buildGrid: [] })); } catch (e) {}
+        const { data: world } = await sb.from('aura3d_worlds').select('wallet, build').eq('id', cloudWorldId).maybeSingle();
+        if (world) {
+          setBankBalance((world.wallet && world.wallet.bankBalance) || 0);
+          replaceInventory((world.wallet && world.wallet.inventory) || {});
+          hydrateWorldGrids(world.build || {});
+          teamBaseline = { bankBalance, inventory: Object.assign({}, inventory) };
+          saveState();
+        }
+        await refreshWorldState();
+        setWorldStatus("You're in! Build it together. 🎉", true);
+        logTransaction('JOINED TEAM WORLD', 'credit');
+      } catch (err) {
+        console.error('AURA: join world failed:', err);
+        setWorldStatus(worldErrorText());
+      }
+    });
+  });
+
+  // ---- Copy the invite code ----
+  document.getElementById('btnCopyInvite').addEventListener('click', async () => {
+    const code = (cloudWorldInfo && cloudWorldInfo.inviteCode) || '';
+    const msgEl = document.getElementById('worldCopyMsg');
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      msgEl.textContent = '✓ Copied! Read it out or paste it to a friend.';
+    } catch (err) {
+      // Clipboard is blocked in plenty of school browser configs - the code is
+      // already displayed in big text above, so this is only ever a nicety.
+      msgEl.textContent = 'Copy blocked — just read the code out loud instead.';
+    }
+    setTimeout(() => { msgEl.textContent = ''; }, 4000);
+  });
+
+  // ---- Leave (permanent) ----
+  document.getElementById('btnLeaveWorld').addEventListener('click', () => {
+    askConfirm('Leave for good?',
+      'You will lose <strong>everything</strong> — all your money, every block you helped build, and all your pets.<br><br>' +
+      'You will go back to an <strong>empty world of your own</strong>, and you will <strong>never be able to join another team world</strong>.<br><br>' +
+      'This cannot be undone. Are you sure?',
+      async () => {
+      setWorldStatus('Leaving…');
+      try {
+        const { data, error } = await sb.rpc('aura3d_leave_world');
+        if (error) throw error;
+        if (!data || !data.ok) { setWorldStatus(worldErrorText(data && data.reason)); return; }
+        cloudWorldId = null;
+        cloudWorldInfo = null;
+        cloudWorldLocked = true;
+        // Back to absolute scratch, exactly as promised in the warning.
+        teamBaseline = { bankBalance: 0, inventory: {} };
+        setBankBalance(0);
+        replaceInventory({});
+        clearAllBuilds();
+        clearAllNature();
+        resetAllPets();
+        try { localStorage.setItem(SAVE_KEY_LITERAL, JSON.stringify({ version: 1, bankBalance: 0, inventory: {}, worldGrid: [], buildGrid: [] })); } catch (e) {}
+        await pushCloudSave();
+        renderWorldPanel();
+        setWorldStatus('You now have your own fresh world.', true);
+        logTransaction('LEFT TEAM WORLD - FRESH START', 'debit');
+      } catch (err) {
+        console.error('AURA: leave world failed:', err);
+        setWorldStatus(worldErrorText());
+      }
+    });
+  });
+
+  // The game is fully wired up from here on, so team merges are safe to apply.
+  gameReady = true;
+  renderWorldPanel();
+
+  // If a teammate's changes arrived while this student was mid-build, apply
+  // them the moment they stop building rather than dropping the update.
+  setInterval(() => {
+    if (teamSyncPending && !isBusyBuilding()) {
+      teamSyncPending = false;
+      pushCloudSave();
+    }
+  }, 3000);
+
   animate();
 })();

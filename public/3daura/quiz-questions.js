@@ -67,3 +67,28 @@ const ART_QUESTIONS = [
     { q: "The ancient statue 'Venus de Milo' is famous for missing which body part?", o: ["Her head", "Her arms", "Her feet", "Her nose"], a: 1 }
 ];
 
+
+// ============================================================
+// SINGLE SOURCE OF TRUTH FOR ALL FOUR KIOSK QUIZ BANKS
+//
+// Both consumers read this one registry, so the built-in questions only ever
+// exist in this file:
+//   • main.js (the game) uses it as the fallback whenever a teacher hasn't
+//     replaced that slot with their own topic.
+//   • The Teacher page loads this file as a plain <script> and reads
+//     window.AURA3D_DEFAULT_QUESTION_BANKS, so "Restore Default" and the
+//     "start from the defaults" editor always show exactly what students see.
+//
+// bank keys must stay in sync with the bank_key check constraint on the
+// aura3d_question_banks table: 'landmark' | 'words' | 'people' | 'art'
+// ============================================================
+const AURA3D_DEFAULT_QUESTION_BANKS = {
+  landmark: { title: '🌍 Landmark',      questions: LANDMARK_QUESTIONS },
+  words:    { title: '📚 Great Words',   questions: WORDS_QUESTIONS },
+  people:   { title: '🌟 Famous People', questions: FAMOUS_PEOPLE_QUESTIONS },
+  art:      { title: '🎨 Famous Art',    questions: ART_QUESTIONS },
+};
+
+if (typeof window !== 'undefined') {
+  window.AURA3D_DEFAULT_QUESTION_BANKS = AURA3D_DEFAULT_QUESTION_BANKS;
+}

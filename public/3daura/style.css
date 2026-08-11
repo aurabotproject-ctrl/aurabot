@@ -770,3 +770,154 @@
     .joy-knob { width: 54px; height: 54px; }
     .mobile-action-btn { width: 56px; height: 56px; font-size: 20px; }
   }
+
+  /* ══════════════════════════════════════════════════════════════
+     SHARED (CO-OP) TEAM WORLDS
+     Launcher button top-left, plus its modal and a second confirm
+     modal for the two irreversible actions (joining and leaving).
+     Colour language matches the rest of the HUD: cyan = normal
+     action, green = safe/creative, red = destructive.
+     ══════════════════════════════════════════════════════════════ */
+  #btnWorldMenu {
+    position: absolute; top: 12px; left: 12px; z-index: 12;
+    background: rgba(255,255,255,0.92); color: #171717; border: 2px solid #000;
+    border-radius: 999px; padding: 9px 16px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 12px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase;
+    cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.25); backdrop-filter: blur(6px);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  #btnWorldMenu:hover { transform: scale(1.06); background: #fff; }
+  #btnWorldMenu.hidden { display: none; }
+  /* Team worlds get a distinct look so it's obvious at a glance which mode you're in. */
+  #btnWorldMenu.in-team { background: #00C853; color: #fff; }
+  #btnWorldMenu.in-team:hover { background: #00b34a; }
+
+  #worldModal {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.75); z-index: 130;
+    display: none; align-items: center; justify-content: center;
+    backdrop-filter: blur(6px); opacity: 0; transition: opacity 0.25s ease;
+  }
+  #worldModal.show { display: flex; opacity: 1; }
+  #worldBox {
+    position: relative; width: 92vw; max-width: 440px; max-height: 88vh; overflow-y: auto;
+    background: rgba(11,12,16,0.97); border: 3px solid #2EE2FA;
+    border-radius: 20px; box-shadow: 0 0 40px rgba(46,226,250,0.35);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-overflow-scrolling: touch;
+  }
+  #worldHeader {
+    position: sticky; top: 0; z-index: 2;
+    padding: 14px 20px; background: #0B0C10; border-bottom: 2px solid #2EE2FA;
+    color: #2EE2FA; font-weight: 900; font-size: 15px; letter-spacing: 0.1em; text-transform: uppercase;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  #closeWorldModal { background: none; border: none; color: #2EE2FA; font-size: 16px; font-weight: 900; cursor: pointer; padding: 0 4px; }
+  #worldBody { padding: 18px 20px 22px; }
+  .world-view.hidden { display: none; }
+  .world-lead { margin: 0 0 10px; color: #fff; font-size: 14px; font-weight: 800; text-align: center; }
+  .world-note { margin: 0 0 14px; color: #b9c2cc; font-size: 12px; font-weight: 600; text-align: center; line-height: 1.5; }
+  .world-note.hidden { display: none; }
+
+  .world-warning {
+    background: rgba(255,90,95,0.10); border: 2px solid rgba(255,90,95,0.55);
+    border-radius: 12px; padding: 12px 14px; margin: 0 0 16px;
+    color: #ffd9da; font-size: 11.5px; font-weight: 600; line-height: 1.55;
+  }
+  .world-warning strong { color: #FF8A8E; display: block; margin-bottom: 6px; font-size: 12.5px; }
+  .world-warning ul { margin: 0; padding-left: 18px; }
+  .world-warning li { margin-bottom: 4px; }
+  .world-warning li strong { display: inline; margin: 0; color: #fff; }
+
+  .world-btn {
+    display: block; width: 100%; box-sizing: border-box;
+    border: 2px solid #000; border-radius: 10px; padding: 11px 10px;
+    font-family: inherit; font-size: 12px; font-weight: 900; cursor: pointer;
+    text-transform: uppercase; line-height: 1.5; margin-bottom: 10px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  }
+  .world-btn small { display: block; font-size: 9.5px; font-weight: 700; text-transform: none; letter-spacing: 0; opacity: 0.85; margin-top: 3px; }
+  .world-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.35); }
+  .world-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .world-btn-green { background: #00C853; color: #fff; }
+  .world-btn-cyan  { background: #2EE2FA; color: #000; }
+  .world-btn-red   { background: #FF5A5F; color: #fff; }
+
+  .world-divider {
+    display: flex; align-items: center; gap: 10px; margin: 16px 0 14px;
+    color: #6c7784; font-size: 10px; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .world-divider::before, .world-divider::after {
+    content: ''; flex: 1; height: 2px; background: rgba(255,255,255,0.10);
+  }
+
+  .world-label {
+    display: block; color: #2EE2FA; font-size: 10px; font-weight: 900;
+    letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px;
+  }
+  #worldJoinCode {
+    width: 100%; box-sizing: border-box; margin-bottom: 10px;
+    background: #0B0C10; border: 2px solid rgba(46,226,250,0.5); border-radius: 10px;
+    color: #fff; font-family: inherit; font-size: 20px; font-weight: 900;
+    letter-spacing: 0.3em; text-align: center; text-transform: uppercase;
+    padding: 12px 10px;
+  }
+  #worldJoinCode:focus { outline: none; border-color: #2EE2FA; box-shadow: 0 0 12px rgba(46,226,250,0.35); }
+
+  .world-code-block {
+    background: rgba(46,226,250,0.08); border: 2px solid rgba(46,226,250,0.45);
+    border-radius: 12px; padding: 14px; margin-bottom: 16px; text-align: center;
+  }
+  .world-code-label { color: #7fd6e8; font-size: 10px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+  #worldInviteCode {
+    color: #2EE2FA; font-size: 34px; font-weight: 900; letter-spacing: 0.22em;
+    margin-bottom: 12px; user-select: text; -webkit-user-select: text;
+  }
+  .world-copy-msg { color: #00C853; font-size: 11px; font-weight: 800; min-height: 14px; }
+
+  .world-members-label { color: #2EE2FA; font-size: 11px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+  #worldMemberList { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .world-member {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.10);
+    border-radius: 10px; padding: 8px 12px; color: #fff; font-size: 12px; font-weight: 800;
+  }
+  .world-member .world-member-tag { font-size: 9.5px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: #FFD34E; }
+  .world-member.is-you { border-color: rgba(46,226,250,0.55); }
+
+  #worldStatusMsg { color: #FF8A8E; font-size: 12px; font-weight: 800; text-align: center; min-height: 16px; margin-top: 8px; }
+  #worldStatusMsg.ok { color: #00C853; }
+
+  /* ---- Confirm step for join / leave ---- */
+  #worldConfirmModal {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8); z-index: 140;
+    display: none; align-items: center; justify-content: center;
+    backdrop-filter: blur(6px); opacity: 0; transition: opacity 0.25s ease;
+  }
+  #worldConfirmModal.show { display: flex; opacity: 1; }
+  #worldConfirmBox {
+    position: relative; width: 90vw; max-width: 400px;
+    background: rgba(11,12,16,0.97); border: 3px solid #FF5A5F;
+    border-radius: 20px; box-shadow: 0 0 40px rgba(255,90,95,0.35); overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  #worldConfirmHeader {
+    padding: 14px 20px; background: #0B0C10; border-bottom: 2px solid #FF5A5F;
+    color: #FF5A5F; font-weight: 900; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  #closeWorldConfirm { background: none; border: none; color: #FF5A5F; font-size: 16px; font-weight: 900; cursor: pointer; padding: 0 4px; }
+  #worldConfirmBody { padding: 20px; }
+  #worldConfirmMessage { margin: 0 0 18px; color: #fff; font-size: 13px; font-weight: 700; text-align: center; line-height: 1.6; }
+  #worldConfirmMessage strong { color: #FF8A8E; }
+  #worldConfirmActions { display: flex; gap: 10px; }
+  #worldConfirmActions button {
+    flex: 1; border: 2px solid #000; border-radius: 10px; padding: 11px 8px;
+    font-family: inherit; font-size: 12px; font-weight: 900; cursor: pointer; text-transform: uppercase;
+    transition: transform 0.15s ease;
+  }
+  #worldConfirmActions button:hover { transform: translateY(-2px); }
+  #btnWorldConfirmYes { background: #FF5A5F; color: #fff; }
+  #btnWorldConfirmNo  { background: #fff; color: #000; }
