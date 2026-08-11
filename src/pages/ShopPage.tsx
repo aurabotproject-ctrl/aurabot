@@ -384,59 +384,49 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
         return;
       }
 
-      // Re-verify both sides still own exactly what they're claiming to trade —
-      // protects against a card already having moved in a different trade.
-      const allIds = [...offer.requested_card_ids, ...offer.offered_card_ids];
-      const { data: liveCards } = await sb.from('cards').select('id, student_id').in('id', allIds);
-      const liveMap: Record<string, string> = {};
-      (liveCards || []).forEach((c: any) => { liveMap[c.id] = c.student_id; });
-      const requestedOk = offer.requested_card_ids.every((id: string) => liveMap[id] === offer.to_student_id);
-      const offeredOk = offer.offered_card_ids.every((id: string) => liveMap[id] === offer.from_student_id);
+      // The whole accept — re-checking ownership, swapping the cards, closing
+      // the listings, charging the fee and auto-declining now-impossible
+      // offers — happens inside accept_trade_offer() on the database.
+      //
+      // Two reasons it isn't done here any more. It's one transaction, so a
+      // dropped connection can't leave one side's cards moved and the other's
+      // not. And moving a card between two students from the browser would
+      // need a permission letting any child rewrite a classmate's cards,
+      // which is the same as letting them take a classmate's collection.
+      //
+      // The fee list is still worked out here, because which accounts are
+      // test accounts is a front-end concept.
+      const feeStudentIds = [offer.to_student_id, offer.from_student_id].filter(
+        id => !TEST_ACCOUNTS.includes(classmates[id] || (id === studentId ? studentName : ''))
+      );
 
-      if (!requestedOk || !offeredOk) {
-        await sb.from('trade_offers').update({ status: 'declined', responded_at: new Date().toISOString() }).eq('id', offer.id);
+      const { data: result, error: acceptErr } = await sb.rpc('accept_trade_offer', {
+        p_offer_id: offer.id,
+        p_fee_student_ids: feeStudentIds,
+      });
+      if (acceptErr) throw acceptErr;
+
+      if (!result?.ok) {
         await loadTradeData();
-        showTradeMsg('This trade is no longer valid — one of the cards has already been traded.');
+        showTradeMsg(
+          result?.reason === 'stale'            ? 'This trade is no longer valid — one of the cards has already been traded.'
+          : result?.reason === 'already_answered' ? 'That offer has already been answered.'
+          : result?.reason === 'not_found'       ? 'That offer no longer exists.'
+          : 'Something went wrong completing this trade.'
+        );
         setTradeBusy(false);
         return;
       }
 
-      // Swap ownership
-      await sb.from('cards').update({ student_id: offer.from_student_id }).in('id', offer.requested_card_ids);
-      await sb.from('cards').update({ student_id: offer.to_student_id }).in('id', offer.offered_card_ids);
-
-      // Close out the listings for the traded cards
-      await sb.from('trade_listings').update({ status: 'completed' }).in('card_id', offer.requested_card_ids).eq('status', 'open');
-
-      // Mark this offer accepted
-      await sb.from('trade_offers').update({ status: 'accepted', responded_at: new Date().toISOString() }).eq('id', offer.id);
-
-      // Trade fee — 1 ⭐ from each side of the trade (skip for test accounts)
-      const feeStudentIds = [offer.to_student_id, offer.from_student_id].filter(
-        id => !TEST_ACCOUNTS.includes(classmates[id] || (id === studentId ? studentName : ''))
-      );
-      if (feeStudentIds.length > 0) {
-        const { data: pointsRows } = await sb.from('student_star_points').select('student_id, points').in('student_id', feeStudentIds);
-        for (const row of (pointsRows || [])) {
-          const newPoints = Math.max(0, (row.points || 0) - 1);
-          await sb.from('student_star_points').update({ points: newPoints }).eq('student_id', row.student_id);
-          if (row.student_id === studentId) setStarPoints(newPoints);
-        }
-      }
-
-      // Auto-decline any other pending offers that referenced the now-moved cards
-      const { data: otherPending } = await sb.from('trade_offers').select('*').eq('teacher_id', teacherId).eq('status', 'pending');
-      for (const o of (otherPending || [])) {
-        if (o.id === offer.id) continue;
-        const refs = [...(o.requested_card_ids || []), ...(o.offered_card_ids || [])];
-        if (refs.some((id: string) => allIds.includes(id))) {
-          await sb.from('trade_offers').update({ status: 'declined', responded_at: new Date().toISOString() }).eq('id', o.id);
-        }
-      }
+      if (typeof result.starPoints === 'number') setStarPoints(result.starPoints);
 
       await loadTradeData();
       onCardsAdded?.();
-      showTradeMsg('✓ Trade complete! (1 ⭐ trade fee charged to each player)');
+      showTradeMsg(
+        feeStudentIds.length > 0
+          ? '✓ Trade complete! (1 ⭐ trade fee charged to each player)'
+          : '✓ Trade complete!'
+      );
     } catch (err: any) { console.error(err); showTradeMsg('Something went wrong completing this trade.'); }
     setTradeBusy(false);
   };
