@@ -7,6 +7,7 @@ import { fileToWebP } from '../lib/imageUtils';
 import { uploadImageToR2 } from '../lib/r2Upload';
 import { Dashboard } from '../lib/dashboard';
 import { AI } from '../lib/ai';
+import Aura3dQuestionBanks from '../components/Aura3dQuestionBanks';
 import { sb } from '../lib/supabase';
 import type { Session } from '../lib/auth';
 import type { Student, Card } from '../lib/supabase';
@@ -440,6 +441,9 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
             </p>
             <p className="text-sm mb-4" style={{ color: 'var(--tp-muted)' }}>
               Their money, inventory, and pets are kept — only the world (trees, flowers, water, and any stacked blocks) is cleared. This takes effect next time they open 3D Aura.
+            </p>
+            <p className="text-sm mb-4" style={{ color: '#d97706' }}>
+              ⚠️ If this student is in a <strong>team world</strong>, this clears what the whole team built — everyone in that world is affected, not just this student.
             </p>
             <div className="flex gap-3">
               <button
@@ -1069,6 +1073,11 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                 </button>
                 {aura3dSavedMsg && <span style={{ fontSize:'0.8rem', color:'#22c55e', fontWeight:700 }}>✓ Saved</span>}
               </div>
+            </div>
+
+            <div className="tp-section">🏛️ 3D Aura Kiosk Quiz Questions</div>
+            <div className="tp-panel" style={{ marginBottom:16 }}>
+              <Aura3dQuestionBanks teacherId={session.user.id} />
             </div>
           </div>
         )}
