@@ -101,16 +101,24 @@
     }
   }
 
-  // Re-reads the balance right before spending (rather than trusting
-  // whatever was on screen) so two rapid clicks - or stars spent elsewhere
-  // in the meantime - can't let a purchase go through without enough stars.
+  // Spending happens in the database (spend_star_points), not here, for the
+  // same reason the shop does it that way: an UPDATE that row-level security
+  // filters out doesn't fail, it silently changes nothing and reports
+  // success. Checking `error` - as this used to - can't catch that, so a pet
+  // could look like it cost 5 stars while the balance never actually moved.
+  // The function also re-checks affordability and locks the row, so rapid
+  // taps can't spend the same stars twice.
   async function spendStars(cost) {
-    const current = await fetchStarPoints();
-    if (current === null || current < cost) return { ok: false, remaining: current };
-    const remaining = current - cost;
-    const { error } = await sb.from('student_star_points').update({ points: remaining }).eq('student_id', cloudStudentId);
-    if (error) { console.error('AURA: failed to spend stars:', error); return { ok: false, remaining: current }; }
-    return { ok: true, remaining };
+    if (!sb || !cloudStudentId) return { ok: false, remaining: null };
+    try {
+      const { data, error } = await sb.rpc('spend_star_points', { p_cost: cost });
+      if (error) throw error;
+      if (data && data.ok) return { ok: true, remaining: data.points };
+      return { ok: false, remaining: (data && typeof data.points === 'number') ? data.points : null };
+    } catch (err) {
+      console.error('AURA: failed to spend stars:', err);
+      return { ok: false, remaining: null };
+    }
   }
 
   // Waits for the parent page (ThreeDAuraPage.tsx) to postMessage the
