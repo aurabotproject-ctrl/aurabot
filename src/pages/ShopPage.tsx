@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { sb } from '../lib/supabase';
+import { sb, spendStarPoints, starSpendMessage } from '../lib/supabase';
 import type { Session } from '../lib/auth';
 import type { Card } from '../lib/supabase';
 
@@ -444,8 +444,16 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
     }
     setUnlocking(item.id);
     try {
-      await sb.from('student_star_points').update({ points: (starPoints || 0) - item.cost }).eq('student_id', studentId);
-      setStarPoints(p => (p || 0) - item.cost);
+      // Charge first, and only unlock if the stars really came off. The old
+      // code assumed the deduction worked and unlocked regardless.
+      const spend = await spendStarPoints(item.cost);
+      if (!spend.ok) {
+        if (typeof spend.points === 'number') setStarPoints(spend.points);
+        showMsg(starSpendMessage(spend.reason));
+        setUnlocking(null);
+        return;
+      }
+      setStarPoints(spend.points);
       // Insert unlock_key row
       await sb.from('student_unlocks').upsert({ student_id: studentId, unlock_key: item.id });
       setUnlockedChoices(prev => [...prev, item.id]);
@@ -832,7 +840,7 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
           teacherId={teacherId}
           specialPackSettings={specialPackSettings}
           onClose={() => setOpeningPack(null)}
-          onStarsSpent={amt => setStarPoints(p => (p || 0) - amt)}
+          onStarsSet={points => setStarPoints(points)}
           onComplete={() => { setOpeningPack(null); onCardsAdded?.(); }}
         />
       )}
@@ -843,13 +851,13 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
 // ── Pack Opening Overlay (self-contained) ─────────────────────────────
 type OpenPhase = 'tiers' | 'confirm' | 'zoom' | 'tear' | 'reveal';
 
-function PackOpeningOverlay({ pack, packImages, starPoints, isTestAccount, studentId, teacherId, specialPackSettings, onClose, onComplete, onStarsSpent }: {
+function PackOpeningOverlay({ pack, packImages, starPoints, isTestAccount, studentId, teacherId, specialPackSettings, onClose, onComplete, onStarsSet }: {
   pack: typeof PACK_TYPES[0]; packImages: Record<string, string>;
   starPoints: number; isTestAccount: boolean;
   studentId: string; teacherId: string;
   specialPackSettings: { is_lucky_dip: boolean; set_name: string } | null;
   onClose: () => void; onComplete: (cards: OpenedCard[]) => void;
-  onStarsSpent: (amt: number) => void;
+  onStarsSet: (points: number) => void;
 }) {
   const [phase, setPhase] = useState<OpenPhase>('tiers');
   const [selectedTier, setSelectedTier] = useState<typeof PACK_TIERS[0] | null>(null);
@@ -877,9 +885,19 @@ function PackOpeningOverlay({ pack, packImages, starPoints, isTestAccount, stude
   const handleConfirm = async () => {
     if (!selectedTier) return;
     setLoadingCards(true);
+    // Charge before opening anything. If the stars don't actually come off,
+    // the pack must not open — otherwise a failed deduction hands out free
+    // cards, which is what was happening: the balance on screen dropped, the
+    // database kept the old value, and the stars "came back" on reload.
     if (!isTestAccount) {
-      await sb.from('student_star_points').update({ points: starPoints - selectedTier.stars }).eq('student_id', studentId);
-      onStarsSpent(selectedTier.stars);
+      const spend = await spendStarPoints(selectedTier.stars);
+      if (!spend.ok) {
+        setLoadingCards(false);
+        alert(starSpendMessage(spend.reason));
+        onClose();
+        return;
+      }
+      onStarsSet(spend.points);
     }
     // Special acts as a second Lucky Dip when no limited-time set is currently active
     const actsAsLuckyDip = pack.id === 'luckydip' || (pack.id === 'special' && (specialPackSettings?.is_lucky_dip ?? true));
