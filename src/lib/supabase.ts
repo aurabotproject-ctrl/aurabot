@@ -348,6 +348,41 @@ export async function saveAura3dTeacherSettings(teacherId: string, settings: Aur
 }
 
 
+/**
+ * Spends a student's star points and returns their real new balance.
+ *
+ * Always use this rather than updating student_star_points directly. A
+ * direct UPDATE that Row Level Security filters out doesn't fail — it
+ * changes nothing and reports success — so the screen would show stars
+ * being spent while the database kept the old balance, and they'd come back
+ * on the next page load. This runs server-side, so it either really happens
+ * or it tells you why it didn't.
+ *
+ * The cost is re-checked in the database too, so the price isn't whatever
+ * the browser claims it is.
+ */
+export async function spendStarPoints(
+  cost: number
+): Promise<{ ok: true; points: number } | { ok: false; reason: string; points: number | null }> {
+  const { data, error } = await sb.rpc('spend_star_points', { p_cost: cost });
+  if (error) {
+    console.error('Star spend failed:', error);
+    return { ok: false, reason: 'error', points: null };
+  }
+  if (data?.ok) return { ok: true, points: data.points as number };
+  return { ok: false, reason: data?.reason ?? 'error', points: (data?.points as number) ?? null };
+}
+
+/** Turns a spend_star_points failure into something a child can read. */
+export function starSpendMessage(reason: string): string {
+  switch (reason) {
+    case 'insufficient': return "You don't have enough ⭐ for that.";
+    case 'no_star_row':  return 'Your star points are not set up yet — ask your teacher.';
+    case 'not_a_student':return 'Only student accounts can spend stars.';
+    default:             return 'Could not spend your stars — try again.';
+  }
+}
+
 /* ─────────────────────────────────────────────────────────────
    3D AURA — TEACHER-EDITABLE KIOSK QUIZ BANKS
 
