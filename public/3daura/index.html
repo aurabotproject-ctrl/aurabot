@@ -38,11 +38,13 @@
         <p class="world-note">A team world lets up to <strong>5 people</strong> build one world together and share the same money and materials.</p>
 
         <div class="world-warning">
-          <strong>⚠️ Think carefully before you join.</strong>
+          <strong>💡 How team worlds work.</strong>
           <ul>
-            <li>You can only ever be in <strong>one</strong> team world.</li>
-            <li>When you join, your own world is <strong>deleted</strong> — money, builds and all.</li>
-            <li>If you ever leave a team world, you start again from scratch and you can <strong>never join another one</strong>.</li>
+            <li>You can be in <strong>one</strong> team world at a time, with up to 5 builders.</li>
+            <li>When you join, your own world is <strong>put away safely</strong> — nothing is deleted.</li>
+            <li>Leave whenever you like and your own world <strong>comes straight back</strong>, exactly as you left it.</li>
+            <li>After leaving there's a <strong>two week wait</strong> before joining another team, so pick your team carefully.</li>
+            <li>Your <strong>pets always stay with you</strong>, wherever you build.</li>
           </ul>
         </div>
 
@@ -73,24 +75,26 @@
         <div class="world-divider"><span>danger zone</span></div>
 
         <div class="world-warning">
-          <strong>⚠️ Leaving is permanent.</strong>
+          <strong>ℹ️ If you leave.</strong>
           <ul>
-            <li>You'll go back to your own world, <strong>completely from scratch</strong> — no money, no builds, no pets.</li>
-            <li>You will <strong>never be able to join another team world</strong>.</li>
-            <li>The team world keeps everything — you just won't be in it.</li>
+            <li>You get <strong>your own world back</strong>, exactly as it was when you joined.</li>
+            <li>The team world <strong>keeps everything</strong> you all built — you just won't be in it, and you'd need a new code to come back.</li>
+            <li>You'd have to <strong>wait two weeks</strong> before joining another team world.</li>
+            <li>Your pets come with you. They're yours.</li>
           </ul>
         </div>
-        <button id="btnLeaveWorld" class="world-btn world-btn-red">🚪 Leave This Team World</button>
+        <button id="btnLeaveWorld" class="world-btn world-btn-red">🏡 Go Back To My Own World</button>
       </div>
 
-      <!-- ── View C: has already left a world once, permanently solo ── -->
+      <!-- ── View C: left a team world recently, waiting out the cooldown ── -->
       <div id="worldViewLocked" class="world-view hidden">
         <p class="world-lead">You're building your <strong>own world</strong>.</p>
         <div class="world-warning">
-          <strong>🔒 Team worlds are closed for you.</strong>
+          <strong>⏳ Team worlds open again <span id="worldCooldownWhen">soon</span>.</strong>
           <ul>
-            <li>You left a team world, so you can't join or start another one.</li>
-            <li>This world is yours to keep — build it up however you like!</li>
+            <li>You left a team world recently, so there's a short wait before joining another one.</li>
+            <li>This world is yours — build it up however you like in the meantime!</li>
+            <li>If you need to join sooner, ask your teacher.</li>
           </ul>
         </div>
       </div>

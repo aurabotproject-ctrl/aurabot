@@ -71,7 +71,8 @@
   // star points (a real classroom reward) so they stay personal and travel
   // with the student into a team world. See students.aura3d_pets.
   let cloudWorldId = null;
-  let cloudWorldLocked = false;   // true once they've left a team world - blocks joining another, forever
+  let cloudWorldLocked = false;   // legacy flag from the old permanent-lock rule; kept only so older saves don't break
+  let cloudWorldCooldownUntil = null; // ISO date: they left a team world recently and can't join another until then (null = free to join)
   let cloudWorldInfo = null;      // { inviteCode, isOwner, members: [{id,name,isOwner}], memberCount }
   let gameReady = false;          // flipped on at the very bottom of this file, once every `let` below is initialised
   let teamSyncPending = false;    // a merge arrived while the student was mid-build; apply it as soon as they're idle
@@ -191,6 +192,7 @@
         if (ws && ws.ok) {
           result.worldFeatureReady = true;
           cloudWorldLocked = !!ws.locked;
+          cloudWorldCooldownUntil = ws.cooldownUntil || null;
           if (ws.inWorld) {
             cloudWorldId = ws.worldId;
             cloudWorldInfo = {
@@ -6818,11 +6820,32 @@
     switch (reason) {
       case 'bad_code':        return "That code didn't match any world. Check every letter and try again.";
       case 'world_full':      return 'That world is already full (5 builders). Ask them to start another one.';
-      case 'locked':          return "You've already left a team world, so you can't join another one.";
+      case 'cooldown':        return 'You left a team world recently. You can join another one ' + cooldownWhenText() + '. Ask your teacher if you need it sooner.';
+      case 'locked':          return "Team worlds aren't available for you right now. Ask your teacher.";
       case 'already_in_world':return "You're already in a team world.";
       case 'not_in_world':    return "You're not in a team world.";
       case 'not_a_student':   return 'Only student accounts can use team worlds.';
       default:                return 'Something went wrong. Try again in a moment.';
+    }
+  }
+
+  // Is the student inside a post-leave cooldown right now?
+  function inCooldown() {
+    if (!cloudWorldCooldownUntil) return false;
+    const until = new Date(cloudWorldCooldownUntil);
+    return isFinite(until.getTime()) && until > new Date();
+  }
+
+  // "on Friday 12 September" - a date a child can actually look forward to,
+  // rather than a countdown they'd have to do arithmetic on.
+  function cooldownWhenText() {
+    if (!cloudWorldCooldownUntil) return 'soon';
+    const until = new Date(cloudWorldCooldownUntil);
+    if (!isFinite(until.getTime())) return 'soon';
+    try {
+      return 'on ' + until.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+    } catch (err) {
+      return 'on ' + until.toDateString();
     }
   }
 
@@ -6839,9 +6862,14 @@
     worldMenuBtn.classList.toggle('in-team', inTeam);
     if (worldMenuLabel) worldMenuLabel.textContent = inTeam ? 'Team World' : 'My World';
 
-    worldViewSolo.classList.toggle('hidden', inTeam || cloudWorldLocked);
+    const waiting = !inTeam && inCooldown();
+    worldViewSolo.classList.toggle('hidden', inTeam || waiting);
     worldViewMember.classList.toggle('hidden', !inTeam);
-    worldViewLocked.classList.toggle('hidden', inTeam || !cloudWorldLocked);
+    worldViewLocked.classList.toggle('hidden', !waiting);
+    if (waiting) {
+      const whenEl = document.getElementById('worldCooldownWhen');
+      if (whenEl) whenEl.textContent = cooldownWhenText();
+    }
 
     if (inTeam && cloudWorldInfo) {
       document.getElementById('worldInviteCode').textContent = cloudWorldInfo.inviteCode || '------';
@@ -6872,6 +6900,7 @@
       const { data: ws } = await sb.rpc('aura3d_world_state');
       if (!ws || !ws.ok) return;
       cloudWorldLocked = !!ws.locked;
+      cloudWorldCooldownUntil = ws.cooldownUntil || null;
       if (ws.inWorld) {
         cloudWorldId = ws.worldId;
         cloudWorldInfo = {
@@ -6952,10 +6981,10 @@
     const code = (worldJoinInput.value || '').trim().toUpperCase();
     if (code.length < 4) { setWorldStatus('Type the 6-letter code your friend gave you.'); return; }
     setWorldStatus('');
-    askConfirm('Join this world? This cannot be undone.',
-      'Your own world will be <strong>deleted right now</strong> — every block, all your money and all your items.<br><br>' +
-      'After this you can <strong>never join a different team world</strong>. If you ever leave this one, you start again from nothing.<br><br>' +
-      'Are you completely sure?',
+    askConfirm('Join this team world?',
+      'Your own world will be <strong>put away safely</strong> — every block, all your money and all your items are kept for you.<br><br>' +
+      'From now on you build in the <strong>team world</strong> with your friends. If you ever leave, you get your own world back exactly as it is now.<br><br>' +
+      'Your pets come with you either way. Ready?',
       async () => {
       setWorldStatus('Joining…');
       try {
@@ -6963,7 +6992,8 @@
         if (error) throw error;
         if (!data || !data.ok) { setWorldStatus(worldErrorText(data && data.reason)); return; }
         cloudWorldId = data.worldId;
-        // We arrive with nothing; the world's own contents load below.
+        // We arrive into the team world's contents, not our own - ours is
+        // safely stashed server-side and comes back if we ever leave.
         teamBaseline = { bankBalance: 0, inventory: {} };
         setBankBalance(0);
         replaceInventory({});
@@ -6979,7 +7009,7 @@
           saveState();
         }
         await refreshWorldState();
-        setWorldStatus("You're in! Build it together. 🎉", true);
+        setWorldStatus("You're in! Build it together. 🎉 Your own world is safe if you ever come back to it.", true);
         logTransaction('JOINED TEAM WORLD', 'credit');
       } catch (err) {
         console.error('AURA: join world failed:', err);
@@ -7004,33 +7034,67 @@
     setTimeout(() => { msgEl.textContent = ''; }, 4000);
   });
 
-  // ---- Leave (permanent) ----
+  // ---- Leave the team world ----
+  // Nothing is destroyed any more. The server hands back the personal world
+  // that was stashed at the moment they joined (or, for the child who started
+  // the world, a snapshot taken at that moment) and we put it straight on
+  // screen. The team world is left completely alone - what the group built
+  // together stays with the group.
   document.getElementById('btnLeaveWorld').addEventListener('click', () => {
-    askConfirm('Leave for good?',
-      'You will lose <strong>everything</strong> — all your money, every block you helped build, and all your pets.<br><br>' +
-      'You will go back to an <strong>empty world of your own</strong>, and you will <strong>never be able to join another team world</strong>.<br><br>' +
-      'This cannot be undone. Are you sure?',
+    askConfirm('Go back to your own world?',
+      'You\'ll get <strong>your own world back</strong>, exactly as it was when you joined — your blocks, your money, your items.<br><br>' +
+      'The team world <strong>keeps everything</strong> you all built together. You just won\'t be in it any more, and you\'d need a new invite code to return.<br><br>' +
+      'You won\'t be able to join another team world for a couple of weeks. Your pets stay with you whatever happens.',
       async () => {
-      setWorldStatus('Leaving…');
+      setWorldStatus('Moving you back…');
       try {
+        // One last sync so anything built in the last few seconds is safely
+        // in the team world before we step out of it.
+        await pushCloudSave();
+
         const { data, error } = await sb.rpc('aura3d_leave_world');
         if (error) throw error;
         if (!data || !data.ok) { setWorldStatus(worldErrorText(data && data.reason)); return; }
+
         cloudWorldId = null;
         cloudWorldInfo = null;
-        cloudWorldLocked = true;
-        // Back to absolute scratch, exactly as promised in the warning.
+        cloudWorldLocked = false;
+        cloudWorldCooldownUntil = data.cooldownUntil || null;
+
+        // Put the restored personal world on screen.
+        const wallet = data.wallet || {};
+        const build = data.build || {};
+        const money = typeof wallet.bankBalance === 'number' ? wallet.bankBalance : 0;
+        const items = (wallet.inventory && typeof wallet.inventory === 'object') ? wallet.inventory : {};
+
         teamBaseline = { bankBalance: 0, inventory: {} };
-        setBankBalance(0);
-        replaceInventory({});
+        setBankBalance(money);
+        replaceInventory(items);
         clearAllBuilds();
         clearAllNature();
-        resetAllPets();
-        try { localStorage.setItem(SAVE_KEY_LITERAL, JSON.stringify({ version: 1, bankBalance: 0, inventory: {}, worldGrid: [], buildGrid: [] })); } catch (e) {}
+        hydrateWorldGrids(build);
+        // Pets are deliberately NOT reset - they were bought with star points.
+
+        try {
+          localStorage.setItem(SAVE_KEY_LITERAL, JSON.stringify({
+            version: 1,
+            bankBalance: money,
+            inventory: items,
+            worldGrid: Array.isArray(build.worldGrid) ? build.worldGrid : [],
+            buildGrid: Array.isArray(build.buildGrid) ? build.buildGrid : [],
+          }));
+        } catch (e) {}
+
+        // saveState() re-serializes from the live scene, which is now the
+        // restored world, and pushes it to the student's own row.
+        saveState();
         await pushCloudSave();
+
         renderWorldPanel();
-        setWorldStatus('You now have your own fresh world.', true);
-        logTransaction('LEFT TEAM WORLD - FRESH START', 'debit');
+        setWorldStatus(data.restored
+          ? 'Welcome back to your own world — everything is just as you left it. 🏡'
+          : 'You now have your own world again.', true);
+        logTransaction('BACK IN MY OWN WORLD', 'credit');
       } catch (err) {
         console.error('AURA: leave world failed:', err);
         setWorldStatus(worldErrorText());
