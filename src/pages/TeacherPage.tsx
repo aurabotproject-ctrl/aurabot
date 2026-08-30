@@ -705,6 +705,14 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
             <span style={{ fontSize:'0.72rem', padding:'4px 12px', borderRadius:20, background:'rgba(160,140,220,0.1)', border:'1px solid rgba(160,140,220,0.25)', color:'var(--tp-text2)', fontWeight:600 }}>{session.user.email}</span>
             <span style={{ fontSize:'0.65rem', padding:'4px 10px', borderRadius:20, background:'linear-gradient(135deg,rgba(200,160,255,0.2),rgba(160,200,255,0.2))', border:'1px solid rgba(160,140,220,0.3)', color:'#6060b0', fontWeight:800, letterSpacing:'0.1em', textTransform:'uppercase' }}>Teacher</span>
+            {/* Read-only tour of the worlds this class has built. The 3D app
+                gives a teacher no way to build, buy or save anything. */}
+            <button
+              onClick={() => { window.location.hash = '/3daura'; }}
+              title="Look inside the 3D worlds your class has built"
+              style={{ fontSize:'0.72rem', fontWeight:800, padding:'6px 14px', borderRadius:20, cursor:'pointer', border:'1.5px solid rgba(46,226,250,0.4)', background:'linear-gradient(135deg,rgba(46,226,250,0.16),rgba(124,92,255,0.16))', color:'#5aa8d8', whiteSpace:'nowrap' }}>
+              🔭 Visit 3D Worlds
+            </button>
             <button onClick={toggleTheme} style={{ width:34, height:34, borderRadius:'50%', border:'1.5px solid var(--tp-border,rgba(60,100,200,0.22))', background:'var(--tp-input-bg,rgba(255,255,255,0.06))', cursor:'pointer', fontSize:'0.9rem', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.2s' }} title={isDark ? 'Light mode' : 'Dark mode'}>{isDark ? '☀️' : '🌙'}</button>
             <button onClick={onSignOut} className="tp-btn-outline" style={{ fontSize:'0.72rem', padding:'6px 14px' }}>Sign Out</button>
           </div>

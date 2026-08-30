@@ -23,7 +23,19 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 export default function ThreeDAuraPage() {
   const [loaded, setLoaded] = useState(false);
+  // Teachers come in as read-only visitors, and Back should return them to
+  // their own page rather than dumping them on the student dashboard.
+  const [isTeacher, setIsTeacher] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) return;
+      const { data: profile } = await sb.from('profiles').select('role').eq('id', session.user.id).maybeSingle();
+      setIsTeacher(profile?.role === 'teacher');
+    })();
+  }, []);
 
   useEffect(() => {
     if (!loaded) return;
@@ -46,7 +58,7 @@ export default function ThreeDAuraPage() {
     <div style={{ position: 'fixed', inset: 0, background: '#05070f', overflow: 'hidden' }}>
       {/* Back button — floats above the 3D app's own UI */}
       <button
-        onClick={() => { window.location.hash = '/student'; }}
+        onClick={() => { window.location.hash = isTeacher ? '/teacher' : '/student'; }}
         title="Back to Collection"
         style={{
           position: 'fixed',
