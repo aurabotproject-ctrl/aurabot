@@ -79,11 +79,21 @@
   // they're looking at. Every save path checks this flag first, which is the
   // real safety net; the disabled buttons are just courtesy on top of it.
   let visiting = { active: false, kind: null, id: null, label: '' };
+
+  // A teacher (or admin) opening 3D Aura has no world of their own. They come
+  // in as a PERMANENT visitor: free to look inside anything their class has
+  // built, never able to build, buy or save. Same read-only guarantees as a
+  // visiting student, just always on.
+  let isTeacherViewer = false;
   function isVisiting() { return !!visiting.active; }
 
   // Called at the top of anything a guest mustn't do. Returns true (and says
   // so on the HUD) when the action should be dropped.
   function guestBlocked() {
+    if (isTeacherViewer) {
+      try { logTransaction('TEACHER VIEW - LOOKING ONLY', 'debit'); } catch (err) {}
+      return true;
+    }
     if (!visiting.active) return false;
     try { logTransaction("YOU'RE A GUEST HERE - LOOK, DON'T TOUCH", 'debit'); } catch (err) {}
     return true;
@@ -182,7 +192,21 @@
       if (!session || !session.user) return result;
 
       const { data: profile } = await sb.from('profiles').select('id, name, role, student_id').eq('id', session.user.id).maybeSingle();
-      if (!profile || profile.role !== 'student' || !profile.student_id) return result;
+      if (!profile) return result;
+
+      // Teachers and admins get the visit-only view described above. They
+      // deliberately never get a cloudStudentId, which is what every save
+      // path keys off - so there is no code path by which they could write a
+      // world at all.
+      if (profile.role !== 'student' || !profile.student_id) {
+        if (profile.role !== 'teacher' && profile.role !== 'admin') return result;
+        isTeacherViewer = true;
+        result.authenticated = true;
+        result.worldFeatureReady = true;
+        result.name = profile.name || null;
+        cloudTeacherId = session.user.id;
+        return await loadTeacherExtras(result, cloudTeacherId);
+      }
 
       result.authenticated = true;
       cloudStudentId = profile.student_id;
@@ -229,22 +253,26 @@
         console.warn('AURA: shared worlds unavailable (has migration_aura3d_shared_worlds.sql been run?)', err);
       }
 
-      if (cloudTeacherId) {
-        try {
-          const { data: settingsRow } = await sb.from('aura3d_teacher_settings').select('settings').eq('teacher_id', cloudTeacherId).maybeSingle();
-          result.teacherSettings = (settingsRow && settingsRow.settings) ? settingsRow.settings : null;
-        } catch (err) { /* settings table may not exist yet - defaults apply, nothing to do */ }
-
-        // Teacher's replacement kiosk quiz banks (if they've made any).
-        try {
-          const { data: bankRows } = await sb.from('aura3d_question_banks')
-            .select('bank_key, title, questions').eq('teacher_id', cloudTeacherId);
-          if (Array.isArray(bankRows) && bankRows.length) result.questionBanks = bankRows;
-        } catch (err) { /* banks table may not exist yet - built-in defaults apply */ }
-      }
+      if (cloudTeacherId) await loadTeacherExtras(result, cloudTeacherId);
     } catch (err) {
       console.error('AURA cloud bootstrap failed, continuing in local-only mode:', err);
     }
+    return result;
+  }
+
+  // The teacher's day/night settings and replacement kiosk quiz banks. Shared
+  // by the student path (their teacher's settings) and the teacher-viewer path
+  // (their own), so the world looks the same to both.
+  async function loadTeacherExtras(result, teacherId) {
+    try {
+      const { data: settingsRow } = await sb.from('aura3d_teacher_settings').select('settings').eq('teacher_id', teacherId).maybeSingle();
+      result.teacherSettings = (settingsRow && settingsRow.settings) ? settingsRow.settings : null;
+    } catch (err) { /* settings table may not exist yet - defaults apply */ }
+    try {
+      const { data: bankRows } = await sb.from('aura3d_question_banks')
+        .select('bank_key, title, questions').eq('teacher_id', teacherId);
+      if (Array.isArray(bankRows) && bankRows.length) result.questionBanks = bankRows;
+    } catch (err) { /* banks table may not exist yet - built-in defaults apply */ }
     return result;
   }
 
@@ -6347,7 +6375,7 @@
   function saveState() {
     // Guests don't save. The world on screen isn't theirs, and writing it to
     // localStorage would make it theirs at the next cloud sync.
-    if (isVisiting()) return false;
+    if (isVisiting() || isTeacherViewer) return false;
     try {
       const data = {
         version: 1,
@@ -6885,9 +6913,21 @@
     // before the DOM references below have been initialised.
     if (!gameReady || !worldMenuBtn) return;
 
-    // No logged-in student (e.g. this file opened directly) = no teams at all.
-    if (!cloudStudentId || !__cloud.worldFeatureReady) { worldMenuBtn.classList.add('hidden'); return; }
+    // No logged-in student or teacher (e.g. this file opened directly) = no
+    // world menu at all.
+    if ((!cloudStudentId && !isTeacherViewer) || !__cloud.worldFeatureReady) { worldMenuBtn.classList.add('hidden'); return; }
     worldMenuBtn.classList.remove('hidden');
+
+    // Teacher view: no world of their own, so the create/join/leave choices
+    // are meaningless. All they get is the list of worlds to look inside.
+    if (isTeacherViewer) {
+      if (worldMenuLabel) worldMenuLabel.textContent = visiting.active ? 'Visiting' : 'Class Worlds';
+      worldViewSolo.classList.add('hidden');
+      worldViewMember.classList.add('hidden');
+      worldViewLocked.classList.add('hidden');
+      if (worldVisitSection) worldVisitSection.classList.remove('hidden');
+      return;
+    }
 
     const inTeam = !!cloudWorldId;
     worldMenuBtn.classList.toggle('in-team', inTeam);
@@ -7271,6 +7311,18 @@
     // Step 4: re-read our own world from the server. localStorage is not
     // trusted here - it may still describe the world we were visiting.
     try {
+      // A teacher has no world of their own to come back to - just clear the
+      // scene rather than trying to look one up.
+      if (isTeacherViewer) {
+        clearAllBuilds();
+        clearAllNature();
+        setBankBalance(0);
+        replaceInventory({});
+        renderWorldPanel();
+        logTransaction('LEFT THE WORLD', 'credit');
+        return;
+      }
+
       let wallet = null, build = null;
 
       const { data: ws } = await sb.rpc('aura3d_world_state');
