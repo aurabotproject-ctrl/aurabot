@@ -1,12 +1,51 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { sb } from '../lib/supabase';
 import { Dashboard } from '../lib/dashboard';
-import type { CatalogueCard } from '../lib/dashboard';
 import PokeCard from '../components/PokeCard';
 import type { Session } from '../lib/auth';
 import type { Card } from '../lib/supabase';
 
 const PAGE_SIZE = 12;
+
+/* ── The master catalogue ──────────────────────────────────────────────────
+   A row from `card_database` is a card DESIGN that exists to be collected —
+   it is not a `Card`. Catalogue rows carry no rarity or stats; those are
+   rolled per-copy at the moment a pack is opened. Kept in this file so the
+   album is a single self-contained page. */
+type CatalogueCard = {
+  id: string;
+  card_name: string;
+  type: string;
+  description: string | null;
+  image_url: string | null;
+  move1_name: string | null;
+  move2_name: string | null;
+  is_rare_exclusive?: boolean | null;
+  created_at: string;
+};
+
+/** Every card that currently exists to be collected, oldest first.
+ *
+ * Oldest-first is what keeps each card's slot number stable forever — adding
+ * a new card to the database appends the next number, it never renumbers the
+ * cards already printed in someone's album.
+ *
+ * `teacherId` scopes the album to the student's own class set; if that teacher
+ * has no cards of their own yet we fall back to the whole table so the page is
+ * never mysteriously empty. */
+async function fetchCardCatalogue(teacherId?: string): Promise<CatalogueCard[]> {
+  const cols = 'id, card_name, type, description, image_url, move1_name, move2_name, is_rare_exclusive, created_at';
+  const run = async (tid?: string) => {
+    let q = sb.from('card_database').select(cols).neq('type', 'project');
+    if (tid) q = q.eq('teacher_id', tid);
+    const { data, error } = await q.order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data || []) as CatalogueCard[];
+  };
+  let rows = await run(teacherId);
+  if (rows.length === 0 && teacherId) rows = await run(undefined);
+  return rows;
+}
 
 /* ── Rarities ──────────────────────────────────────────────────────────────
    Displayed as clickable circles above every slot. 'common' is the bronze
@@ -70,7 +109,7 @@ export default function MyCardsPage({ session, onBack }: { session: NonNullable<
 
       const [owned, cat] = await Promise.all([
         sid ? Dashboard.getStudentCards(sid) : Promise.resolve([] as Card[]),
-        Dashboard.getCardCatalogue(tid || undefined).catch(err => { console.error('[Album] catalogue load failed', err); return [] as CatalogueCard[]; }),
+        fetchCardCatalogue(tid || undefined).catch((err: unknown) => { console.error('[Album] catalogue load failed', err); return [] as CatalogueCard[]; }),
       ]);
       setCards(owned);
       setCatalogue(cat);
