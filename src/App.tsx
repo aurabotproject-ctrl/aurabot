@@ -68,7 +68,10 @@ function App() {
           if (role !== 'student' && role !== 'admin') { Router.navigate('/'); setPage('login'); }
           else setPage('shop');
         } else if (path.startsWith('/3daura')) {
-          if (role !== 'student' && role !== 'admin') { Router.navigate('/'); setPage('login'); }
+          // Teachers are allowed in as read-only visitors, so they can look
+          // inside the worlds their class has built. The game itself gives a
+          // non-student no way to build, buy or save anything.
+          if (role !== 'student' && role !== 'admin' && role !== 'teacher') { Router.navigate('/'); setPage('login'); }
           else setPage('3daura');
         } else {
           setPage('login');
