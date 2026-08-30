@@ -72,6 +72,23 @@
   // with the student into a team world. See students.aura3d_pets.
   let cloudWorldId = null;
   let cloudWorldLocked = false;   // legacy flag from the old permanent-lock rule; kept only so older saves don't break
+  // ---- Visiting someone else's world (read-only) ----
+  // While `visiting.active` is true the scene on screen belongs to somebody
+  // else. NOTHING may be written in this state - not to localStorage, not to
+  // the cloud - or we'd overwrite the visitor's own world with the one
+  // they're looking at. Every save path checks this flag first, which is the
+  // real safety net; the disabled buttons are just courtesy on top of it.
+  let visiting = { active: false, kind: null, id: null, label: '' };
+  function isVisiting() { return !!visiting.active; }
+
+  // Called at the top of anything a guest mustn't do. Returns true (and says
+  // so on the HUD) when the action should be dropped.
+  function guestBlocked() {
+    if (!visiting.active) return false;
+    try { logTransaction("YOU'RE A GUEST HERE - LOOK, DON'T TOUCH", 'debit'); } catch (err) {}
+    return true;
+  }
+
   let cloudWorldCooldownUntil = null; // ISO date: they left a team world recently and can't join another until then (null = free to join)
   let cloudWorldInfo = null;      // { inviteCode, isOwner, members: [{id,name,isOwner}], memberCount }
   let gameReady = false;          // flipped on at the very bottom of this file, once every `let` below is initialised
@@ -283,12 +300,14 @@
   // a periodic safety-net push plus one on page hide/close so nothing is lost.
   let cloudSaveTimer = null;
   function scheduleCloudSave() {
+    if (isVisiting()) return;    // guest in someone else's world - never write
     if (!cloudStudentId) return; // no session - stay purely local (dev/offline mode)
     if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
     cloudSaveTimer = setTimeout(pushCloudSave, 1500);
   }
   let cloudSaveInFlight = false;
   async function pushCloudSave() {
+    if (isVisiting()) return;    // guest in someone else's world - never write
     if (!cloudStudentId) return;
     if (cloudSaveInFlight) return; // never let two syncs overlap - they'd merge against each other
     if (cloudSaveTimer) { clearTimeout(cloudSaveTimer); cloudSaveTimer = null; }
@@ -4233,6 +4252,7 @@
       logTransaction('ALL PETS ALREADY ADOPTED!', 'credit');
       return;
     }
+    if (guestBlocked()) { flashAdoptButtonError(); return; }
     if (!cloudStudentId) {
       logTransaction('ERR: LOG IN TO ADOPT PETS', 'debit');
       flashAdoptButtonError();
@@ -4285,6 +4305,7 @@
   let activeQuizTitle = "";
 
   function startQuiz(questions, title) {
+    if (guestBlocked()) return;
     isQuizActive = true; currentQIndex = 0; quizScore = 0;
     activeQuizQuestions = questions;
     activeQuizTitle = title;
@@ -4447,6 +4468,7 @@
   });
 
   document.getElementById('btnTransfer').addEventListener('click', () => {
+    if (guestBlocked()) return;
     if (bankBalance >= 1) { 
       bankBalance -= 1; 
       updateBankUI(); 
@@ -4542,6 +4564,7 @@
   }
 
   function enterPlacementMode(itemName) {
+    if (guestBlocked()) return;
     placementMode.active = true;
     placementMode.item = itemName;
     placementMode.gx = Math.round(robot.position.x / GRID_SIZE);
@@ -5034,6 +5057,7 @@
   }
 
   function enterBuildMode(startType) {
+    if (guestBlocked()) return;
     if (placementMode.active) exitPlacementMode();
     buildMode.active = true;
     buildMode.selectedType = (inventory[startType] > 0) ? startType : firstAvailableBlockType();
@@ -5456,6 +5480,7 @@
   }
 
   function enterEditMode() {
+    if (guestBlocked()) return;
     if (placementMode.active) exitPlacementMode();
     if (buildMode.active) exitBuildMode();
     editMode.active = true;
@@ -5616,6 +5641,7 @@
 
   document.querySelectorAll('.btn-snack').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (guestBlocked()) return;
       const price = parseFloat(btn.dataset.price);
       const name = btn.dataset.name;
       const color = btn.dataset.color;
@@ -5634,6 +5660,7 @@
 
   document.querySelectorAll('.btn-nature').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (guestBlocked()) return;
       const price = parseFloat(btn.dataset.price);
       const name = btn.dataset.name;
       const color = btn.dataset.color;
@@ -5652,6 +5679,7 @@
 
   document.querySelectorAll('.btn-build').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (guestBlocked()) return;
       const price = parseFloat(btn.dataset.price);
       const name = btn.dataset.name;
       const color = btn.dataset.color;
@@ -6317,6 +6345,9 @@
   }
 
   function saveState() {
+    // Guests don't save. The world on screen isn't theirs, and writing it to
+    // localStorage would make it theirs at the next cloud sync.
+    if (isVisiting()) return false;
     try {
       const data = {
         version: 1,
@@ -6860,7 +6891,18 @@
 
     const inTeam = !!cloudWorldId;
     worldMenuBtn.classList.toggle('in-team', inTeam);
-    if (worldMenuLabel) worldMenuLabel.textContent = inTeam ? 'Team World' : 'My World';
+    if (worldMenuLabel) worldMenuLabel.textContent = visiting.active ? 'Visiting' : (inTeam ? 'Team World' : 'My World');
+
+    // As a guest, none of the create/join/leave choices apply - the only
+    // thing on offer is going home, and that lives on the banner.
+    if (visiting.active) {
+      worldViewSolo.classList.add('hidden');
+      worldViewMember.classList.add('hidden');
+      worldViewLocked.classList.add('hidden');
+      if (worldVisitSection) worldVisitSection.classList.add('hidden');
+      return;
+    }
+    if (worldVisitSection) worldVisitSection.classList.remove('hidden');
 
     const waiting = !inTeam && inCooldown();
     worldViewSolo.classList.toggle('hidden', inTeam || waiting);
@@ -6919,6 +6961,8 @@
 
   function openWorldModal() {
     setWorldStatus('');
+    const listEl = document.getElementById('worldVisitList');
+    if (listEl) { listEl.classList.remove('show'); listEl.innerHTML = ''; }
     renderWorldPanel();
     worldModal.classList.add('show');
     refreshWorldState();
@@ -7102,8 +7146,184 @@
     });
   });
 
+  // ═══════════════════════════════════════════════════════════════
+  // VISITING SOMEONE ELSE'S WORLD (read-only)
+  //
+  // The trip is deliberately simple and one-way-safe:
+  //   1. Save our own world properly, and remember where we live.
+  //   2. Flip `visiting.active` on. From this moment every save path is a
+  //      no-op, so nothing that happens on screen can reach the database.
+  //   3. Swap the scene for theirs.
+  //   4. Coming home re-reads our own world from the server rather than
+  //      trusting whatever is in localStorage, because localStorage may
+  //      still be holding the world we were just looking at.
+  //
+  // If the tab is closed mid-visit, nothing was ever written, so the child
+  // simply comes back to the world they saved in step 1.
+  // ═══════════════════════════════════════════════════════════════
+
+  const visitorBanner    = document.getElementById('visitorBanner');
+  const visitorBannerTxt = document.getElementById('visitorBannerText');
+  const visitListEl      = document.getElementById('worldVisitList');
+  const btnOpenVisit     = document.getElementById('btnOpenVisit');
+  const worldVisitSection = document.getElementById('worldVisitSection');
+
+  function renderVisitorBanner() {
+    if (!visitorBanner) return;
+    visitorBanner.classList.toggle('hidden', !visiting.active);
+    if (visiting.active && visitorBannerTxt) {
+      visitorBannerTxt.textContent = '🔭 Visiting ' + (visiting.label || 'a world') + " — you're a guest, so nothing here can be changed";
+    }
+  }
+
+  // Load the list of worlds in this class that we're allowed to look at.
+  async function loadVisitList() {
+    if (!visitListEl) return;
+    visitListEl.classList.add('show');
+    visitListEl.innerHTML = '<div class="visit-empty">Looking for worlds…</div>';
+    try {
+      const { data, error } = await sb.rpc('aura3d_visitable_worlds');
+      if (error) throw error;
+      if (!data || !data.ok) {
+        visitListEl.innerHTML = '<div class="visit-empty">No worlds to visit yet.</div>';
+        return;
+      }
+      const worlds = Array.isArray(data.worlds) ? data.worlds : [];
+      if (worlds.length === 0) {
+        visitListEl.innerHTML = '<div class="visit-empty">Nobody else in your class has a world to look at yet.</div>';
+        return;
+      }
+      visitListEl.innerHTML = '';
+      worlds.forEach(w => {
+        const row = document.createElement('div');
+        row.className = 'visit-row';
+
+        const left = document.createElement('div');
+        const nameEl = document.createElement('div');
+        nameEl.className = 'visit-name';
+        nameEl.textContent = w.kind === 'team' ? (w.label || 'Team world') : ((w.label || 'A builder') + "'s world");
+        const metaEl = document.createElement('div');
+        metaEl.className = 'visit-meta';
+        const blocks = w.blocks || 0, tiles = w.tiles || 0;
+        metaEl.textContent = blocks === 0 && tiles === 0
+          ? 'Nothing built here yet'
+          : blocks + ' block' + (blocks === 1 ? '' : 's') + ' · ' + tiles + ' tile' + (tiles === 1 ? '' : 's');
+        left.appendChild(nameEl); left.appendChild(metaEl);
+
+        const kindEl = document.createElement('span');
+        kindEl.className = 'visit-kind ' + (w.kind === 'team' ? 'team' : 'personal');
+        kindEl.textContent = w.kind === 'team' ? 'Team' : 'Solo';
+
+        row.appendChild(left); row.appendChild(kindEl);
+        row.addEventListener('click', () => startVisit(w));
+        visitListEl.appendChild(row);
+      });
+    } catch (err) {
+      console.error('AURA: could not list visitable worlds:', err);
+      visitListEl.innerHTML = '<div class="visit-empty">Could not load the list. Try again in a moment.</div>';
+    }
+  }
+
+  async function startVisit(entry) {
+    if (visiting.active) return;
+    setWorldStatus('Packing your bag…');
+    try {
+      // Step 1: our own work is written away safely BEFORE we go anywhere.
+      await pushCloudSave();
+
+      const { data, error } = await sb.rpc('aura3d_visit_world', { p_kind: entry.kind, p_id: entry.id });
+      if (error) throw error;
+      if (!data || !data.ok) { setWorldStatus("Couldn't get into that world. It may have changed."); return; }
+
+      // Step 2: guest mode ON before a single thing changes on screen.
+      visiting = {
+        active: true,
+        kind: entry.kind,
+        id: entry.id,
+        label: entry.kind === 'team' ? (data.label || 'a team world') : ((data.label || 'a builder') + "'s world"),
+      };
+
+      // Step 3: their world, on screen. Money and items are blanked rather
+      // than shown, because a guest has no business seeing either.
+      clearAllBuilds();
+      clearAllNature();
+      hydrateWorldGrids(data.build || {});
+      setBankBalance(0);
+      replaceInventory({});
+
+      renderVisitorBanner();
+      renderWorldPanel();
+      closeWorldModal();
+      logTransaction('VISITING: ' + (data.label || 'A WORLD').toUpperCase(), 'credit');
+    } catch (err) {
+      console.error('AURA: visit failed:', err);
+      // Never leave someone stranded in a half-loaded visit.
+      if (visiting.active) { await endVisit(); }
+      setWorldStatus('Something went wrong. You\'re still in your own world.');
+    }
+  }
+
+  async function endVisit() {
+    if (!visiting.active) return;
+    visiting = { active: false, kind: null, id: null, label: '' };
+    renderVisitorBanner();
+
+    // Step 4: re-read our own world from the server. localStorage is not
+    // trusted here - it may still describe the world we were visiting.
+    try {
+      let wallet = null, build = null;
+
+      const { data: ws } = await sb.rpc('aura3d_world_state');
+      if (ws && ws.ok && ws.inWorld) {
+        wallet = ws.wallet; build = ws.build;
+        cloudWorldId = ws.worldId;
+      } else {
+        cloudWorldId = null;
+        const { data: me } = await sb.from('students')
+          .select('aura3d_wallet, aura3d_build')
+          .eq('id', cloudStudentId).maybeSingle();
+        if (me) { wallet = me.aura3d_wallet; build = me.aura3d_build; }
+      }
+
+      wallet = wallet || {};
+      build = build || {};
+      const money = typeof wallet.bankBalance === 'number' ? wallet.bankBalance : 0;
+      const items = (wallet.inventory && typeof wallet.inventory === 'object') ? wallet.inventory : {};
+
+      clearAllBuilds();
+      clearAllNature();
+      hydrateWorldGrids(build);
+      setBankBalance(money);
+      replaceInventory(items);
+
+      if (cloudWorldId) {
+        teamBaseline = { bankBalance: money, inventory: Object.assign({}, items) };
+      }
+      try {
+        localStorage.setItem(SAVE_KEY_LITERAL, JSON.stringify({
+          version: 1,
+          bankBalance: money,
+          inventory: items,
+          worldGrid: Array.isArray(build.worldGrid) ? build.worldGrid : [],
+          buildGrid: Array.isArray(build.buildGrid) ? build.buildGrid : [],
+        }));
+      } catch (e) {}
+
+      logTransaction('BACK HOME', 'credit');
+    } catch (err) {
+      console.error('AURA: could not reload your own world after visiting:', err);
+      logTransaction('ERR: RELOAD YOUR PAGE TO GET BACK', 'debit');
+    }
+    renderWorldPanel();
+  }
+
+  if (btnOpenVisit) btnOpenVisit.addEventListener('click', loadVisitList);
+  const btnEndVisit = document.getElementById('btnEndVisit');
+  if (btnEndVisit) btnEndVisit.addEventListener('click', endVisit);
+
   // The game is fully wired up from here on, so team merges are safe to apply.
   gameReady = true;
+  renderVisitorBanner();
   renderWorldPanel();
 
   // If a teammate's changes arrived while this student was mid-build, apply

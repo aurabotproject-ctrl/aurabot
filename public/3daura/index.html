@@ -24,6 +24,11 @@
      because with no logged-in student there is no world to share. -->
 <button id="btnWorldMenu" class="hidden" title="Team World">🌍 <span id="worldMenuLabel">My World</span></button>
 
+<div id="visitorBanner" class="hidden">
+  <span id="visitorBannerText">Visiting</span>
+  <button id="btnEndVisit">🏡 Back to my world</button>
+</div>
+
 <div id="worldModal">
   <div id="worldBox">
     <div id="worldHeader">
@@ -97,6 +102,14 @@
             <li>If you need to join sooner, ask your teacher.</li>
           </ul>
         </div>
+      </div>
+
+      <!-- ── Visiting: available whatever world you're in ── -->
+      <div id="worldVisitSection">
+        <div class="world-divider"><span>look around</span></div>
+        <p class="world-note">You can <strong>visit</strong> anyone's world in your class and have a look at what they've built. You can't change anything or buy anything while you're a guest — and they can't change yours.</p>
+        <button id="btnOpenVisit" class="world-btn world-btn-cyan">🔭 Visit Someone's World</button>
+        <div id="worldVisitList"></div>
       </div>
 
       <div id="worldStatusMsg"></div>
