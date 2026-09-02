@@ -6294,10 +6294,31 @@
   const WORLD_GROUND_Y = -4.65, ROBOT_GROUND_BASE_Y = 0.1;
   let smoothedGroundY = ROBOT_GROUND_BASE_Y; // eases toward the current standing height when NOT actively jumping, so stepping off a ledge glides down instead of snapping
 
-  function getStandingSurfaceOffset(x, z) {
+  // How high a lip AURA can walk straight over. Deliberately much smaller than
+  // one block (GRID_SIZE = 6): getting on top of a block still needs a jump,
+  // exactly as before. This only forgives floating-point wobble at a surface
+  // AURA is already standing on.
+  const STEP_UP_ALLOWANCE = 1.2;
+
+  // The height of whatever AURA is STANDING ON at this spot.
+  //
+  // The bug this fixes: this used to return the highest block top in the
+  // column, no matter how far overhead it was. Build a house and walk into
+  // the doorway, and the ROOF - metres above your head - counted as the floor,
+  // so AURA was lifted straight onto it and could never get inside.
+  //
+  // A surface only counts as a floor if it's at or below AURA's feet (plus the
+  // small lip above). Anything higher than that is a ceiling, and you walk
+  // under it. `feetY` is the previous frame's foot height, which is both
+  // correct and avoids a circular dependency with the value being computed.
+  function getStandingSurfaceOffset(x, z, feetY) {
     let topY = WORLD_GROUND_Y;
     for (const box of buildCollisionBoxes) {
-      if (x >= box.minX && x <= box.maxX && z >= box.minZ && z <= box.maxZ && box.maxY > topY) topY = box.maxY;
+      if (x < box.minX || x > box.maxX || z < box.minZ || z > box.maxZ) continue;
+      if (box.maxY <= topY) continue;
+      // It's over our head - that's a roof, not a floor.
+      if (typeof feetY === 'number' && box.maxY > feetY + STEP_UP_ALLOWANCE) continue;
+      topY = box.maxY;
     }
     return topY - WORLD_GROUND_Y;
   }
@@ -6306,7 +6327,8 @@
     if (isJumping || isDancing || placementMode.active || buildMode.active || editMode.active) return;
     isJumping = true;
     jumpVelocity = JUMP_INITIAL_VELOCITY;
-    jumpY = ROBOT_GROUND_BASE_Y + getStandingSurfaceOffset(robot.position.x, robot.position.z);
+    jumpY = ROBOT_GROUND_BASE_Y + getStandingSurfaceOffset(
+      robot.position.x, robot.position.z, smoothedGroundY + ROBOT_FEET_OFFSET);
   }
   // currentTheme is now just a display label for the kiosk "THEME:" readout -
   // actual colour is set once at boot by applyRobotColorFromCloud() (see the
@@ -6654,7 +6676,11 @@
     }
 
     // --- JUMP PHYSICS: gravity arc + landing on top of whatever's below AURA ---
-    const surfaceOffset = getStandingSurfaceOffset(robot.position.x, robot.position.z);
+    // Feet as of the previous frame - what decides whether a block above us is
+    // a floor we're standing on or a ceiling we're walking under. While jumping
+    // this rises with the arc, so leaping onto a roof still lands on it.
+    const prevFeetY = (isJumping ? jumpY : smoothedGroundY) + ROBOT_FEET_OFFSET;
+    const surfaceOffset = getStandingSurfaceOffset(robot.position.x, robot.position.z, prevFeetY);
     const targetGroundY = ROBOT_GROUND_BASE_Y + surfaceOffset;
     let groundBaseY;
     let jumpHeightAboveSurface = 0;
@@ -6834,6 +6860,9 @@
     const camZ = smoothFocus.z + camDist * Math.cos(camAngleX) * Math.cos(camAngleY);
     camera.position.set(camX, camY, camZ);
     camera.lookAt(smoothFocus);
+
+    // Show the red see-through outline if AURA is hidden behind something built.
+    updateXrayRobot();
 
     renderer.render(scene, camera);
 
@@ -7185,6 +7214,83 @@
       }
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════
+  // "WHERE AM I?" — X-RAY SILHOUETTE
+  //
+  // Once you can walk INSIDE a house, you can also be completely hidden by
+  // one. So whenever something built is between the camera and AURA, a red
+  // see-through silhouette of AURA is drawn on top of the scene.
+  //
+  // How it works: a one-off clone of the robot, with every material swapped
+  // for a flat red one that ignores the depth buffer (depthTest: false), so
+  // it always paints over whatever is in front of it. The clone's bones are
+  // copied from the real robot each frame, so the silhouette walks, turns and
+  // jumps exactly in step. It's only made visible when a single ray from the
+  // camera to AURA actually hits a placed block - so in the open, nothing is
+  // drawn and nothing changes.
+  // ═══════════════════════════════════════════════════════════════
+
+  const xrayMaterial = new THREE.MeshBasicMaterial({
+    color: 0xFF2D55,
+    transparent: true,
+    opacity: 0.9,
+    depthTest: false,   // paint over walls rather than being hidden by them
+    depthWrite: false,
+    fog: false,
+  });
+
+  const xrayRobot = robot.clone(true);
+  xrayRobot.traverse(node => {
+    if (node.isMesh) {
+      node.material = xrayMaterial;
+      node.castShadow = false;
+      node.receiveShadow = false;
+      node.renderOrder = 9999; // drawn last, so it sits on top of everything
+    }
+  });
+  xrayRobot.visible = false;
+  scene.add(xrayRobot);
+
+  // clone(true) keeps the child order identical, so the two trees can be
+  // walked side by side and the pose copied straight across.
+  function syncXrayPose(src, dst) {
+    dst.position.copy(src.position);
+    dst.quaternion.copy(src.quaternion);
+    dst.scale.copy(src.scale);
+    const n = Math.min(src.children.length, dst.children.length);
+    for (let i = 0; i < n; i++) syncXrayPose(src.children[i], dst.children[i]);
+  }
+
+  const xrayRaycaster = new THREE.Raycaster();
+  const xrayTargetVec = new THREE.Vector3();
+  const xrayDirVec = new THREE.Vector3();
+
+  function updateXrayRobot() {
+    // Nothing built yet = nothing that could hide AURA. Cheapest possible exit.
+    if (buildBlockMeshes.length === 0) {
+      if (xrayRobot.visible) xrayRobot.visible = false;
+      return;
+    }
+
+    // Aim at AURA's chest rather than its feet: feet are often legitimately
+    // behind a low block the child can see over, and flickering the outline
+    // on for that would be noise rather than help.
+    xrayTargetVec.set(robot.position.x, robot.position.y + 1.2, robot.position.z);
+    xrayDirVec.copy(xrayTargetVec).sub(camera.position);
+    const distance = xrayDirVec.length();
+    if (distance < 0.001) { xrayRobot.visible = false; return; }
+    xrayDirVec.divideScalar(distance);
+
+    xrayRaycaster.set(camera.position, xrayDirVec);
+    xrayRaycaster.near = 0;
+    // Stop just short of AURA, so the blocks it is standing ON never count.
+    xrayRaycaster.far = Math.max(0.01, distance - 2.0);
+
+    const blocked = xrayRaycaster.intersectObjects(buildBlockMeshes, true).length > 0;
+    xrayRobot.visible = blocked;
+    if (blocked) syncXrayPose(robot, xrayRobot);
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // VISITING SOMEONE ELSE'S WORLD (read-only)
