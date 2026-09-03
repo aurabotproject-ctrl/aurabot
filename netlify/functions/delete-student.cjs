@@ -87,7 +87,24 @@ async function handle(event, headers) {
     { headers: restHeaders }
   );
   if (!studentRes.ok) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Could not look up student' }) };
+    // Say what actually went wrong. A bare "Could not look up student" hides
+    // the difference between a rotated service key (401), a missing column
+    // (400) and a stale PostgREST schema cache - which is the difference
+    // between a two-minute fix and an afternoon of guessing.
+    const detail = await studentRes.text().catch(() => '');
+    console.error('delete-student: student lookup failed', studentRes.status, detail);
+    let hint = '';
+    if (studentRes.status === 401 || studentRes.status === 403) {
+      hint = ' — the SUPABASE_SERVICE_ROLE_KEY in Netlify looks wrong or expired. Copy it again from Supabase → Project Settings → API and redeploy.';
+    }
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({
+        error: `Could not look up student (HTTP ${studentRes.status})` +
+               (detail ? ': ' + detail.slice(0, 300) : '') + hint,
+      }),
+    };
   }
   const students = await studentRes.json();
   const student = students?.[0];
