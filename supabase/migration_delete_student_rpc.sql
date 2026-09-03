@@ -42,7 +42,8 @@ set search_path = public
 as $$
 declare
   v_student   students%rowtype;
-  v_is_admin  boolean := false;
+  v_caller    uuid := auth.uid();
+  v_allowed   boolean := false;
   v_auth_id   uuid;
 begin
   select * into v_student from students where id = p_student_id;
@@ -50,13 +51,35 @@ begin
     return jsonb_build_object('ok', false, 'reason', 'not_found');
   end if;
 
-  -- Admins may delete anyone; teachers only their own students.
-  select exists (
-    select 1 from profiles p where p.id = auth.uid() and p.role = 'admin'
-  ) into v_is_admin;
+  -- WHO MAY DELETE
+  --
+  --  1. The student's own teacher. students.teacher_id holds the teacher's
+  --     auth user id, which is exactly what auth.uid() returns in the app.
+  --  2. An admin.
+  --  3. A trusted server-side caller with no JWT at all — you, running this
+  --     by hand in the Supabase SQL editor, or a service-role script.
+  --
+  -- Case 3 matters: auth.uid() is NULL in the SQL editor, so without it every
+  -- manual call returns 'not_your_student' and there's no way to clean up a
+  -- student by hand. session_user is checked rather than current_user because
+  -- this function is SECURITY DEFINER — current_user is always the owner
+  -- (postgres) whoever calls it, whereas session_user still reflects the real
+  -- connection: 'authenticator' for anything arriving from a browser, so a
+  -- browser can never reach this branch.
+  if v_caller is not null then
+    v_allowed := (v_student.teacher_id = v_caller)
+              or exists (select 1 from profiles p where p.id = v_caller and p.role = 'admin');
+  else
+    v_allowed := session_user in ('postgres', 'supabase_admin', 'service_role');
+  end if;
 
-  if not v_is_admin and v_student.teacher_id is distinct from auth.uid() then
-    return jsonb_build_object('ok', false, 'reason', 'not_your_student');
+  if not v_allowed then
+    return jsonb_build_object(
+      'ok', false,
+      'reason', 'not_your_student',
+      'callerUid', v_caller,
+      'studentTeacherId', v_student.teacher_id
+    );
   end if;
 
   v_auth_id := v_student.auth_user_id;
@@ -157,4 +180,31 @@ grant execute on function delete_student(uuid) to authenticated, service_role;
 -- To delete a student by hand from here (careful — no undo):
 --
 --   select delete_student('paste-the-students-id-here');
+--
+--
+-- ------------------------------------------------------------
+-- TESTING IT AS A PARTICULAR TEACHER, WITHOUT DELETING ANYONE
+--
+-- The SQL editor has no logged-in user, so auth.uid() is NULL. To prove the
+-- permission check works for a real teacher, pretend to be one — and roll it
+-- back so nothing is actually deleted. Run all four lines together:
+--
+--   begin;
+--   select set_config('request.jwt.claims',
+--          '{"sub":"PASTE-THE-TEACHERS-AUTH-USER-ID","role":"authenticated"}', true);
+--   select delete_student('PASTE-A-STUDENT-ID');
+--   rollback;
+--
+-- {"ok": true} means it would have worked. ROLLBACK undoes it all.
+--
+-- Find a teacher's auth user id with:
+--
+--   select id, email from auth.users order by created_at;
+--
+-- And check a student's teacher matches:
+--
+--   select s.id, s.name, s.teacher_id, u.email as teacher_email
+--     from students s left join auth.users u on u.id = s.teacher_id
+--    order by s.name;
+-- ------------------------------------------------------------
 -- ============================================================
