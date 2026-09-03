@@ -101,12 +101,36 @@ export const Dashboard = {
   },
 
   async deleteStudent(id: string) {
-    // Deletes the student's cards + students row + profile + their actual
-    // Supabase Auth login, via a server-side function (deleting an auth user
-    // requires the service role key, which can't be used from the browser).
-    // Without removing the auth user too, its email stays registered forever
-    // and creating a new account for that student later fails with
-    // "User already registered".
+    // Removes the student's cards, trades, stars, profile, students row AND
+    // their actual Supabase Auth login. That last part is why this can't be a
+    // plain browser delete: leaving the auth user behind keeps their email
+    // registered forever, so creating an account for that child later fails
+    // with "User already registered".
+    //
+    // Preferred path: one database function, one transaction. Either the
+    // student is completely gone or nothing changed — and there is no service
+    // key, REST layer or network hop in between to fail silently.
+    const { data, error } = await sb.rpc('delete_student', { p_student_id: id });
+
+    if (!error) {
+      if (data && data.ok) return;
+      const reason = data?.reason;
+      if (reason === 'not_found')        throw new Error('That student no longer exists — refresh the page.');
+      if (reason === 'not_your_student') throw new Error('You can only delete students in your own class.');
+      throw new Error(data?.note || 'Could not delete that student.');
+    }
+
+    // Fall through to the old server-side function ONLY when delete_student()
+    // isn't in the database yet (migration not run). A genuine failure must
+    // not be retried against a second, weaker path — it would just fail again,
+    // differently, and hide the real reason.
+    const missing =
+      error.code === 'PGRST202' ||
+      /could not find the function|does not exist/i.test(error.message || '');
+    if (!missing) throw new Error(error.message || 'Could not delete that student.');
+
+    console.warn('[deleteStudent] delete_student() not found in the database — run migration_delete_student_rpc.sql. Using the old Netlify function for now.');
+
     const { data: { session } } = await sb.auth.getSession();
     const res = await fetch('/.netlify/functions/delete-student', {
       method: 'POST',
