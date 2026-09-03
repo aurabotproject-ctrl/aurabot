@@ -33,7 +33,9 @@ export default function ThreeDAuraPage() {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) return;
       const { data: profile } = await sb.from('profiles').select('role').eq('id', session.user.id).maybeSingle();
-      setIsTeacher(profile?.role === 'teacher');
+      // Admins reach 3D Aura through the teacher page too, so Back must send
+      // them there rather than to the student dashboard.
+      setIsTeacher(profile?.role === 'teacher' || profile?.role === 'admin');
     })();
   }, []);
 
