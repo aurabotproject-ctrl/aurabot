@@ -408,6 +408,9 @@
       aura3d_saved_at: new Date().toISOString(),
     }).eq('id', cloudStudentId);
 
+    // Our deletions are now part of the shared world, so stop re-sending them.
+    teamTombstones = [];
+
     teamBaseline = {
       bankBalance: merged.wallet.bankBalance,
       inventory: Object.assign({}, merged.wallet.inventory),
@@ -447,12 +450,48 @@
     return { bankBalance, inventory };
   }
 
+  // ---- Deletions in a team world ----
+  // The merge below is a union, so a block one child erases is handed straight
+  // back to them by the shared copy on the next sync. The fix is a tombstone:
+  // a short-lived note saying "this was deliberately removed", which travels
+  // in the shared world blob so every teammate's client honours it too.
+  //
+  // They expire after 10 minutes. That's the deliberate compromise the
+  // original union was reaching for: long enough that a real deletion sticks
+  // everywhere, short enough that a stale note can never keep a rebuilt block
+  // from existing. Build it again after ten minutes and it stays.
+  const TOMBSTONE_TTL_MS = 10 * 60 * 1000;
+  let teamTombstones = [];   // [{ kind: 'b'|'t', k: gridKey, t: epochMs }]
+
+  function noteTeamRemoval(kind, key) {
+    if (!cloudWorldId) return;   // personal worlds just save the whole blob
+    teamTombstones.push({ kind, k: key, t: Date.now() });
+  }
+
   // Union by grid key. If both sides have the same cell, ours wins (it may
-  // carry paint we just applied). Erasing is intentionally NOT propagated:
-  // in a shared classroom world it's far better for a block to survive an
-  // accidental sync race than for one child to be able to wipe the team's
-  // work from another device without anyone seeing it happen.
+  // carry paint we just applied), EXCEPT where a tombstone says the cell was
+  // deliberately erased - deletions now win over both sides. Keeping a block
+  // that somebody meant to delete is just as much a bug as losing one.
   function mergeTeamBuild(remoteBuild, localBuild) {
+    // Everyone's recent deletions: the ones already in the shared world, plus
+    // any this child has made since the last sync. Expired ones are dropped
+    // here, which is also what stops the list growing forever.
+    const now = Date.now();
+    const seen = new Set();
+    const removed = [];
+    []
+      .concat(Array.isArray(remoteBuild.removed) ? remoteBuild.removed : [], teamTombstones)
+      .forEach(r => {
+        if (!r || typeof r.t !== 'number' || !r.k) return;
+        if (now - r.t >= TOMBSTONE_TTL_MS) return;
+        const id = r.kind + ':' + r.k;
+        if (seen.has(id)) return;
+        seen.add(id);
+        removed.push(r);
+      });
+    const removedBlocks = new Set(removed.filter(r => r.kind === 'b').map(r => r.k));
+    const removedTiles  = new Set(removed.filter(r => r.kind === 't').map(r => r.k));
+
     const byKey = (arr, keyFn) => {
       const m = new Map();
       (Array.isArray(arr) ? arr : []).forEach(item => m.set(keyFn(item), item));
@@ -467,7 +506,14 @@
     const blocks = byKey(remoteBuild.buildGrid, blockKey);
     byKey(localBuild.buildGrid, blockKey).forEach((v, k) => blocks.set(k, v));
 
-    return { worldGrid: Array.from(tiles.values()), buildGrid: Array.from(blocks.values()) };
+    removedTiles.forEach(k => tiles.delete(k));
+    removedBlocks.forEach(k => blocks.delete(k));
+
+    return {
+      worldGrid: Array.from(tiles.values()),
+      buildGrid: Array.from(blocks.values()),
+      removed,
+    };
   }
 
   // Applies a merge result to the running game. Money and inventory update
@@ -5279,6 +5325,15 @@
       if (stack.length === 0) delete buildGrid[key];
       rebuildBuildCollisionBoxes();
       logTransaction('ERASED: BLOCK', 'debit');
+      // In a team world the shared copy still has this block, and the merge
+      // is a union - so without a tombstone it would simply come straight
+      // back on the next sync. Recorded before saving, so the save carries it.
+      noteTeamRemoval('b', `${info.gx},${info.gz},${info.level}`);
+      // THE BUG: this branch used to `return` here, skipping the saveState()
+      // at the bottom of this function entirely. Placing blocks saved,
+      // erasing nature saved, erasing a block did not - so deleted blocks
+      // came back the next time the world loaded.
+      saveState();
       return;
     }
 
@@ -5311,6 +5366,7 @@
 
     if (!tile.base && !tile.object && (!tile.flowers || tile.flowers.length === 0)) {
       delete worldGrid[info.key];
+      noteTeamRemoval('t', info.key);
     }
     saveState();
   }
