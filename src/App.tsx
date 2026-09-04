@@ -9,16 +9,17 @@ import MyCardsPage from './pages/MyCardsPage';
 import ShopPage from './pages/ShopPage';
 import SetPinPage from './pages/SetPinPage';
 import ThreeDAuraPage from './pages/ThreeDAuraPage';
+import LandingPage from './pages/LandingPage';
 import { Auth } from './lib/auth';
 import { Router } from './lib/router';
 import type { Session } from './lib/auth';
 
-type Page = 'login' | 'teacher' | 'student' | 'admin' | 'arena' | 'buildabot' | 'mycards' | 'shop' | 'setpin' | '3daura';
+type Page = 'landing' | 'login' | 'teacher' | 'student' | 'admin' | 'arena' | 'buildabot' | 'mycards' | 'shop' | 'setpin' | '3daura';
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState<Page>('login');
+  const [page, setPage] = useState<Page>('landing');
 
   useEffect(() => {
     init();
@@ -33,8 +34,14 @@ function App() {
       const s = await Auth.getSession();
       setSession(s);
       if (!s) {
-        if (path !== '/') Router.replace('/');
-        setPage('login');
+        // Signed out: "/" is the public landing page, "#/login" is the sign-in
+        // screen. Anything else a signed-out visitor asks for goes to "/".
+        if (path === '/login') {
+          setPage('login');
+        } else {
+          if (path !== '/') Router.replace('/');
+          setPage('landing');
+        }
       } else {
         const role = s.profile.role;
         // A student who hasn't set their own PIN yet is forced here no matter
@@ -104,6 +111,7 @@ function App() {
 
   return (
     <>
+      {page === 'landing'  && <LandingPage />}
       {page === 'login'    && <LoginPage />}
       {page === 'setpin'   && <SetPinPage session={session!} onSignOut={handleSignOut} onDone={() => { Router.navigate('/student'); init(); }} />}
       {page === 'teacher'  && <TeacherPage session={session!} onSignOut={handleSignOut} />}
