@@ -262,7 +262,35 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
     return () => window.removeEventListener('focus', onFocus);
   }, [loadTradeData]);
 
-  const showTradeMsg = (m: string) => { setTradeMsg(m); setTimeout(() => setTradeMsg(''), 3500); };
+  const showTradeMsg = (m: string) => { setTradeMsg(m); setTimeout(() => setTradeMsg(''), 6000); };
+
+  /** Trading used to report every failure as "try again", which is useless to
+   * a child and worse than useless to whoever has to fix it. This names the
+   * two causes that actually happen — a migration that was never run, and
+   * row-level security refusing the write — and otherwise passes through
+   * whatever the database said. */
+  const tradeErrorText = (err: any, fallback: string) => {
+    const msg = String(err?.message || err || '');
+    const code = err?.code || '';
+    console.error('[Trade]', code, msg, err);
+
+    if (code === 'PGRST202' || /could not find the function|function .* does not exist/i.test(msg)) {
+      return 'Trading isn\'t set up on the database yet — ask your teacher to run migration_card_trading.sql.';
+    }
+    if (code === '42883' || /app_current_student_id/i.test(msg)) {
+      return 'Trading is missing a database helper — ask your teacher to run migration_students_self_save.sql, then migration_card_trading.sql.';
+    }
+    if (code === '42501' || /permission denied/i.test(msg)) {
+      return 'The database is refusing this (permission denied) — ask your teacher to run migration_card_trading.sql.';
+    }
+    if (code === '42P01' || /relation .* does not exist/i.test(msg)) {
+      return 'The trading tables are missing — ask your teacher to run migration_card_trading.sql.';
+    }
+    if (/row-level security|violates row-level/i.test(msg)) {
+      return 'The database blocked this trade (row-level security). Ask your teacher to check the trading setup.';
+    }
+    return msg ? `${fallback} (${msg})` : fallback;
+  };
 
   // A card is "listed" if it has an open trade_listings row
   const listedCardIds = new Set(myListings.map((l: any) => l.card_id));
@@ -293,7 +321,7 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
       setSelectedListIds([]);
       await loadTradeData();
       showTradeMsg(`✓ ${rows.length} card${rows.length !== 1 ? 's' : ''} now up for trade!`);
-    } catch (err: any) { showTradeMsg('Could not list those cards — try again.'); console.error(err); }
+    } catch (err: any) { showTradeMsg(tradeErrorText(err, 'Could not list those cards.')); }
     setTradeBusy(false);
   };
 
@@ -342,7 +370,25 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
   };
 
   const handleSendOffer = async () => {
-    if (!tradeBalanced || !wantedOwnerId) return;
+    // Explain rather than silently doing nothing. This used to be guarded by a
+    // disabled button, which fires no click event at all — so a child who
+    // couldn't make the values match got no feedback whatsoever and reported
+    // it as "trading is broken".
+    if (!wantedOwnerId || wantedCardIds.length === 0) {
+      showTradeMsg('Pick at least one card you want from your classmate first.');
+      return;
+    }
+    if (offeredCardIds.length === 0) {
+      showTradeMsg(`Now choose some of your own cards to offer — you need ${wantedValue} points' worth.`);
+      return;
+    }
+    if (!tradeBalanced) {
+      const diff = wantedValue - offeredValue;
+      showTradeMsg(diff > 0
+        ? `Not a fair trade yet — you're ${diff} point${diff !== 1 ? 's' : ''} short. Add more of your cards. (Common 1 · Silver 2 · Gold 4 · Prismatic 8)`
+        : `That's ${-diff} point${-diff !== -1 ? 's' : ''} too much — take some of your cards back out. (Common 1 · Silver 2 · Gold 4 · Prismatic 8)`);
+      return;
+    }
     setTradeBusy(true);
     try {
       const { error } = await sb.from('trade_offers').insert({
@@ -359,16 +405,17 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
       setOfferedCardIds([]);
       await loadTradeData();
       showTradeMsg('✓ Trade offer sent! Waiting for them to respond.');
-    } catch (err: any) { showTradeMsg('Could not send that offer — try again.'); console.error(err); }
+    } catch (err: any) { showTradeMsg(tradeErrorText(err, 'Could not send that offer.')); }
     setTradeBusy(false);
   };
 
   const handleCancelOffer = async (offer: any) => {
     setTradeBusy(true);
     try {
-      await sb.from('trade_offers').update({ status: 'cancelled', responded_at: new Date().toISOString() }).eq('id', offer.id);
+      const { error } = await sb.from('trade_offers').update({ status: 'cancelled', responded_at: new Date().toISOString() }).eq('id', offer.id);
+      if (error) throw error;
       await loadTradeData();
-    } catch (err) { console.error(err); }
+    } catch (err: any) { showTradeMsg(tradeErrorText(err, 'Could not cancel that offer.')); }
     setTradeBusy(false);
   };
 
@@ -412,7 +459,9 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
           result?.reason === 'stale'            ? 'This trade is no longer valid — one of the cards has already been traded.'
           : result?.reason === 'already_answered' ? 'That offer has already been answered.'
           : result?.reason === 'not_found'       ? 'That offer no longer exists.'
-          : 'Something went wrong completing this trade.'
+          : result?.reason === 'not_yours'       ? 'This offer was sent to someone else.'
+          : result?.reason === 'not_a_student'   ? 'Only student accounts can accept trades.'
+          : `Could not complete this trade (${result?.reason || 'unknown reason'}).`
         );
         setTradeBusy(false);
         return;
@@ -427,7 +476,7 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
           ? '✓ Trade complete! (1 ⭐ trade fee charged to each player)'
           : '✓ Trade complete!'
       );
-    } catch (err: any) { console.error(err); showTradeMsg('Something went wrong completing this trade.'); }
+    } catch (err: any) { showTradeMsg(tradeErrorText(err, 'Could not complete this trade.')); }
     setTradeBusy(false);
   };
 
@@ -820,7 +869,7 @@ export default function ShopPage({ session, onBack, onCardsAdded }: {
               </span>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => setShowOfferModal(false)} style={{ fontSize: '0.74rem', fontWeight: 700, color: '#94a3b8', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 9, padding: '8px 14px', cursor: 'pointer' }}>Cancel</button>
-                <button disabled={!tradeBalanced || tradeBusy} onClick={handleSendOffer} style={{ fontSize: '0.74rem', fontWeight: 800, color: 'white', background: tradeBalanced ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'rgba(60,60,80,0.5)', border: 'none', borderRadius: 9, padding: '8px 16px', cursor: tradeBalanced ? 'pointer' : 'not-allowed' }}>
+                <button disabled={tradeBusy} onClick={handleSendOffer} style={{ fontSize: '0.74rem', fontWeight: 800, color: 'white', background: tradeBalanced ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#64748b,#475569)', border: 'none', borderRadius: 9, padding: '8px 16px', cursor: 'pointer' }}>
                   {tradeBusy ? 'Sending…' : '🤝 Send Offer'}
                 </button>
               </div>
