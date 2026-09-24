@@ -6,7 +6,6 @@ import { Auth } from '../lib/auth';
 import { fileToWebP } from '../lib/imageUtils';
 import { uploadImageToR2 } from '../lib/r2Upload';
 import { Dashboard } from '../lib/dashboard';
-import { AI } from '../lib/ai';
 import Aura3dQuestionBanks from '../components/Aura3dQuestionBanks';
 import { sb } from '../lib/supabase';
 import type { Session } from '../lib/auth';
@@ -21,15 +20,82 @@ import type { Aura3dTeacherSettings } from '../lib/supabase';
 
 type TabKey = 'generate' | 'weekly' | 'cards' | 'students' | 'stars' | 'homecomms' | 'settings';
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'generate', label: '✦ Card Creation' },
-  { key: 'weekly', label: '📋 Weekly Project' },
-  { key: 'cards', label: '🃏 Card Database' },
-  { key: 'students', label: 'Students' },
-  { key: 'stars', label: '⭐ Stars' },
-  { key: 'homecomms', label: '🏠 Home Communication' },
-  { key: 'settings', label: 'Settings' },
+// ── Navigation ─────────────────────────────────────────────────────────────
+// Grouped the way a teacher actually thinks about the week: things you MAKE,
+// the CLASS you look after, and the settings you rarely touch. Order here is
+// also the 1–7 keyboard-shortcut order.
+type NavItem = { key: TabKey; label: string; icon: IconName; group: string; eyebrow: string; title: React.ReactNode; lead: string };
+const NAV: NavItem[] = [
+  { key: 'generate',  group: 'Create', icon: 'spark',    label: 'Card Creation',
+    eyebrow: '01 — Create', title: <>Card <em>Creation</em></>,
+    lead: 'Design a new card for the pack pool. Its stats stay sealed until a student opens it in a pack.' },
+  { key: 'cards',     group: 'Create', icon: 'layers',   label: 'Card Database',
+    eyebrow: '02 — Create', title: <>Card <em>Database</em></>,
+    lead: 'Every card your class can collect. Edit it, retire it, or make it a rare exclusive.' },
+  { key: 'weekly',    group: 'Create', icon: 'flag',     label: 'Weekly Project',
+    eyebrow: '03 — Create', title: <>Weekly <em>Project</em></>,
+    lead: 'Set the task, choose the card it earns, then review what comes back and award it.' },
+  { key: 'students',  group: 'Class',  icon: 'users',    label: 'Students',
+    eyebrow: '04 — Class', title: <>Your <em>Students</em></>,
+    lead: 'Logins, collections and resets for everyone in your class.' },
+  { key: 'stars',     group: 'Class',  icon: 'star',     label: 'Stars',
+    eyebrow: '05 — Class', title: <>Star <em>Points</em></>,
+    lead: 'Reward effort as it happens. Students spend stars on card packs in the shop.' },
+  { key: 'homecomms', group: 'Class',  icon: 'megaphone', label: 'Home Communication',
+    eyebrow: '06 — Class', title: <>Home <em>Board</em></>,
+    lead: 'What families see: a pinned message and photo at the top, dated events underneath.' },
+  { key: 'settings',  group: 'System', icon: 'cog',      label: 'Settings',
+    eyebrow: '07 — System', title: <>Studio <em>Settings</em></>,
+    lead: 'Pack settings, the 3D Aura world, and the questions students answer at the kiosk.' },
 ];
+
+// ── Icons ─────────────────────────────────────────────────────────────────
+// One consistent line set instead of emoji, which render differently on
+// every device and read as placeholder. 24px grid, 1.8 stroke.
+type IconName = 'spark' | 'layers' | 'flag' | 'users' | 'star' | 'megaphone' | 'cog' | 'orbit' | 'sun' | 'moon'
+  | 'logout' | 'menu' | 'close' | 'search' | 'download' | 'pencil' | 'key' | 'rotate' | 'trash' | 'plus' | 'list';
+const ICON_PATHS: Record<IconName, React.ReactNode> = {
+  spark:     <><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></>,
+  layers:    <><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/><path d="M3 17.5l9 5 9-5"/></>,
+  flag:      <><path d="M5 21V4"/><path d="M5 4h11l-1.5 4L16 12H5"/></>,
+  users:     <><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 010 6.8"/><path d="M18.5 14.8c1.6.8 2.7 2.5 3 5.2"/></>,
+  star:      <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>,
+  megaphone: <><path d="M3 10v4a1 1 0 001 1h2l5 4V5L6 9H4a1 1 0 00-1 1z"/><path d="M15.5 8.5a5 5 0 010 7"/><path d="M18.5 5.5a9 9 0 010 13"/></>,
+  cog:       <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></>,
+  orbit:     <><circle cx="12" cy="12" r="3.2"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(-25 12 12)"/><circle cx="20.2" cy="8.3" r="1.1" fill="currentColor" stroke="none"/></>,
+  sun:       <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,
+  moon:      <path d="M20.5 14.5A8.5 8.5 0 019.5 3.5a8.5 8.5 0 1011 11z"/>,
+  logout:    <><path d="M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3"/><path d="M10 16l-4-4 4-4"/><path d="M6 12h10"/></>,
+  menu:      <path d="M4 7h16M4 12h16M4 17h10"/>,
+  close:     <path d="M6 6l12 12M18 6L6 18"/>,
+  search:    <><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></>,
+  download:  <><path d="M12 4v11"/><path d="M7.5 10.5L12 15l4.5-4.5"/><path d="M5 20h14"/></>,
+  pencil:    <><path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 013 3L8 19z"/><path d="M14.5 6.5l3 3"/></>,
+  key:       <><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3"/><path d="M16.5 6.5L19 9"/><path d="M14 9l2 2"/></>,
+  rotate:    <><path d="M4 12a8 8 0 0113.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 01-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/></>,
+  trash:     <><path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v5M14 11v5"/></>,
+  plus:      <path d="M12 5v14M5 12h14"/>,
+  list:      <><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></>,
+};
+function Ico({ name }: { name: IconName }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICON_PATHS[name]}</svg>
+  );
+}
+
+// An optional illustration. Renders nothing until the file actually loads,
+// so the page looks finished with or without the artwork in /public/teacher.
+function Art({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [missing, setMissing] = React.useState(false);
+  if (missing) return null;
+  return <img className={'tp-art ' + (className || '')} src={src} alt={alt} onError={() => setMissing(true)} />;
+}
+
+// Stable, distinct avatar colours for the roster.
+const AVATAR_TONES = ['#cc3355', '#3b5bab', '#2f8f6b', '#b7791f', '#7a4fb3', '#1f7a8c', '#c2410c', '#4d5a8a', '#a23b72', '#3d7a3a', '#8a5a2b', '#5b4fc9'];
+const initialsOf = (name: string) =>
+  (name || '?').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]!.toUpperCase()).join('') || '?';
 
 function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; onSignOut: () => void }) {
   const spaceCanvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -92,10 +158,28 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
   }, []);
 
   const [tab, setTab] = useState<TabKey>('generate');
+  const [navOpen, setNavOpen] = useState(false);
+  const [rosterQuery, setRosterQuery] = useState('');
+  const goTab = (k: TabKey) => { setTab(k); setNavOpen(false); window.scrollTo({ top: 0 }); };
+
+  // 1–7 jump between sections — but never while typing, or a teacher
+  // entering "3" in a form would be thrown onto another page.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
+      if (document.querySelector('.tp-modal-bg')) return;
+      const i = Number(e.key) - 1;
+      if (Number.isInteger(i) && i >= 0 && i < NAV.length) { setTab(NAV[i].key); window.scrollTo({ top: 0 }); }
+      if (e.key === 'Escape') setNavOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const [students, setStudents] = useState<Student[]>([]);
   const [cardCounts, setCardCounts] = useState<Record<string, number>>({});
   const [downloadLoading, setDownloadLoading] = useState<string | null>(null);
-  const [geminiKey, setGeminiKey] = useState('');
   const [modal, setModal] = useState<{ type: string; data?: any } | null>(null);
   const [modalError, setModalError] = useState('');
   const [detailCard, setDetailCard] = useState<Card | null>(null);
@@ -191,7 +275,6 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
       } catch { /* table may not exist yet */ }
       setStudents(sList);
       setCardCounts(countsMap);
-      setGeminiKey(AI.getGeminiKey());
     } catch (err: any) {
       console.error(err.message);
     }
@@ -294,10 +377,6 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
       setPinboard(null); setPbMessage(''); setPbPhotoUrl(null);
       setPbStatus('✓ Message cleared.');  setTimeout(() => setPbStatus(''), 2500);
     } catch (err: any) { setPbStatus('Error: ' + err.message); }
-  };
-
-  const handleSaveKey = () => {
-    AI.setGeminiKey(geminiKey);
   };
 
   // ── 3D Aura universal settings (loaded lazily the first time the Settings
@@ -413,7 +492,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         return (
           <ModalWrapper title="🗑 Delete Student" onClose={() => setModal(null)} danger>
             <p className="text-sm mb-2" style={{ color: 'var(--tp-text)' }}>Delete <strong>{modal.data.name}</strong>?</p>
-            <p className="text-sm mb-4" style={{ color: '#c82020' }}>This will also delete all their cards and their login, and cannot be undone.</p>
+            <p className="text-sm mb-4" style={{ color: 'var(--tp-danger-text)' }}>This will also delete all their cards and their login, and cannot be undone.</p>
             <div className="flex gap-3">
               <button
                 onClick={async () => {
@@ -430,7 +509,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
               >Yes, Delete Everything</button>
               <button onClick={() => setModal(null)} className="tp-btn-outline">Cancel</button>
             </div>
-            {modalError && <p className="text-sm mt-3" style={{ color: '#c82020' }}>{modalError}</p>}
+            {modalError && <p className="text-sm mt-3" style={{ color: 'var(--tp-danger-text)' }}>{modalError}</p>}
           </ModalWrapper>
         );
       case 'resetAura3d':
@@ -459,7 +538,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
               >Yes, Reset Their Build</button>
               <button onClick={() => setModal(null)} className="tp-btn-outline">Cancel</button>
             </div>
-            {modalError && <p className="text-sm mt-3" style={{ color: '#c82020' }}>{modalError}</p>}
+            {modalError && <p className="text-sm mt-3" style={{ color: 'var(--tp-danger-text)' }}>{modalError}</p>}
           </ModalWrapper>
         );
       case 'downloadCards': {
@@ -632,7 +711,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         return (
           <ModalWrapper title="🗑 Delete Card" onClose={() => setModal(null)} danger>
             <p className="text-sm mb-2" style={{ color: 'var(--tp-text)' }}>Delete <strong>{modal.data.card_name}</strong>?</p>
-            <p className="text-sm mb-4" style={{ color: '#c82020' }}>This cannot be undone.</p>
+            <p className="text-sm mb-4" style={{ color: 'var(--tp-danger-text)' }}>This cannot be undone.</p>
             <div className="flex gap-3">
               <button onClick={async () => { await Dashboard.deleteCard(modal.data.id); loadData(); setModal(null); }} className="tp-btn-danger">Yes, Delete Card</button>
               <button onClick={() => setModal(null)} className="tp-btn-outline">Cancel</button>
@@ -660,7 +739,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
               <label className="tp-label">Confirm PIN</label>
               <input type="password" inputMode="numeric" maxLength={8} className="tp-input" placeholder="Repeat PIN" value={pw2} onChange={e => setPw2(e.target.value.replace(/\D/g, '').slice(0, 8))} />
             </div>
-            {modalError && <p className="text-sm mt-2" style={{ color: '#c82020' }}>{modalError}</p>}
+            {modalError && <p className="text-sm mt-2" style={{ color: 'var(--tp-danger-text)' }}>{modalError}</p>}
             <div className="flex gap-3 mt-4">
               <button className="tp-btn-gold" onClick={async () => {
                 if (!/^\d{8}$/.test(pw)) { setModalError('PIN must be exactly 8 digits.'); return; }
@@ -692,45 +771,101 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
   }
 
 
-  return (
-    <div style={{ position:'relative', minHeight:'100vh', fontFamily:"'Nunito','Segoe UI',sans-serif" }}>
-      <canvas ref={spaceCanvasRef} style={{ position:'fixed', inset:0, width:'100%', height:'100%', zIndex:0, pointerEvents:'none', opacity: isDark ? 1 : 0, transition:'opacity 0.6s' }} />
-      {!isDark && <div style={{ position:'fixed', inset:0, zIndex:0, background:'linear-gradient(160deg,#dce8ff 0%,#eaf0ff 40%,#f0f5ff 70%,#e8eeff 100%)' }} />}
-      <div className={'tp-page ' + (isDark ? 'tp-dark' : 'tp-light')} style={{ position:'relative', zIndex:1, minHeight:'100vh' }}>
+  const current = NAV.find(n => n.key === tab) || NAV[0];
+  const teacherName = session.profile?.name || session.user.email.split('@')[0];
 
-      {/* Header */}
-      <header style={{ background:'var(--tp-header-bg,rgba(8,18,50,0.88))', borderBottom:'1.5px solid var(--tp-header-border,rgba(60,100,200,0.2))', backdropFilter:'blur(20px)', position:'sticky', top:0, zIndex:100, boxShadow:'0 2px 16px rgba(0,0,0,0.2)' }}>
-        <div style={{ maxWidth:1240, margin:'0 auto', padding:'0 28px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60 }}>
-          <span style={{ fontSize:'1.1rem', fontWeight:900, background:'linear-gradient(135deg,#f4a8c8,#a8d8ff,#c8b0ff)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', letterSpacing:'0.04em' }}>✦ ClassCard ✦</span>
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <span style={{ fontSize:'0.72rem', padding:'4px 12px', borderRadius:20, background:'rgba(160,140,220,0.1)', border:'1px solid rgba(160,140,220,0.25)', color:'var(--tp-text2)', fontWeight:600 }}>{session.user.email}</span>
-            <span style={{ fontSize:'0.65rem', padding:'4px 10px', borderRadius:20, background:'linear-gradient(135deg,rgba(200,160,255,0.2),rgba(160,200,255,0.2))', border:'1px solid rgba(160,140,220,0.3)', color:'#6060b0', fontWeight:800, letterSpacing:'0.1em', textTransform:'uppercase' }}>Teacher</span>
-            {/* Read-only tour of the worlds this class has built. The 3D app
-                gives a teacher no way to build, buy or save anything. */}
+  const sidebar = (
+    <aside className={'tp-side' + (navOpen ? ' is-open' : '')} aria-label="Teacher navigation">
+      <div className="tp-brand">
+        <i />
+        <div>ClassCard<small>Teacher studio</small></div>
+      </div>
+
+      <nav className="tp-nav">
+        {NAV.map((n, i) => (
+          <React.Fragment key={n.key}>
+            {(i === 0 || NAV[i - 1].group !== n.group) && <div className="tp-nav-group">{n.group}</div>}
             <button
-              onClick={() => { window.location.hash = '/3daura'; }}
-              title="Look inside the 3D worlds your class has built"
-              style={{ fontSize:'0.72rem', fontWeight:800, padding:'6px 14px', borderRadius:20, cursor:'pointer', border:'1.5px solid rgba(46,226,250,0.4)', background:'linear-gradient(135deg,rgba(46,226,250,0.16),rgba(124,92,255,0.16))', color:'#5aa8d8', whiteSpace:'nowrap' }}>
-              🔭 Visit 3D Worlds
+              type="button"
+              className={'tp-navitem' + (tab === n.key ? ' is-active' : '')}
+              aria-current={tab === n.key ? 'page' : undefined}
+              onClick={() => goTab(n.key)}
+            >
+              <Ico name={n.icon} />
+              {n.label}
+              <kbd>{i + 1}</kbd>
             </button>
-            <button onClick={toggleTheme} style={{ width:34, height:34, borderRadius:'50%', border:'1.5px solid var(--tp-border,rgba(60,100,200,0.22))', background:'var(--tp-input-bg,rgba(255,255,255,0.06))', cursor:'pointer', fontSize:'0.9rem', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.2s' }} title={isDark ? 'Light mode' : 'Dark mode'}>{isDark ? '☀️' : '🌙'}</button>
-            <button onClick={onSignOut} className="tp-btn-outline" style={{ fontSize:'0.72rem', padding:'6px 14px' }}>Sign Out</button>
+          </React.Fragment>
+        ))}
+      </nav>
+
+      <div className="tp-side-foot">
+        {/* Optional mascot art — appears once /public/teacher/sidebar-bot.png exists */}
+        <Art src="/teacher/sidebar-bot.png" alt="" className="tp-side-art" />
+        {/* Read-only tour of the worlds this class has built. The 3D app
+            gives a teacher no way to build, buy or save anything. */}
+        <button type="button" className="tp-worlds-btn" onClick={() => { window.location.hash = '/3daura'; }}
+          title="Look inside the 3D worlds your class has built">
+          <span className="ic"><Ico name="orbit" /></span>
+          <span><b>Visit 3D Worlds</b><span>Look around, read-only</span></span>
+        </button>
+
+        <div className="tp-me">
+          <div className="tp-me-avatar" aria-hidden="true">{initialsOf(teacherName)}</div>
+          <div className="tp-me-text">
+            <b>{teacherName}</b>
+            <span title={session.user.email}>{session.user.email}</span>
           </div>
+          <button type="button" className="tp-icon-btn" onClick={toggleTheme}
+            title={isDark ? 'Switch to light' : 'Switch to dark'} aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}>
+            <Ico name={isDark ? 'sun' : 'moon'} />
+          </button>
+          <button type="button" className="tp-icon-btn" onClick={onSignOut} title="Sign out" aria-label="Sign out">
+            <Ico name="logout" />
+          </button>
         </div>
-      </header>
+      </div>
+    </aside>
+  );
 
-      {/* Main */}
-      <div style={{ maxWidth:1240, margin:'0 auto', padding:'24px 28px' }}>
-        <div style={{ background:'var(--tp-outer,rgba(8,18,48,0.72))', borderRadius:40, padding:'24px 28px', boxShadow:'var(--tp-outer-shadow,0 20px 80px rgba(0,0,0,0.6))', border:'1.5px solid var(--tp-outer-border,rgba(80,120,255,0.18))', backdropFilter:'blur(20px)' }}>
+  // Per-section header actions. Only Students has any today; the other
+  // sections keep their controls inside their own panels.
+  const headActions = tab === 'students' ? (
+    <>
+      <button onClick={() => setModal({ type: 'bulkAddStudents' })} className="tp-btn-outline"><Ico name="list" /> Bulk add</button>
+      <button onClick={() => setModal({ type: 'addStudent' })} className="tp-btn-primary"><Ico name="plus" /> Add student</button>
+    </>
+  ) : null;
 
-        {/* Tab bar */}
-        <div style={{ display:'flex', gap:6, marginBottom:24, flexWrap:'wrap' }}>
-          {TABS.map(t => (
-            <button key={t.key} className={`tp-tab${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+  return (
+    <div className={'tp-page ' + (isDark ? 'tp-dark' : 'tp-light')}>
+      <div className="tp-shell">
+
+        {/* Mobile top bar */}
+        <header className="tp-topbar">
+          <div className="tp-brand"><i />ClassCard</div>
+          <button type="button" className="tp-icon-btn" data-nav-toggle onClick={() => setNavOpen(o => !o)}
+            aria-label={navOpen ? 'Close menu' : 'Open menu'} aria-expanded={navOpen} style={{ color: 'var(--tp-cream)' }}>
+            <Ico name={navOpen ? 'close' : 'menu'} />
+          </button>
+        </header>
+        {navOpen && <div className="tp-scrim" onClick={() => setNavOpen(false)} />}
+
+        {sidebar}
+
+        <main className="tp-main">
+          <div className="tp-main-inner">
+
+            <header className="tp-pagehead" key={'head-' + tab}>
+              <div>
+                <p className="tp-eyebrow">{current.eyebrow}</p>
+                <h1 className="tp-title">{current.title}</h1>
+                <p className="tp-lead">{current.lead}</p>
+              </div>
+              {headActions && <div className="tp-pagehead-actions">{headActions}</div>}
+            </header>
+
+            <div className="tp-view" key={'view-' + tab}>
 
         {/* Generate Card Tab */}
         {tab === 'generate' && (
@@ -785,58 +920,134 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         )}
 
         {/* Students Tab */}
-        {tab === 'students' && (
-          <div>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-              <div className="tp-section" style={{ marginBottom:0 }}>Your Students</div>
-              <div style={{ display:'flex', gap:8 }}>
-                <button onClick={() => setModal({ type: 'bulkAddStudents' })} className="tp-btn-outline" style={{ fontSize:'0.8rem' }}>📋 Bulk Add</button>
-                <button onClick={() => setModal({ type: 'addStudent' })} className="tp-btn-primary" style={{ fontSize:'0.8rem' }}>+ Add Student</button>
+        {tab === 'students' && (() => {
+          const total = students.reduce((n, st) => n + (cardCounts[st.id] || 0), 0);
+          const max = Math.max(1, ...students.map(st => cardCounts[st.id] || 0));
+          const top = students.reduce<Student | null>((best, st) =>
+            !best || (cardCounts[st.id] || 0) > (cardCounts[best.id] || 0) ? st : best, null);
+          const q = rosterQuery.trim().toLowerCase();
+          const shown = q
+            ? students.filter(st => st.name.toLowerCase().includes(q) || (st.login_email || '').toLowerCase().includes(q))
+            : students;
+
+          const openCards = async (st: Student) => {
+            setDownloadLoading(st.id);
+            try {
+              const studentCards = await Dashboard.getStudentCards(st.id);
+              const filtered = studentCards.filter(c => c.card_name !== Dashboard.WELCOME_CARD_NAME);
+              setModal({ type: 'downloadCards', data: { ...st, cards: filtered } });
+            } catch (err: any) {
+              alert('Could not load this student\'s cards: ' + (err.message || 'unknown error'));
+            }
+            setDownloadLoading(null);
+          };
+
+          if (students.length === 0) {
+            return (
+              <div className="tp-panel tp-empty">
+                <Art src="/teacher/empty-students.png" alt="" />
+                <div className="glyph"><Ico name="users" /></div>
+                <h3>No students yet</h3>
+                <p>Add your class one at a time, or paste a whole list with Bulk add. Each student gets a PIN login and a welcome card.</p>
+                <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <button onClick={() => setModal({ type: 'bulkAddStudents' })} className="tp-btn-outline"><Ico name="list" /> Bulk add</button>
+                  <button onClick={() => setModal({ type: 'addStudent' })} className="tp-btn-primary"><Ico name="plus" /> Add student</button>
+                </div>
               </div>
-            </div>
-            {students.length === 0 ? (
-              <div style={{ textAlign:'center', padding:'48px 20px', color:'#a0a8c8', fontStyle:'italic', fontSize:'0.85rem' }}>No students yet.</div>
-            ) : (
-              <div className="tp-panel" style={{ padding:0, overflow:'hidden' }}>
-              <table className="tp-table">
-                <thead><tr><th>Name</th><th>Login Email</th><th>Cards</th><th>Actions</th></tr></thead>
-                <tbody>
-                  {students.map(s => (
-                    <tr key={s.id}>
-                      <td style={{ fontWeight:700 }}>{s.name}</td>
-                      <td style={{ fontSize:'0.78rem', color:'var(--tp-muted)' }}>{s.login_email || '—'}</td>
-                      <td>{cardCounts[s.id] || 0}</td>
-                      <td>
-                        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                          <button
-                            onClick={async () => {
-                              setDownloadLoading(s.id);
-                              try {
-                                const studentCards = await Dashboard.getStudentCards(s.id);
-                                const filtered = studentCards.filter(c => c.card_name !== Dashboard.WELCOME_CARD_NAME);
-                                setModal({ type: 'downloadCards', data: { ...s, cards: filtered } });
-                              } catch (err: any) {
-                                alert('Could not load this student\'s cards: ' + (err.message || 'unknown error'));
-                              }
-                              setDownloadLoading(null);
-                            }}
-                            disabled={downloadLoading === s.id}
-                            className="tp-btn-outline"
-                          >{downloadLoading === s.id ? '…' : '⬇ Cards'}</button>
-                          <button onClick={() => setModal({ type: 'editStudent', data: s })} className="tp-btn-outline">✏ Edit</button>
-                          <button onClick={() => { setModalError(''); setModal({ type: 'resetPassword', data: s }); }} className="tp-btn-outline" style={{ borderColor:'rgba(80,200,120,0.35)', color:'#2a7a50' }}>🔑 Reset PIN</button>
-                          <button onClick={() => { setModalError(''); setModal({ type: 'resetAura3d', data: s }); }} className="tp-btn-outline" style={{ borderColor:'rgba(100,140,255,0.35)', color:'#3050c0' }} title="Clears everything this student has built in 3D Aura, but keeps their money, inventory, and pets">🤖 Reset Build</button>
-                          <button onClick={() => { setModalError(''); setModal({ type: 'deleteStudent', data: s }); }} className="tp-btn-danger">🗑</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            );
+          }
+
+          return (
+            <>
+              <dl className="tp-stats">
+                <div className="tp-stat"><dt>Students</dt><dd>{students.length}</dd></div>
+                <div className="tp-stat is-accent"><dt>Cards collected</dt><dd>{total}</dd></div>
+                <div className="tp-stat"><dt>Average each</dt><dd>{(total / students.length).toFixed(1)}</dd></div>
+                <div className="tp-stat"><dt>Top collector</dt>
+                  <dd style={{ fontSize: 24, paddingTop: 8 }}>{top ? top.name.split(' ')[0] : '—'}<small>{top ? cardCounts[top.id] || 0 : ''}</small></dd>
+                </div>
+              </dl>
+
+              <div className="tp-panel tp-roster">
+                <div className="tp-roster-tools">
+                  <label className="tp-search">
+                    <Ico name="search" />
+                    <input value={rosterQuery} onChange={e => setRosterQuery(e.target.value)}
+                      placeholder="Search by name or email" aria-label="Search students" />
+                  </label>
+                  <span className="tp-count">{shown.length} of {students.length}</span>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="tp-table">
+                    <thead>
+                      <tr>
+                        <th>Student</th>
+                        <th>Collection</th>
+                        <th style={{ textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {shown.map((st, i) => {
+                        const n = cardCounts[st.id] || 0;
+                        const tone = AVATAR_TONES[(st.robot_color_index ?? i) % AVATAR_TONES.length];
+                        return (
+                          <tr key={st.id}>
+                            <td>
+                              <div className="tp-person">
+                                <div className="tp-avatar" style={{ background: tone }} aria-hidden="true">{initialsOf(st.name)}</div>
+                                <div style={{ minWidth: 0 }}>
+                                  <b>{st.name}</b>
+                                  <span>{st.login_email || 'No login email'}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <div className="tp-meter" title={`${n} card${n === 1 ? '' : 's'}`}>
+                                <b>{n}</b>
+                                <i style={{ ['--pct' as any]: `${Math.round((n / max) * 100)}%` }} />
+                              </div>
+                            </td>
+                            <td>
+                              <div className="tp-actions">
+                                <button className="tp-act" data-tip="Download cards" aria-label={`Download ${st.name}'s cards`}
+                                  onClick={() => openCards(st)} disabled={downloadLoading === st.id}>
+                                  <Ico name="download" />
+                                </button>
+                                <button className="tp-act" data-tip="Edit" aria-label={`Edit ${st.name}`}
+                                  onClick={() => setModal({ type: 'editStudent', data: st })}>
+                                  <Ico name="pencil" />
+                                </button>
+                                <button className="tp-act" data-tip="Reset PIN" aria-label={`Reset ${st.name}'s PIN`}
+                                  onClick={() => { setModalError(''); setModal({ type: 'resetPassword', data: st }); }}>
+                                  <Ico name="key" />
+                                </button>
+                                <button className="tp-act" data-tip="Reset 3D build" aria-label={`Reset ${st.name}'s 3D Aura build`}
+                                  title="Clears everything this student has built in 3D Aura, but keeps their money, inventory and pets"
+                                  onClick={() => { setModalError(''); setModal({ type: 'resetAura3d', data: st }); }}>
+                                  <Ico name="rotate" />
+                                </button>
+                                <button className="tp-act is-danger" data-tip="Delete" aria-label={`Delete ${st.name}`}
+                                  onClick={() => { setModalError(''); setModal({ type: 'deleteStudent', data: st }); }}>
+                                  <Ico name="trash" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {shown.length === 0 && (
+                        <tr><td colSpan={3} style={{ textAlign: 'center', padding: '36px 18px', color: 'var(--tp-muted)' }}>
+                          No students match “{rosterQuery}”.
+                        </td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            )}
-          </div>
-        )}
+            </>
+          );
+        })()}
 
         {/* Home Communication Tab */}
         {tab === 'stars' && (
@@ -844,14 +1055,10 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
         )}
 
         {tab === 'homecomms' && (
-          <div style={{ maxWidth: 760 }}>
-            <div className="tp-section" style={{ marginBottom: 16 }}>📣 Home Communication</div>
-            <p style={{ fontSize: '0.78rem', color: 'var(--tp-muted)', marginBottom: 22, lineHeight: 1.6 }}>
-              Manage what parents and students see on the Home Communication board. The pinboard message and photo appear at the top; dated events appear below.
-            </p>
+          <div style={{ maxWidth: 880 }}>
 
             {/* ── PINBOARD SECTION ── */}
-            <div style={{ marginBottom: 8, fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--tp-muted)' }}>📌 Pinboard Message &amp; Photo</div>
+            <div className="tp-section">Pinned message &amp; photo</div>
             <div className="tp-panel" style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
 
@@ -876,10 +1083,10 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                       <img
                         src={pbPhotoUrl}
                         alt="Pinboard"
-                        style={{ width: '100%', height: 130, objectFit: 'cover', borderRadius: 12, border: '2px solid rgba(160,140,220,0.3)', display: 'block' }}
+                        style={{ width: '100%', height: 130, objectFit: 'cover', borderRadius: 12, border: '2px solid var(--tp-border-bright)', display: 'block' }}
                       />
                       <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                        <label style={{ flex: 1, padding: '5px 0', background: 'rgba(160,140,220,0.1)', border: '1.5px solid rgba(160,140,220,0.3)', borderRadius: 8, cursor: 'pointer', textAlign: 'center', fontSize: '0.65rem', fontWeight: 700, color: 'var(--tp-text2)' }}>
+                        <label style={{ flex: 1, padding: '5px 0', background: 'var(--tp-lift-2)', border: '1.5px solid var(--tp-border-bright)', borderRadius: 8, cursor: 'pointer', textAlign: 'center', fontSize: '0.65rem', fontWeight: 700, color: 'var(--tp-text2)' }}>
                           🔄 Change
                           <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePbPhotoUpload} disabled={pbUploading} />
                         </label>
@@ -887,7 +1094,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                       </div>
                     </div>
                   ) : (
-                    <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: 130, background: 'rgba(240,236,255,0.5)', border: '2px dashed rgba(160,140,220,0.4)', borderRadius: 12, cursor: pbUploading ? 'wait' : 'pointer', gap: 6 }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: 130, background: 'var(--tp-sunken)', border: '1.5px dashed var(--tp-border-bright)', borderRadius: 12, cursor: pbUploading ? 'wait' : 'pointer', gap: 6 }}>
                       <span style={{ fontSize: '1.6rem' }}>{pbUploading ? '⏳' : '📷'}</span>
                       <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--tp-muted)' }}>{pbUploading ? 'Uploading…' : 'Click to add photo'}</span>
                       <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePbPhotoUpload} disabled={pbUploading} />
@@ -905,7 +1112,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                   <button className="tp-btn-danger" onClick={handleDeletePinboard} style={{ fontSize: '0.78rem' }}>🗑 Clear Pinboard</button>
                 )}
                 {pbStatus && (
-                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: pbStatus.startsWith('Error') ? '#e05050' : pbStatus.startsWith('✓') ? '#22a060' : '#8090b0' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: pbStatus.startsWith('Error') ? '#e05050' : pbStatus.startsWith('✓') ? '#22a060' : 'var(--tp-muted)' }}>
                     {pbStatus}
                   </span>
                 )}
@@ -913,7 +1120,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
             </div>
 
             {/* ── DATED EVENTS SECTION ── */}
-            <div style={{ marginBottom: 8, fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--tp-muted)' }}>📅 Dates &amp; Events</div>
+            <div className="tp-section">Dates &amp; events</div>
 
             {/* Add new post */}
             <div className="tp-panel" style={{ marginBottom: 16 }}>
@@ -944,7 +1151,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <button className="tp-btn-primary" onClick={handleAddHomeComm}>+ Add Event</button>
                 {hcStatus && (
-                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: hcStatus.startsWith('Error') ? '#e05050' : hcStatus.startsWith('✓') ? '#22a060' : '#8090b0' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: hcStatus.startsWith('Error') ? '#e05050' : hcStatus.startsWith('✓') ? '#22a060' : 'var(--tp-muted)' }}>
                     {hcStatus}
                   </span>
                 )}
@@ -953,7 +1160,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
             {/* Events list */}
             {homeComms.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--tp-muted)', fontSize: '0.85rem', background: 'rgba(240,236,255,0.3)', borderRadius: 16, border: '1.5px dashed rgba(180,160,220,0.3)' }}>
+              <div style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--tp-muted)', fontSize: '0.85rem', background: 'rgba(240,236,255,0.3)', borderRadius: 16, border: '1.5px dashed var(--tp-border-bright)' }}>
                 No events yet. Add your first dated event above.
               </div>
             ) : (
@@ -985,20 +1192,14 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                       </div>
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-                        <div style={{ flexShrink: 0, background: 'linear-gradient(135deg,#e8e0ff,#d0c8f8)', borderRadius: 12, padding: '8px 14px', textAlign: 'center', minWidth: 72 }}>
-                          <div style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7060b0', marginBottom: 2 }}>
-                            {new Date(hc.event_date + 'T12:00:00').toLocaleDateString('en-NZ', { month: 'short' }).toUpperCase()}
-                          </div>
-                          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#4030a0', lineHeight: 1 }}>
-                            {new Date(hc.event_date + 'T12:00:00').getDate()}
-                          </div>
-                          <div style={{ fontSize: '0.55rem', fontWeight: 700, color: '#9080c0', marginTop: 1 }}>
-                            {new Date(hc.event_date + 'T12:00:00').toLocaleDateString('en-NZ', { weekday: 'short' }).toUpperCase()}
-                          </div>
+                        <div className="tp-datetile" aria-label={new Date(hc.event_date + 'T12:00:00').toDateString()}>
+                          <span className="m">{new Date(hc.event_date + 'T12:00:00').toLocaleDateString('en-NZ', { month: 'short' }).toUpperCase()}</span>
+                          <span className="d">{new Date(hc.event_date + 'T12:00:00').getDate()}</span>
+                          <span className="w">{new Date(hc.event_date + 'T12:00:00').toLocaleDateString('en-NZ', { weekday: 'short' }).toUpperCase()}</span>
                         </div>
                         <div style={{ flex: 1 }}>
                           <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--tp-text)', lineHeight: 1.6, fontWeight: 600 }}>{hc.comment}</p>
-                          <div style={{ fontSize: '0.65rem', color: '#b0b8d0', marginTop: 6 }}>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--tp-muted)', marginTop: 6, fontFamily: 'var(--tp-mono)', letterSpacing: '.04em' }}>
                             Posted {new Date(hc.created_at).toLocaleDateString('en-NZ')}
                           </div>
                         </div>
@@ -1017,80 +1218,85 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
 
         {/* Settings Tab */}
         {tab === 'settings' && (
-          <div style={{ maxWidth:500 }}>
-            <div className="tp-section">AI Settings</div>
-            <div className="tp-panel" style={{ marginBottom:16 }}>
-              <div style={{ marginBottom:14 }}>
-                <label className="tp-label">Gemini API Key</label>
-                <input type="password" className="tp-input" placeholder="AIza…" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} />
-                <p style={{ fontSize:'0.72rem', color:'#a0a8c8', marginTop:6 }}>Free at <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" style={{ color:'#9090d0', textDecoration:'underline' }}>aistudio.google.com ↗</a></p>
+          <div className="tp-settings">
+
+            <section className="tp-setting">
+              <div className="tp-setting-about">
+                <h3>3D Aura world</h3>
+                <p>Applies to every student's world. There's no per-student settings menu — this is the one place that controls it.</p>
               </div>
-              <button onClick={handleSaveKey} className="tp-btn-primary">Save Key</button>
-            </div>
+              <div className="tp-panel">
+                <label className="tp-switch-row">
+                  <span>
+                    <b>Day / night cycle</b>
+                    <span>The sky turns over as students play</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="tp-switch"
+                    checked={aura3dSettings.dayNightEnabled ?? true}
+                    onChange={e => setAura3dSettings(s => ({ ...s, dayNightEnabled: e.target.checked }))}
+                  />
+                </label>
 
-            <div className="tp-section">🤖 3D Aura Settings</div>
-            <div className="tp-panel" style={{ marginBottom:16 }}>
-              <p style={{ fontSize:'0.78rem', color:'var(--tp-muted)', marginBottom:16, lineHeight:1.5 }}>
-                These apply to every student's 3D Aura world — there's no per-student settings menu any more, this is the one place that controls it.
-              </p>
+                <div className="tp-slider-grid">
+                  <Aura3dSliderRow
+                    label="Day / night speed"
+                    value={aura3dSettings.dayNightSpeed ?? AURA3D_SETTINGS_DEFAULTS.dayNightSpeed}
+                    min={0.05} max={3} step={0.05}
+                    onChange={v => setAura3dSettings(s => ({ ...s, dayNightSpeed: v }))}
+                  />
+                  <Aura3dSliderRow
+                    label="Fog distance"
+                    value={aura3dSettings.fogFar ?? AURA3D_SETTINGS_DEFAULTS.fogFar}
+                    min={60} max={500} step={5}
+                    onChange={v => setAura3dSettings(s => ({ ...s, fogFar: v }))}
+                  />
+                </div>
 
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-                <label className="tp-label" style={{ margin:0 }}>🌗 Day/Night Cycle</label>
-                <input
-                  type="checkbox"
-                  checked={aura3dSettings.dayNightEnabled ?? true}
-                  onChange={e => setAura3dSettings(s => ({ ...s, dayNightEnabled: e.target.checked }))}
-                  style={{ width:20, height:20 }}
-                />
+                <div className="tp-label" style={{ margin: '24px 0 14px' }}>Pet follow distance</div>
+                <div className="tp-slider-grid">
+                  {([
+                    ['petGapDog', '🐶 Dog'], ['petGapCat', '🐱 Cat'], ['petGapBird', '🐦 Bird'],
+                    ['petGapAlpaca', '🦙 Alpaca'], ['petGapBunny', '🐰 Bunny'], ['petGapFrog', '🐸 Frog'],
+                    ['petGapMonkey', '🐵 Monkey'], ['petGapPanda', '🐼 Panda'], ['petGapOwl', '🦉 Owl'],
+                    ['petGapDragon', '🐉 Dragon'], ['petGapLamb', '🐑 Lamb'],
+                  ] as [Exclude<keyof Aura3dTeacherSettings, 'dayNightEnabled'>, string][]).map(([key, label]) => (
+                    <Aura3dSliderRow
+                      key={key}
+                      label={label}
+                      value={aura3dSettings[key] ?? AURA3D_SETTINGS_DEFAULTS[key]}
+                      min={0.5} max={15} step={0.1}
+                      onChange={v => setAura3dSettings(s => ({ ...s, [key]: v }))}
+                    />
+                  ))}
+                </div>
+
+                <div className="tp-savebar">
+                  {aura3dSavedMsg && <span className="tp-saved">Saved</span>}
+                  <button onClick={handleSaveAura3dSettings} className="tp-btn-primary" disabled={aura3dSaving}>
+                    {aura3dSaving ? 'Saving…' : 'Save world settings'}
+                  </button>
+                </div>
               </div>
+            </section>
 
-              <Aura3dSliderRow
-                label="Day/Night Speed"
-                value={aura3dSettings.dayNightSpeed ?? AURA3D_SETTINGS_DEFAULTS.dayNightSpeed}
-                min={0.05} max={3} step={0.05}
-                onChange={v => setAura3dSettings(s => ({ ...s, dayNightSpeed: v }))}
-              />
-              <Aura3dSliderRow
-                label="Fog Distance"
-                value={aura3dSettings.fogFar ?? AURA3D_SETTINGS_DEFAULTS.fogFar}
-                min={60} max={500} step={5}
-                onChange={v => setAura3dSettings(s => ({ ...s, fogFar: v }))}
-              />
-
-              <div style={{ fontSize:'0.72rem', fontWeight:800, color:'var(--tp-label-color)', textTransform:'uppercase', letterSpacing:'0.06em', margin:'18px 0 8px' }}>
-                🐾 Pet Follow Distances
+            <section className="tp-setting">
+              <div className="tp-setting-about">
+                <h3>Kiosk quiz</h3>
+                <p>Swap the four quiz topics at the 3D Aura kiosk for your own.</p>
               </div>
-              {([
-                ['petGapDog', '🐶 Dog'], ['petGapCat', '🐱 Cat'], ['petGapBird', '🐦 Bird'],
-                ['petGapAlpaca', '🦙 Alpaca'], ['petGapBunny', '🐰 Bunny'], ['petGapFrog', '🐸 Frog'],
-                ['petGapMonkey', '🐵 Monkey'], ['petGapPanda', '🐼 Panda'], ['petGapOwl', '🦉 Owl'],
-                ['petGapDragon', '🐉 Dragon'], ['petGapLamb', '🐑 Lamb'],
-              ] as [Exclude<keyof Aura3dTeacherSettings, 'dayNightEnabled'>, string][]).map(([key, label]) => (
-                <Aura3dSliderRow
-                  key={key}
-                  label={label}
-                  value={aura3dSettings[key] ?? AURA3D_SETTINGS_DEFAULTS[key]}
-                  min={0.5} max={15} step={0.1}
-                  onChange={v => setAura3dSettings(s => ({ ...s, [key]: v }))}
-                />
-              ))}
-
-              <div style={{ display:'flex', alignItems:'center', gap:12, marginTop:16 }}>
-                <button onClick={handleSaveAura3dSettings} className="tp-btn-primary" disabled={aura3dSaving}>
-                  {aura3dSaving ? 'Saving…' : 'Save 3D Aura Settings'}
-                </button>
-                {aura3dSavedMsg && <span style={{ fontSize:'0.8rem', color:'#22c55e', fontWeight:700 }}>✓ Saved</span>}
+              <div className="tp-panel">
+                <Aura3dQuestionBanks teacherId={session.user.id} />
               </div>
-            </div>
+            </section>
 
-            <div className="tp-section">🏛️ 3D Aura Kiosk Quiz Questions</div>
-            <div className="tp-panel" style={{ marginBottom:16 }}>
-              <Aura3dQuestionBanks teacherId={session.user.id} />
-            </div>
           </div>
         )}
-        </div>{/* inner container */}
-        </div>{/* main padding */}
+            </div>{/* tp-view */}
+          </div>{/* tp-main-inner */}
+        </main>
+      </div>{/* tp-shell */}
 
       {/* Modals */}
       {renderModal()}
@@ -1099,15 +1305,15 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
       {detailCard && (
         <div className="tp-modal-bg" onClick={() => setDetailCard(null)}>
           <div className="tp-modal tp-modal-wide" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setDetailCard(null)} style={{ position:'absolute', top:16, right:16, width:32, height:32, borderRadius:'50%', background:'rgba(160,140,220,0.12)', border:'none', fontSize:'1rem', cursor:'pointer', color:'#8080c0' }}>✕</button>
+            <button onClick={() => setDetailCard(null)} style={{ position:'absolute', top:16, right:16, width:32, height:32, borderRadius:'50%', background:'var(--tp-lift-2)', border:'none', fontSize:'1rem', cursor:'pointer', color:'var(--tp-muted)' }}>✕</button>
             <div style={{ display:'flex', gap:28, alignItems:'flex-start', flexWrap:'wrap' }}>
               <div style={{ flexShrink:0 }}>
                 <PokeCard card={detailCard} />
               </div>
               <div style={{ flex:1, minWidth:200 }}>
                 <h2 style={{ fontSize:'1.4rem', fontWeight:900, color:'var(--tp-text)', marginBottom:4 }}>{detailCard.card_name}</h2>
-                <div style={{ display:'inline-block', padding:'3px 12px', borderRadius:20, background:'rgba(100,120,220,0.08)', border:'1px solid rgba(100,120,220,0.2)', fontSize:'0.65rem', fontWeight:700, color:'#6070c0', marginBottom:16, textTransform:'uppercase', letterSpacing:'0.1em' }}>{detailCard.rarity}</div>
-                <p style={{ fontSize:'0.88rem', color:'#7080b0', fontStyle:'italic', marginBottom:20, lineHeight:1.5 }}>"{detailCard.description}"</p>
+                <div style={{ display:'inline-block', padding:'3px 12px', borderRadius:20, background:'var(--tp-lift-2)', border:'1px solid var(--tp-border)', fontSize:'0.65rem', fontWeight:700, color:'var(--tp-muted)', marginBottom:16, textTransform:'uppercase', letterSpacing:'0.1em' }}>{detailCard.rarity}</div>
+                <p style={{ fontSize:'0.88rem', color:'var(--tp-muted)', fontStyle:'italic', marginBottom:20, lineHeight:1.5 }}>"{detailCard.description}"</p>
 
                 <div className="space-y-0">
                   {[
@@ -1120,7 +1326,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
                     { label: detailCard.move2_name, value: `${detailCard.move2_dmg} dmg` },
                     { label: 'Awarded', value: new Date(detailCard.created_at).toLocaleDateString() },
                   ].map((row, i) => (
-                    <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid rgba(100,120,220,0.08)' }}>
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid var(--tp-border)' }}>
                       <span style={{ fontSize:'0.72rem', color:'var(--tp-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>{row.label}</span>
                       <span style={{ fontSize:'0.82rem', fontWeight:700, color:'var(--tp-text)' }}>{row.value}</span>
                     </div>
@@ -1132,10 +1338,7 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
           </div>
         </div>
       )}
-   {/* tp-page */}
-</div>
-   {/* outer */}
-</div>
+    </div>
   );
 }
 
@@ -1145,28 +1348,31 @@ function TeacherPage({ session, onSignOut }: { session: NonNullable<Session>; on
 function Aura3dSliderRow({ label, value, min, max, step, onChange }: {
   label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void;
 }) {
+  const pct = ((value - min) / (max - min)) * 100;
   return (
-    <div style={{ marginBottom:10 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.78rem', color:'var(--tp-text)', marginBottom:3 }}>
+    <label className="tp-slider">
+      <span className="tp-slider-head">
         <span>{label}</span>
-        <span style={{ fontWeight:700, color:'var(--tp-muted)' }}>{value.toFixed(2).replace(/\.?0+$/, '') || '0'}</span>
-      </div>
+        <output>{value.toFixed(2).replace(/\.?0+$/, '') || '0'}</output>
+      </span>
       <input
         type="range"
         min={min} max={max} step={step} value={value}
         onChange={e => onChange(parseFloat(e.target.value))}
-        style={{ width:'100%' }}
+        style={{ ['--fill' as any]: `${pct}%` }}
       />
-    </div>
+    </label>
   );
 }
 
 function ModalWrapper({ title, children, onClose, danger }: { title: string; children: React.ReactNode; onClose: () => void; danger?: boolean }) {
   return (
     <div className="tp-modal-bg" onClick={onClose}>
-      <div className="tp-modal" onClick={e => e.stopPropagation()}>
-        <button onClick={onClose} style={{ position:'absolute', top:16, right:16, width:32, height:32, borderRadius:'50%', background:'rgba(160,140,220,0.1)', border:'none', fontSize:'1rem', cursor:'pointer', color:'#8080c0' }}>✕</button>
-        <h3 style={{ fontWeight:800, fontSize:'1.1rem', marginBottom:20, color: danger ? '#c03030' : '#3040a0' }}>{title}</h3>
+      <div className={'tp-modal' + (danger ? ' is-danger' : '')} role="dialog" aria-modal="true" aria-label={title} onClick={e => e.stopPropagation()}>
+        <button type="button" className="tp-modal-x" onClick={onClose} aria-label="Close"><Ico name="close" /></button>
+        {/* Titles arrive with a leading emoji ("🗑 Delete Student"); the
+            headline type does the work now, so drop it for display. */}
+        <h3>{title.replace(/^[^\p{L}\p{N}]+/u, '')}</h3>
         {children}
       </div>
     </div>
@@ -1261,7 +1467,7 @@ function BulkAddStudentsModal({ teacherId, onDone, onCancel }: {
         <>
           <div style={{ display: 'flex', gap: 16, marginBottom: 14 }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#4cba80' }}>✓ {successCount} created</span>
-            {failCount > 0 && <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#e05050' }}>✕ {failCount} failed</span>}
+            {failCount > 0 && <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--tp-danger-text)' }}>✕ {failCount} failed</span>}
             {running && <span style={{ fontSize: '0.85rem', color: 'var(--tp-muted)' }}>Working…</span>}
           </div>
           <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -1417,33 +1623,37 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
     setGiving(null);
   };
 
+  // Real metal swatches — the same ones as the landing page's rarity buttons.
+  // (These used to be a purple "bronze" and a pink "gold", and the legend's
+  // emoji didn't match the buttons' emoji, so the points were a guessing game.
+  // The buttons now just say how many points they give.)
   const starColors = {
-    bronze: { bg: 'linear-gradient(135deg,#a78bfa,#818cf8,#6366f1)', label: '✨', pts: 1, glow: 'rgba(139,92,246,0.55)', name: 'Bronze' },
-    silver: { bg: 'linear-gradient(135deg,#38bdf8,#22d3ee,#06b6d4)', label: '⭐', pts: 2, glow: 'rgba(34,211,238,0.5)',  name: 'Silver' },
-    gold:   { bg: 'linear-gradient(135deg,#f472b6,#c084fc,#818cf8)', label: '🌟', pts: 3, glow: 'rgba(192,132,252,0.6)', name: 'Gold'   },
+    bronze: { bg: 'linear-gradient(160deg,#e3b58a 0%,#b87a48 45%,#8b5a2b 100%)', ink: '#2b1606', label: '+1', pts: 1, glow: 'rgba(184,122,72,0.40)', name: 'Bronze' },
+    silver: { bg: 'linear-gradient(160deg,#f2f6fa 0%,#bccbd8 45%,#8fa3b5 100%)', ink: '#18222d', label: '+2', pts: 2, glow: 'rgba(143,163,181,0.40)', name: 'Silver' },
+    gold:   { bg: 'linear-gradient(160deg,#ffe9a6 0%,#f0b020 45%,#c98a0b 100%)', ink: '#2a1a00', label: '+3', pts: 3, glow: 'rgba(240,176,32,0.45)', name: 'Gold'   },
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {loadError && (
-        <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: 12, padding: '10px 16px', fontSize: '0.8rem', fontWeight: 700 }}>
+        <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--tp-danger-text)', borderRadius: 12, padding: '10px 16px', fontSize: '0.8rem', fontWeight: 700 }}>
           ⚠️ Couldn't load star points: {loadError} — the numbers below may be out of date.
         </div>
       )}
 
-      {/* Header */}
-      <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: '18px 24px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <div style={{ fontSize: '1rem', fontWeight: 900, color: '#c084fc', marginBottom: 4 }}>⭐ Star Points</div>
-          <div style={{ fontSize: '0.8rem', color: 'var(--tp-text2)', lineHeight: 1.5 }}>
-            Tap a star to award points — students spend them on card packs.&nbsp;
-            <span style={{ background: '#f59e0b22', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#c084fc' }}>⭐ = 1pt</span>&nbsp;
-            <span style={{ background: '#94a3b822', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#38bdf8' }}>🌟 = 2pts</span>&nbsp;
-            <span style={{ background: '#fbbf2422', padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, color: '#f472b6' }}>✨ = 3pts</span>
-          </div>
+      {/* Legend — what each metal is worth */}
+      <div className="tp-panel" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+          <span className="tp-label" style={{ margin: 0 }}>Tap to award</span>
+          {(Object.values(starColors)).map(cfg => (
+            <span key={cfg.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 700, color: 'var(--tp-text2)' }}>
+              <i style={{ width: 16, height: 16, borderRadius: 5, background: cfg.bg, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.25)', display: 'block' }} />
+              {cfg.name} <b style={{ color: 'var(--tp-text)', fontWeight: 900 }}>+{cfg.pts}</b>
+            </span>
+          ))}
         </div>
-        <div style={{ fontSize: '0.75rem', color: 'var(--tp-text2)', fontWeight: 700 }}>{students.length} students</div>
+        <span className="tp-count">{students.length} students</span>
       </div>
 
       {loading ? (
@@ -1460,11 +1670,11 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
             return (
               <div key={student.id}
                 className={isFlashing ? 'card-flash' : ''}
-                style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 22, padding: '14px 10px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1px solid rgba(255,255,255,0.08)', position: 'relative' }}>
+                style={{ background: 'var(--tp-panel)', borderRadius: 16, padding: '16px 12px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, boxShadow: 'var(--tp-shadow)', border: '1px solid var(--tp-border)', position: 'relative' }}>
 
                 {/* Points badge — re-keys on pts to retrigger ptsPop animation */}
                 <div key={`pts-${student.id}-${pts}`} className="pts-pop"
-                  style={{ position: 'absolute', top: -11, right: -11, background: pts > 0 ? 'linear-gradient(135deg,#f472b6,#c084fc)' : 'rgba(255,255,255,0.12)', color: pts > 0 ? 'white' : 'rgba(255,255,255,0.4)', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.85rem', boxShadow: pts > 0 ? '0 2px 12px rgba(192,132,252,0.6)' : 'none', border: '1.5px solid rgba(255,255,255,0.2)', zIndex: 1 }}>
+                  style={{ position: 'absolute', top: -11, right: -11, background: pts > 0 ? 'linear-gradient(135deg,var(--tp-rose),var(--tp-rose))' : 'var(--tp-lift-2)', color: pts > 0 ? 'white' : 'var(--tp-muted)', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.85rem', boxShadow: pts > 0 ? '0 2px 12px rgba(204,51,85,0.6)' : 'none', border: '1.5px solid var(--tp-border)', zIndex: 1 }}>
                   {pts}
                 </div>
 
@@ -1480,16 +1690,9 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
                     <button key={type} className="star-btn" disabled={isBusy}
                       onClick={() => giveStars(student.id, cfg.pts, type as any)}
                       title={`${cfg.name}: +${cfg.pts} star point${cfg.pts > 1 ? 's' : ''}`}
-                      style={{ flex: 1, height: 46, borderRadius: 12, border: 'none', background: cfg.bg, cursor: 'pointer', fontSize: '1.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 3px 10px ${cfg.glow}` }}>
+                      style={{ flex: 1, height: 42, borderRadius: 10, border: 'none', background: cfg.bg, color: cfg.ink, cursor: 'pointer', font: "900 17px/1 var(--tp-display)", fontStretch: '112%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 4px 12px ${cfg.glow}, inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 0 rgba(0,0,0,.15)` }}>
                       {isBusy ? '…' : cfg.label}
                     </button>
-                  ))}
-                </div>
-
-                {/* pt labels under buttons */}
-                <div style={{ display: 'flex', gap: 5, width: '100%' }}>
-                  {(Object.entries(starColors) as [string, typeof starColors.bronze][]).map(([type, cfg]) => (
-                    <div key={type} style={{ flex: 1, textAlign: 'center', fontSize: '0.58rem', fontWeight: 700, color: 'var(--tp-muted)', letterSpacing: '0.04em' }}>+{cfg.pts}pt</div>
                   ))}
                 </div>
 
@@ -1498,10 +1701,10 @@ function StarsTab({ students, session }: { students: Student[]; session: NonNull
                   title="Remove 1 star point"
                   style={{
                     width: '100%', marginTop: 2, height: 26, borderRadius: 9, fontSize: '0.68rem', fontWeight: 800,
-                    border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#f87171',
+                    border: '1px solid var(--tp-border)', background: 'transparent', color: 'var(--tp-muted)',
                     cursor: pts > 0 ? 'pointer' : 'not-allowed', opacity: pts > 0 ? 1 : 0.4,
                   }}>
-                  − 1 ⭐
+                  − 1 point
                 </button>
               </div>
             );
@@ -1528,7 +1731,7 @@ const DB_DECK_OPTIONS = [
 ];
 
 const DB_RARITY_OPTIONS = [
-  { id: 'common',    label: '⭐ Common',     color: '#9ca3af', hint: 'Available in all packs' },
+  { id: 'common',    label: '⭐ Common',     color: '#c08552', hint: 'Available in all packs' },
   { id: 'silver',    label: '✦ Silver',      color: '#94a3b8', hint: 'Less common in packs' },
   { id: 'gold-rare', label: '★ Gold',        color: '#f59e0b', hint: 'Rare — few per pack cycle' },
   { id: 'prismatic', label: '🌈 Rainbow',    color: '#a855f7', hint: 'Extremely rare, holographic' },
@@ -1675,22 +1878,14 @@ function CardDatabaseTab({ session, specialPackLabel }: { session: NonNullable<i
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-      {/* Header */}
-      <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: '18px 24px', border: '1.5px solid rgba(160,140,220,0.2)' }}>
-        <div style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--tp-text)', marginBottom: 4 }}>🃏 Card Database</div>
-        <div style={{ fontSize: '0.8rem', color: 'var(--tp-text2)', lineHeight: 1.5 }}>
-          Create cards for the pack pool. Students spend ⭐ star points on packs — each pack pulls random cards from this database. Higher rarity cards appear less often.
-        </div>
-      </div>
-
       {/* Card Builder */}
-      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr 260px', gap: '1.5rem', alignItems: 'start' }}>
+      <div className="tp-builder">
 
         {/* Column 1: Image */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div className="tp-panel">
             <div className="tp-section">1 · Upload Image</div>
-            <div style={{ background: '#0d1230', borderRadius: 8, border: '2px dashed rgba(192,132,252,0.25)', aspectRatio: '4/3', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 8, position: 'relative' }}>
+            <div style={{ background: 'var(--tp-sunken)', borderRadius: 10, border: '1.5px dashed var(--tp-border-bright)', aspectRatio: '4/3', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 8, position: 'relative' }}>
               {dbImage ? (
                 <img src={dbImage} alt="preview" draggable={false}
                   onMouseDown={e => { e.preventDefault(); setDbIsDragging(true); setDbDragStart({ clientX: e.clientX, clientY: e.clientY, startX: dbPosition.x, startY: dbPosition.y }); }}
@@ -1705,7 +1900,7 @@ function CardDatabaseTab({ session, specialPackLabel }: { session: NonNullable<i
             {dbImage && (
               <div style={{ display: 'flex', gap: 4, marginBottom: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
                 {[['↺', () => setDbRotation(r => r - 90)], ['↻', () => setDbRotation(r => r + 90)], ['⟳', () => { setDbScale(1); setDbRotation(0); setDbPosition({ x:0,y:0 }); }]].map(([l, fn]: any) => (
-                  <button key={l} onClick={fn} style={{ fontSize:'0.68rem', padding:'3px 9px', border:'1px solid rgba(160,140,220,0.25)', borderRadius:4, background:'rgba(255,255,255,0.07)', cursor:'pointer', color:'var(--tp-text2)' }}>{l}</button>
+                  <button key={l} onClick={fn} style={{ fontSize:'0.68rem', padding:'3px 9px', border:'1px solid var(--tp-border-bright)', borderRadius:4, background:'var(--tp-lift-2)', cursor:'pointer', color:'var(--tp-text2)' }}>{l}</button>
                 ))}
               </div>
             )}
@@ -1713,7 +1908,7 @@ function CardDatabaseTab({ session, specialPackLabel }: { session: NonNullable<i
               <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
                 <span style={{ fontSize:'0.65rem', color:'var(--tp-muted)', flexShrink:0 }}>🔍</span>
                 <input type="range" min="0.3" max="5" step="0.05" value={dbScale}
-                  onChange={e => setDbScale(parseFloat(e.target.value))} style={{ flex:1, accentColor:'#c084fc' }} />
+                  onChange={e => setDbScale(parseFloat(e.target.value))} style={{ flex:1, accentColor:'var(--tp-rose)' }} />
                 <span style={{ fontSize:'0.68rem', color:'var(--tp-muted)', width:28, textAlign:'right' }}>{dbScale.toFixed(1)}×</span>
               </div>
             )}
@@ -1723,7 +1918,7 @@ function CardDatabaseTab({ session, specialPackLabel }: { session: NonNullable<i
               </div>
             )}
             <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} style={{ display:'none' }} />
-            <button onClick={() => fileInputRef.current?.click()} style={{ width:'100%', padding:'0.5rem', border:'1.5px dashed rgba(160,140,220,0.35)', borderRadius:8, background:'rgba(192,132,252,0.1)', color:'var(--tp-text2)', fontSize:'0.8rem', cursor:'pointer', fontWeight:700 }}>
+            <button onClick={() => fileInputRef.current?.click()} style={{ width:'100%', padding:'0.5rem', border:'1.5px dashed var(--tp-border-bright)', borderRadius:8, background:'rgba(204,51,85,0.1)', color:'var(--tp-text2)', fontSize:'0.8rem', cursor:'pointer', fontWeight:700 }}>
               📁 Upload Image
             </button>
             {dbImage && (
@@ -1750,7 +1945,7 @@ function CardDatabaseTab({ session, specialPackLabel }: { session: NonNullable<i
             <label className="tp-label">Preview Rarity <span style={{ fontWeight:400, fontSize:'0.7rem', color:'#b0b8cc', textTransform:'none', letterSpacing:0 }}>(for preview only — rarity is assigned when a pack is opened)</span></label>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
               {DB_RARITY_OPTIONS.map(r => (
-                <button key={r.id} onClick={() => setCardRarity(r.id)} style={{ padding:'8px 10px', borderRadius:10, fontSize:'0.78rem', fontWeight:700, cursor:'pointer', textAlign:'left', border: cardRarity === r.id ? `2px solid ${r.color}` : '1.5px solid rgba(180,160,220,0.2)', background: cardRarity === r.id ? `${r.color}18` : 'rgba(255,255,255,0.07)', color: cardRarity === r.id ? r.color : '#8090b0' }}>
+                <button key={r.id} onClick={() => setCardRarity(r.id)} style={{ padding:'8px 10px', borderRadius:10, fontSize:'0.78rem', fontWeight:700, cursor:'pointer', textAlign:'left', border: cardRarity === r.id ? `2px solid ${r.color}` : '1.5px solid var(--tp-border)', background: cardRarity === r.id ? `${r.color}18` : 'var(--tp-lift-2)', color: cardRarity === r.id ? r.color : 'var(--tp-muted)' }}>
                   <div>{r.label}</div>
                   <div style={{ fontSize:'0.65rem', opacity:0.7, marginTop:1 }}>{r.hint}</div>
                 </button>
@@ -1763,7 +1958,7 @@ function CardDatabaseTab({ session, specialPackLabel }: { session: NonNullable<i
             <label className="tp-label">Deck Type</label>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
               {deckOptions.map(d => (
-                <button key={d.id} onClick={() => setCardDeck(d.id)} style={{ padding:'5px 12px', borderRadius:20, fontSize:'0.76rem', fontWeight:700, cursor:'pointer', border: cardDeck === d.id ? `2px solid ${d.color}` : '1.5px solid rgba(180,160,220,0.2)', background: cardDeck === d.id ? `${d.color}18` : 'rgba(255,255,255,0.07)', color: cardDeck === d.id ? d.color : '#8090b0' }}>
+                <button key={d.id} onClick={() => setCardDeck(d.id)} style={{ padding:'5px 12px', borderRadius:20, fontSize:'0.76rem', fontWeight:700, cursor:'pointer', border: cardDeck === d.id ? `2px solid ${d.color}` : '1.5px solid var(--tp-border)', background: cardDeck === d.id ? `${d.color}18` : 'var(--tp-lift-2)', color: cardDeck === d.id ? d.color : 'var(--tp-muted)' }}>
                   {d.label}
                 </button>
               ))}
@@ -1781,9 +1976,9 @@ function CardDatabaseTab({ session, specialPackLabel }: { session: NonNullable<i
           {/* Actions */}
           <div>
             <label className="tp-label">Action Names</label>
-            <div style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, padding:'12px 14px', display:'flex', flexDirection:'column', gap:10 }}>
+            <div style={{ background:'var(--tp-lift-2)', border:'1px solid var(--tp-border)', borderRadius:12, padding:'12px 14px', display:'flex', flexDirection:'column', gap:10 }}>
 
-              <div style={{ background:'rgba(192,132,252,0.1)', border:'1px solid rgba(160,140,220,0.15)', borderRadius:8, padding:'8px 10px', fontSize:'0.72rem', color:'var(--tp-text2)', lineHeight:1.5 }}>
+              <div style={{ background:'rgba(204,51,85,0.1)', border:'1px solid var(--tp-border)', borderRadius:8, padding:'8px 10px', fontSize:'0.72rem', color:'var(--tp-text2)', lineHeight:1.5 }}>
                 🔒 <strong>Stats are sealed</strong> — HP and damage values are rolled randomly when a student opens their pack. Only name the actions here.
               </div>
 
@@ -1804,7 +1999,7 @@ function CardDatabaseTab({ session, specialPackLabel }: { session: NonNullable<i
               </div>
 
               {/* HP range info */}
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:6, borderTop:'1px solid rgba(255,255,255,0.08)', fontSize:'0.72rem', color:'var(--tp-muted)' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:6, borderTop:'1px solid var(--tp-border)', fontSize:'0.72rem', color:'var(--tp-muted)' }}>
                 <span>❤️ Hit Points</span>
                 <span style={{ fontWeight:700, color:'var(--tp-text2)' }}>{currentRange.hpMin}–{currentRange.hpMax} (rolled on open)</span>
               </div>
@@ -1812,13 +2007,13 @@ function CardDatabaseTab({ session, specialPackLabel }: { session: NonNullable<i
           </div>
 
           {/* Rare Exclusive */}
-          <div style={{ background: isRareExclusive ? 'rgba(192,132,252,0.1)' : 'rgba(255,255,255,0.4)', border:`1.5px solid ${isRareExclusive ? 'rgba(245,158,11,0.3)' : 'rgba(180,160,220,0.2)'}`, borderRadius:12, padding:'10px 14px' }}>
+          <div style={{ background: isRareExclusive ? 'rgba(204,51,85,0.1)' : 'var(--tp-lift-3)', border:`1.5px solid ${isRareExclusive ? 'rgba(245,158,11,0.3)' : 'var(--tp-border)'}`, borderRadius:12, padding:'10px 14px' }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: isRareExclusive ? 8 : 0 }}>
               <div>
-                <div style={{ fontSize:'0.8rem', fontWeight:800, color: isRareExclusive ? '#c084fc' : 'var(--tp-text2)' }}>🌟 Rare Exclusive</div>
+                <div style={{ fontSize:'0.8rem', fontWeight:800, color: isRareExclusive ? 'var(--tp-accent-pink)' : 'var(--tp-text2)' }}>🌟 Rare Exclusive</div>
                 <div style={{ fontSize:'0.65rem', color:'var(--tp-muted)', marginTop:2 }}>Limit how many students can own this card</div>
               </div>
-              <button onClick={() => setIsRareExclusive(v => !v)} style={{ padding:'4px 14px', borderRadius:20, fontSize:'0.75rem', fontWeight:800, border:'none', cursor:'pointer', background: isRareExclusive ? 'rgba(192,132,252,0.2)' : 'rgba(255,255,255,0.08)', color: isRareExclusive ? '#92400e' : '#8090b0' }}>
+              <button onClick={() => setIsRareExclusive(v => !v)} style={{ padding:'4px 14px', borderRadius:20, fontSize:'0.75rem', fontWeight:800, border:'none', cursor:'pointer', background: isRareExclusive ? 'rgba(204,51,85,0.2)' : 'var(--tp-lift-2)', color: isRareExclusive ? '#92400e' : 'var(--tp-muted)' }}>
                 {isRareExclusive ? 'ON' : 'OFF'}
               </button>
             </div>
@@ -1833,8 +2028,8 @@ function CardDatabaseTab({ session, specialPackLabel }: { session: NonNullable<i
           </div>
         </div>
 
-        {/* Column 3: Preview + Save */}
-        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+        {/* Column 3: Preview + Save — sticky, so the card stays in view while you fill the form */}
+        <div className="tp-builder-preview">
           <div className="tp-section">3 · Preview & Save</div>
 
           {/* PokeCard preview */}
@@ -1859,8 +2054,8 @@ function CardDatabaseTab({ session, specialPackLabel }: { session: NonNullable<i
           </div>
 
           {/* Sealed badge */}
-          <div style={{ background:'rgba(192,132,252,0.08)', border:'1px solid rgba(192,132,252,0.2)', borderRadius:12, padding:'10px 14px', textAlign:'center' }}>
-            <div style={{ fontSize:'0.8rem', fontWeight:800, color:'#c084fc' }}>🔒 Stats Sealed</div>
+          <div style={{ background:'rgba(204,51,85,0.08)', border:'1px solid rgba(204,51,85,0.2)', borderRadius:12, padding:'10px 14px', textAlign:'center' }}>
+            <div style={{ fontSize:'0.8rem', fontWeight:800, color:'var(--tp-accent-pink)' }}>🔒 Stats Sealed</div>
             <div style={{ fontSize:'0.68rem', color:'var(--tp-text2)', marginTop:3, lineHeight:1.4 }}>
               HP, damage & skill points are rolled<br/>randomly when a student opens their pack
             </div>
@@ -2027,14 +2222,15 @@ function CharacterPoolTab({ session, specialPackLabel }: { session: NonNullable<
     return `${start}–${end}`;
   };
 
+  // Match the studio's .tp-input / .tp-label so this modal isn't its own island.
   const inputStyle: React.CSSProperties = {
-    width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 8,
-    border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)',
-    color: 'var(--tp-text)', fontSize: '0.8rem', outline: 'none',
+    width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10,
+    border: '1px solid var(--tp-input-border)', background: 'var(--tp-input-bg)',
+    color: 'var(--tp-text)', fontSize: 14, fontFamily: 'var(--tp-body)', outline: 'none',
   };
   const labelStyle: React.CSSProperties = {
-    fontSize: '0.65rem', color: 'var(--tp-muted)', letterSpacing: '0.1em',
-    textTransform: 'uppercase', marginBottom: 4, display: 'block',
+    font: '600 10.5px/1.3 var(--tp-mono)', color: 'var(--tp-label-color)', letterSpacing: '0.14em',
+    textTransform: 'uppercase', marginBottom: 8, display: 'block',
   };
 
   return (
@@ -2042,14 +2238,12 @@ function CharacterPoolTab({ session, specialPackLabel }: { session: NonNullable<
 
       {/* ── Edit Modal ── */}
       {editCard && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', padding: '1rem' }}
+        <div className="tp-modal-bg" style={{ zIndex: 1000 }}
           onClick={e => e.target === e.currentTarget && setEditCard(null)}>
-          <div style={{ background: '#131929', border: '1px solid rgba(192,132,252,0.25)', borderRadius: 20, padding: '1.8rem', width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}>
+          <div className="tp-modal" style={{ maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', padding: '1.8rem' }}>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.4rem' }}>
-              <div style={{ fontWeight: 900, fontSize: '1rem', background: 'linear-gradient(135deg,#c084fc,#818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                ✏️ Edit Card
-              </div>
+              <h3 style={{ margin: 0 }}>Edit card</h3>
               <button onClick={() => setEditCard(null)} style={{ background: 'none', border: 'none', color: 'var(--tp-muted)', fontSize: '1.2rem', cursor: 'pointer', lineHeight: 1 }}>✕</button>
             </div>
 
@@ -2080,7 +2274,7 @@ function CharacterPoolTab({ session, specialPackLabel }: { session: NonNullable<
                 <label style={labelStyle}>Card Image</label>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                   {/* Preview */}
-                  <div style={{ width: 90, height: 90, borderRadius: 10, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.03)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 90, height: 90, borderRadius: 10, overflow: 'hidden', border: '1.5px solid var(--tp-border)', background: 'var(--tp-lift)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {editForm.image_url
                       ? <img src={editForm.image_url} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       : <span style={{ fontSize: '1.8rem', opacity: 0.2 }}>🖼</span>
@@ -2088,7 +2282,7 @@ function CharacterPoolTab({ session, specialPackLabel }: { session: NonNullable<
                   </div>
                   {/* Upload + clear controls */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-                    <label style={{ display: 'inline-block', padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(192,132,252,0.4)', background: 'rgba(192,132,252,0.08)', color: '#c084fc', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}>
+                    <label style={{ display: 'inline-block', padding: '8px 14px', borderRadius: 8, border: '1px solid rgba(204,51,85,0.4)', background: 'rgba(204,51,85,0.08)', color: 'var(--tp-accent-pink)', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}>
                       📁 Choose Image
                       <input type="file" accept="image/*" style={{ display: 'none' }}
                         onChange={async e => {
@@ -2104,7 +2298,7 @@ function CharacterPoolTab({ session, specialPackLabel }: { session: NonNullable<
                     </label>
                     {editForm.image_url && (
                       <button onClick={() => setEditForm((prev: any) => ({ ...prev, image_url: '' }))}
-                        style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)', color: '#f87171', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 700 }}>
+                        style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)', color: 'var(--tp-danger-text)', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 700 }}>
                         ✕ Remove Image
                       </button>
                     )}
@@ -2157,7 +2351,7 @@ function CharacterPoolTab({ session, specialPackLabel }: { session: NonNullable<
                 </div>
               </div>
 
-              {editError && <div style={{ fontSize: '0.75rem', color: '#f87171', background: 'rgba(248,113,113,0.08)', borderRadius: 8, padding: '8px 12px' }}>{editError}</div>}
+              {editError && <div style={{ fontSize: '0.75rem', color: 'var(--tp-danger-text)', background: 'rgba(248,113,113,0.08)', borderRadius: 8, padding: '8px 12px' }}>{editError}</div>}
 
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
                 <button onClick={() => setEditCard(null)} className="tp-btn-outline" style={{ fontSize: '0.78rem' }}>Cancel</button>
@@ -2170,21 +2364,15 @@ function CharacterPoolTab({ session, specialPackLabel }: { session: NonNullable<
         </div>
       )}
 
-      <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: '18px 24px', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
-        <div style={{ fontSize: '1rem', fontWeight: 900, marginBottom: 4, background: 'linear-gradient(135deg,#c084fc,#818cf8,#38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>🃏 Card Database</div>
-        <div style={{ fontSize: '0.8rem', color: 'var(--tp-text2)', lineHeight: 1.5 }}>
-          All characters available in student card packs. Use <strong style={{ color: 'rgba(192,132,252,0.9)' }}>Card Creation</strong> to add new characters.
-        </div>
-      </div>
 
       {/* Filter pills + refresh */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button onClick={() => handleFilterChange('all')} style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === 'all' ? '2px solid rgba(192,132,252,0.7)' : '1px solid rgba(255,255,255,0.1)', background: filter === 'all' ? 'rgba(192,132,252,0.18)' : 'rgba(255,255,255,0.05)', color: filter === 'all' ? '#c084fc' : 'var(--tp-muted)' }}>
+          <button onClick={() => handleFilterChange('all')} style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === 'all' ? '2px solid rgba(204,51,85,0.7)' : '1px solid var(--tp-border)', background: filter === 'all' ? 'rgba(204,51,85,0.18)' : 'var(--tp-lift)', color: filter === 'all' ? 'var(--tp-accent-pink)' : 'var(--tp-muted)' }}>
             ✦ All <span style={{ opacity: 0.6 }}>({deckCounts['all'] ?? 0})</span>
           </button>
           {deckOptions.map(d => (
-            <button key={d.id} onClick={() => handleFilterChange(d.id)} style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === d.id ? `2px solid ${d.color}` : '1px solid rgba(255,255,255,0.1)', background: filter === d.id ? `${d.color}22` : 'rgba(255,255,255,0.05)', color: filter === d.id ? d.color : 'var(--tp-muted)' }}>
+            <button key={d.id} onClick={() => handleFilterChange(d.id)} style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', border: filter === d.id ? `2px solid ${d.color}` : '1px solid var(--tp-border)', background: filter === d.id ? `${d.color}22` : 'var(--tp-lift)', color: filter === d.id ? d.color : 'var(--tp-muted)' }}>
               {d.label} <span style={{ opacity: 0.6 }}>({deckCounts[d.id] ?? 0})</span>
             </button>
           ))}
@@ -2196,7 +2384,7 @@ function CharacterPoolTab({ session, specialPackLabel }: { session: NonNullable<
       {loading ? (
         <div style={{ textAlign: 'center', color: 'var(--tp-muted)', fontSize: '0.85rem', padding: 48 }}>Loading…</div>
       ) : cards.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '4rem 2rem', border: '2px dashed rgba(192,132,252,0.15)', borderRadius: 20 }}>
+        <div style={{ textAlign: 'center', padding: '4rem 2rem', border: '2px dashed rgba(204,51,85,0.15)', borderRadius: 20 }}>
           <div style={{ fontSize: '3rem', marginBottom: 12, opacity: 0.2 }}>🃏</div>
           <p style={{ fontSize: '0.85rem', color: 'var(--tp-muted)', fontStyle: 'italic', margin: 0 }}>
             {totalCount === 0 ? 'No characters yet — go to Card Creation to add some!' : `No ${filter} characters on this page.`}
@@ -2207,19 +2395,19 @@ function CharacterPoolTab({ session, specialPackLabel }: { session: NonNullable<
           {cards.map(c => {
             const dc = deckOptions.find(d => d.id === c.type)?.color || '#818cf8';
             return (
-              <div key={c.id} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, overflow: 'hidden', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
+              <div key={c.id} style={{ background: 'var(--tp-lift)', border: '1px solid var(--tp-border)', borderRadius: 16, overflow: 'hidden', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
                 <div style={{ height: 3, background: `linear-gradient(90deg,${dc},${dc}66)` }} />
                 {c.image_url ? (
                   <img src={c.image_url} alt={c.card_name} style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }} loading="lazy" />
                 ) : (
-                  <div style={{ width: '100%', height: 130, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', opacity: 0.2 }}>🃏</div>
+                  <div style={{ width: '100%', height: 130, background: 'var(--tp-lift)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', opacity: 0.2 }}>🃏</div>
                 )}
                 <div style={{ padding: '10px 12px' }}>
                   <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--tp-text)', marginBottom: 3 }}>{c.card_name}</div>
                   <div style={{ fontSize: '0.65rem', color: 'var(--tp-muted)', marginBottom: 8, fontStyle: 'italic', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{c.description}</div>
                   <div style={{ display: 'flex', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.6rem', padding: '2px 8px', borderRadius: 20, background: `${dc}22`, color: dc, fontWeight: 700, border: `1px solid ${dc}44` }}>{deckOptions.find(d => d.id === c.type)?.label || c.type}</span>
-                    {c.is_rare_exclusive && <span style={{ fontSize: '0.6rem', padding: '2px 8px', borderRadius: 20, background: 'rgba(192,132,252,0.15)', color: '#c084fc', fontWeight: 700, border: '1px solid rgba(192,132,252,0.3)' }}>🌟 ×{c.max_copies}</span>}
+                    {c.is_rare_exclusive && <span style={{ fontSize: '0.6rem', padding: '2px 8px', borderRadius: 20, background: 'rgba(204,51,85,0.15)', color: 'var(--tp-accent-pink)', fontWeight: 700, border: '1px solid rgba(204,51,85,0.3)' }}>🌟 ×{c.max_copies}</span>}
                   </div>
                   <div style={{ fontSize: '0.62rem', color: 'var(--tp-muted)', marginBottom: 8, display: 'flex', gap: 6 }}>
                     <span>⚡ {c.move1_name || '—'}</span><span style={{ opacity: 0.4 }}>·</span><span>💥 {c.move2_name || '—'}</span>
@@ -2241,7 +2429,7 @@ function CharacterPoolTab({ session, specialPackLabel }: { session: NonNullable<
           <button
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0 || loading}
-            style={{ padding: '5px 12px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 700, cursor: page === 0 ? 'not-allowed' : 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: page === 0 ? 'rgba(180,210,255,0.2)' : 'var(--tp-text2)', opacity: page === 0 ? 0.4 : 1 }}
+            style={{ padding: '5px 12px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 700, cursor: page === 0 ? 'not-allowed' : 'pointer', border: '1px solid var(--tp-border)', background: 'var(--tp-lift)', color: page === 0 ? 'var(--tp-muted)' : 'var(--tp-text2)', opacity: page === 0 ? 0.4 : 1 }}
           >← Prev</button>
 
           {Array.from({ length: totalPages }, (_, i) => (
@@ -2252,9 +2440,9 @@ function CharacterPoolTab({ session, specialPackLabel }: { session: NonNullable<
               style={{
                 padding: '5px 12px', borderRadius: 8, fontSize: '0.72rem', fontWeight: i === page ? 800 : 500,
                 cursor: 'pointer', transition: 'all 0.15s',
-                border: i === page ? '2px solid rgba(192,132,252,0.7)' : '1px solid rgba(255,255,255,0.1)',
-                background: i === page ? 'rgba(192,132,252,0.18)' : 'rgba(255,255,255,0.05)',
-                color: i === page ? '#c084fc' : 'var(--tp-muted)',
+                border: i === page ? '2px solid rgba(204,51,85,0.7)' : '1px solid var(--tp-border)',
+                background: i === page ? 'rgba(204,51,85,0.18)' : 'var(--tp-lift)',
+                color: i === page ? 'var(--tp-accent-pink)' : 'var(--tp-muted)',
               }}
             >
               {pageLabel(i)}
@@ -2264,7 +2452,7 @@ function CharacterPoolTab({ session, specialPackLabel }: { session: NonNullable<
           <button
             onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
             disabled={page === totalPages - 1 || loading}
-            style={{ padding: '5px 12px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 700, cursor: page === totalPages - 1 ? 'not-allowed' : 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: page === totalPages - 1 ? 'rgba(180,210,255,0.2)' : 'var(--tp-text2)', opacity: page === totalPages - 1 ? 0.4 : 1 }}
+            style={{ padding: '5px 12px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 700, cursor: page === totalPages - 1 ? 'not-allowed' : 'pointer', border: '1px solid var(--tp-border)', background: 'var(--tp-lift)', color: page === totalPages - 1 ? 'var(--tp-muted)' : 'var(--tp-text2)', opacity: page === totalPages - 1 ? 0.4 : 1 }}
           >Next →</button>
         </div>
       )}
@@ -2601,45 +2789,33 @@ function WeeklyProjectTab({
 
   return (
     <div>
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <div>
-          <h2 className="font-display font-bold text-xs uppercase tracking-[0.15em] mb-1" style={{ color: '#c084fc' }}>
-            🏆 Aurabot Weekly Challenge
-          </h2>
-          <p className="text-xs italic" style={{ color: 'var(--tp-muted)' }}>
-            {activeChallenge?.week_label || getCurrentWeekLabel()}
-            {activeChallenge?.end_date && ` · Due ${new Date(activeChallenge.end_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`}
-            {activeChallenge && !activeChallenge?.end_date && ' · Students see this challenge and earn the card for completing it'}
-            {!activeChallenge && ' · No challenge published yet — publish one or load one from the Bank'}
-          </p>
+      {/* ── Toolbar: this week · view switcher · actions ── */}
+      <div className="tp-toolbar">
+        <div className="tp-weekchip">
+          <span className="dot" data-live={activeChallenge ? '' : undefined} />
+          <div>
+            <b>{activeChallenge?.week_label || getCurrentWeekLabel()}
+              {activeChallenge?.end_date && ` · Due ${new Date(activeChallenge.end_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`}</b>
+            <span>{activeChallenge ? 'Live — students can see this challenge' : 'Nothing published yet — publish one, or load one from the Bank'}</span>
+          </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          {/* View toggle */}
-          <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <button
-              onClick={() => setWeeklyView('project')}
-              style={{ padding: '5px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', border: 'none', background: weeklyView === 'project' ? 'rgba(192,132,252,0.2)' : 'transparent', color: weeklyView === 'project' ? '#c084fc' : '#9a7040' }}
-            >🏆 Challenge</button>
-            <button
-              onClick={() => { setWeeklyView('bank'); loadChallengeBank(); }}
-              style={{ padding: '5px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', border: 'none', borderLeft: '1px solid rgba(90,50,10,0.2)', background: weeklyView === 'bank' ? 'rgba(192,132,252,0.2)' : 'transparent', color: weeklyView === 'bank' ? '#c084fc' : '#9a7040' }}
-            >🗄️ Bank {challengeBank.length > 0 && <span style={{ background: 'rgba(192,132,252,0.25)', color: '#c084fc', borderRadius: '50%', padding: '1px 5px', fontSize: '0.62rem', marginLeft: 4 }}>{challengeBank.length}</span>}</button>
+
+        <div className="tp-toolbar-right">
+          <div className="tp-seg" role="group" aria-label="Weekly project view">
+            <button aria-pressed={weeklyView === 'project'} onClick={() => setWeeklyView('project')}>Challenge</button>
+            <button aria-pressed={weeklyView === 'bank'} onClick={() => { setWeeklyView('bank'); loadChallengeBank(); }}>
+              Bank {challengeBank.length > 0 && <i>{challengeBank.length}</i>}
+            </button>
             {hasActiveChallenge && (
-              <button
-                onClick={handleViewSubmissions}
-                style={{ padding: '5px 14px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', border: 'none', borderLeft: '1px solid rgba(90,50,10,0.2)', background: weeklyView === 'submissions' ? 'rgba(192,132,252,0.2)' : 'transparent', color: weeklyView === 'submissions' ? '#c084fc' : '#9a7040' }}
-              >📥 Submissions {submissions.length > 0 && <span style={{ background: 'linear-gradient(135deg,#f472b6,#c084fc)', color: 'white', borderRadius: '50%', padding: '1px 5px', fontSize: '0.62rem', marginLeft: 4 }}>{submissions.length}</span>}</button>
+              <button aria-pressed={weeklyView === 'submissions'} onClick={handleViewSubmissions}>
+                Submissions {submissions.length > 0 && <i className="hot">{submissions.length}</i>}
+              </button>
             )}
           </div>
           {hasActiveChallenge && (
-            <button onClick={handleOpenAward} className="tp-btn-gold">
-              🏅 Award Students
-            </button>
+            <button onClick={handleOpenAward} className="tp-btn-gold">Award students</button>
           )}
-          <button onClick={handleNewProject} className="tp-btn-outline" style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'var(--tp-text2)' }}>
-            + New Challenge
-          </button>
+          <button onClick={handleNewProject} className="tp-btn-outline"><Ico name="plus" /> New challenge</button>
         </div>
       </div>
 
@@ -2661,11 +2837,11 @@ function WeeklyProjectTab({
           ) : bankError ? (
             <div className="text-center py-12" style={{ background: 'rgba(255,80,80,0.06)', borderRadius: 16, border: '1.5px solid rgba(255,80,80,0.25)' }}>
               <div style={{ fontSize: '1.6rem', marginBottom: 6 }}>⚠️</div>
-              <p style={{ fontSize: '0.82rem', color: '#ff7070', fontWeight: 700, margin: '0 0 4px' }}>Couldn't load the Challenge Bank</p>
+              <p style={{ fontSize: '0.82rem', color: 'var(--tp-danger-text)', fontWeight: 700, margin: '0 0 4px' }}>Couldn't load the Challenge Bank</p>
               <p style={{ fontSize: '0.72rem', color: 'var(--tp-muted)', margin: 0, padding: '0 20px' }}>{bankError}</p>
             </div>
           ) : challengeBank.length === 0 ? (
-            <div className="text-center py-16" style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, border: '2px dashed rgba(192,132,252,0.2)' }}>
+            <div className="text-center py-16" style={{ background: 'var(--tp-lift)', borderRadius: 16, border: '2px dashed rgba(204,51,85,0.2)' }}>
               <div style={{ fontSize: '2.5rem', opacity: 0.2, marginBottom: 8 }}>🏆</div>
               <p className="text-sm italic" style={{ color: 'var(--tp-muted)' }}>No challenges saved yet. Create your first one!</p>
             </div>
@@ -2679,8 +2855,8 @@ function WeeklyProjectTab({
                 return (
                   <div key={c.id} style={{
                     borderRadius: 16, overflow: 'hidden',
-                    border: isActive ? '2px solid #c084fc' : '1.5px solid rgba(255,255,255,0.09)',
-                    background: isActive ? 'rgba(192,132,252,0.07)' : 'rgba(255,255,255,0.05)',
+                    border: isActive ? '2px solid var(--tp-rose)' : '1.5px solid var(--tp-border)',
+                    background: isActive ? 'rgba(204,51,85,0.07)' : 'var(--tp-lift)',
                     transition: 'all 0.15s',
                   }}>
                     {/* Card image strip */}
@@ -2691,7 +2867,7 @@ function WeeklyProjectTab({
                         <span style={{ fontSize: '2rem', opacity: 0.15 }}>📋</span>
                       )}
                       {isActive && (
-                        <div style={{ position: 'absolute', top: 8, right: 8, background: '#c084fc', color: 'white', fontSize: '0.6rem', fontWeight: 900, padding: '2px 8px', borderRadius: 99, letterSpacing: '0.05em' }}>
+                        <div style={{ position: 'absolute', top: 8, right: 8, background: 'var(--tp-rose)', color: 'white', fontSize: '0.6rem', fontWeight: 900, padding: '2px 8px', borderRadius: 99, letterSpacing: '0.05em' }}>
                           ACTIVE
                         </div>
                       )}
@@ -2710,7 +2886,7 @@ function WeeklyProjectTab({
                     <div style={{ display: 'flex', gap: 8, padding: '0 16px 14px' }}>
                       <button
                         onClick={() => handleLoadChallenge(c)}
-                        style={{ flex: 1, padding: '7px 0', borderRadius: 9, fontSize: '0.73rem', fontWeight: 800, cursor: 'pointer', border: '1.5px solid rgba(192,132,252,0.4)', background: 'rgba(192,132,252,0.1)', color: '#c084fc', transition: 'all 0.15s' }}
+                        style={{ flex: 1, padding: '7px 0', borderRadius: 9, fontSize: '0.73rem', fontWeight: 800, cursor: 'pointer', border: '1.5px solid rgba(204,51,85,0.4)', background: 'rgba(204,51,85,0.1)', color: 'var(--tp-accent-pink)', transition: 'all 0.15s' }}
                         onMouseEnter={e => (e.currentTarget.style.background = 'rgba(192,132,252,0.2)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'rgba(192,132,252,0.1)')}
                       >✏️ Load & Edit</button>
@@ -2737,7 +2913,7 @@ function WeeklyProjectTab({
             <h3 className="text-sm font-bold" style={{ color: 'var(--tp-text)' }}>
               Student Submissions — {activeChallenge.title}
             </h3>
-            <button onClick={() => loadSubmissions(activeChallenge.id)} className="tp-btn-outline" style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'var(--tp-muted)' }}>
+            <button onClick={() => loadSubmissions(activeChallenge.id)} className="tp-btn-outline" style={{ borderColor: 'var(--tp-border)', color: 'var(--tp-muted)' }}>
               ↻ Refresh
             </button>
           </div>
@@ -2745,14 +2921,14 @@ function WeeklyProjectTab({
           {submissionsLoading ? (
             <div className="text-sm italic text-center py-8" style={{ color: 'var(--tp-muted)' }}>Loading submissions…</div>
           ) : submissions.length === 0 ? (
-            <div className="text-center py-12" style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, border: '2px dashed rgba(200,160,0,0.2)' }}>
+            <div className="text-center py-12" style={{ background: 'var(--tp-lift)', borderRadius: 16, border: '2px dashed rgba(200,160,0,0.2)' }}>
               <div style={{ fontSize: '2.5rem', opacity: 0.2, marginBottom: 8 }}>📭</div>
               <p className="text-sm italic" style={{ color: 'var(--tp-muted)' }}>No pending submissions yet</p>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
               {submissions.map((sub: any) => (
-                <div key={sub.id} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: '1.2rem 1.5rem' }}>
+                <div key={sub.id} style={{ background: 'var(--tp-lift)', border: '1px solid var(--tp-border)', borderRadius: 16, padding: '1.2rem 1.5rem' }}>
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     {/* Student info */}
                     <div style={{ flex: 1, minWidth: 180 }}>
@@ -2767,7 +2943,7 @@ function WeeklyProjectTab({
                         {sub.photo1_url && (
                           <a href={sub.photo1_url} target="_blank" rel="noopener noreferrer">
                             <img src={sub.photo1_url} alt="Evidence 1"
-                              style={{ width: 110, height: 80, objectFit: 'cover', borderRadius: 10, border: '1.5px solid rgba(192,132,252,0.3)', cursor: 'pointer', transition: 'transform 0.15s' }}
+                              style={{ width: 110, height: 80, objectFit: 'cover', borderRadius: 10, border: '1.5px solid rgba(204,51,85,0.3)', cursor: 'pointer', transition: 'transform 0.15s' }}
                               onMouseEnter={e => { (e.target as HTMLImageElement).style.transform = 'scale(1.05)'; }}
                               onMouseLeave={e => { (e.target as HTMLImageElement).style.transform = 'scale(1)'; }}
                             />
@@ -2776,7 +2952,7 @@ function WeeklyProjectTab({
                         {sub.photo2_url && (
                           <a href={sub.photo2_url} target="_blank" rel="noopener noreferrer">
                             <img src={sub.photo2_url} alt="Evidence 2"
-                              style={{ width: 110, height: 80, objectFit: 'cover', borderRadius: 10, border: '1.5px solid rgba(192,132,252,0.3)', cursor: 'pointer', transition: 'transform 0.15s' }}
+                              style={{ width: 110, height: 80, objectFit: 'cover', borderRadius: 10, border: '1.5px solid rgba(204,51,85,0.3)', cursor: 'pointer', transition: 'transform 0.15s' }}
                               onMouseEnter={e => { (e.target as HTMLImageElement).style.transform = 'scale(1.05)'; }}
                               onMouseLeave={e => { (e.target as HTMLImageElement).style.transform = 'scale(1)'; }}
                             />
@@ -2792,9 +2968,9 @@ function WeeklyProjectTab({
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
                       <div className="text-xs font-bold mb-1 text-center" style={{ color: 'var(--tp-muted)' }}>Award as:</div>
                       {([
-                        { rar: 'common'    as const, label: '⭐ Common',  color: '#a78bfa', bg: 'rgba(167,139,250,0.12)',   border: 'rgba(200,160,0,0.35)' },
+                        { rar: 'common'    as const, label: '⭐ Common',  color: 'var(--tp-accent-pink)', bg: 'rgba(167,139,250,0.12)',   border: 'rgba(200,160,0,0.35)' },
                         { rar: 'silver'    as const, label: '✦ Silver',   color: '#5a7a90', bg: 'rgba(56,189,248,0.1)', border: 'rgba(120,160,190,0.4)' },
-                        { rar: 'gold-rare' as const, label: '★ Gold',     color: '#f472b6', bg: 'rgba(244,114,182,0.1)',  border: 'rgba(212,160,23,0.4)' },
+                        { rar: 'gold-rare' as const, label: '★ Gold',     color: 'var(--tp-accent-pink)', bg: 'rgba(244,114,182,0.1)',  border: 'rgba(212,160,23,0.4)' },
                       ]).map(({ rar, label, color, bg, border }) => (
                         <button
                           key={rar}
@@ -2819,14 +2995,14 @@ function WeeklyProjectTab({
         <div className="grid gap-6" style={{ gridTemplateColumns: 'minmax(320px,420px) 1fr' }}>
 
           {/* Left: form */}
-          <div className="p-6 rounded-xs" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(90,50,10,0.18)', boxShadow: '2px 3px 12px rgba(0,0,0,0.09)' }}>
+          <div className="p-6 rounded-xs" style={{ background: 'var(--tp-lift)', border: '1px solid rgba(90,50,10,0.18)', boxShadow: '2px 3px 12px rgba(0,0,0,0.09)' }}>
 
             {weeklyProject?.id ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 16, padding: '8px 12px', borderRadius: 10, background: 'rgba(192,132,252,0.1)', border: '1px solid rgba(192,132,252,0.3)' }}>
-                <span style={{ fontSize: '0.72rem', color: '#c084fc', fontWeight: 700 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 16, padding: '8px 12px', borderRadius: 10, background: 'rgba(204,51,85,0.1)', border: '1px solid rgba(204,51,85,0.3)' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--tp-accent-pink)', fontWeight: 700 }}>
                   ✏️ Editing "{weeklyProject.title}" — Save will update this Bank entry
                 </span>
-                <button onClick={handleNewProject} style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--tp-text2)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 7, padding: '3px 9px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                <button onClick={handleNewProject} style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--tp-text2)', background: 'var(--tp-lift-2)', border: '1px solid var(--tp-border)', borderRadius: 7, padding: '3px 9px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                   + New instead
                 </button>
               </div>
@@ -2891,7 +3067,7 @@ function WeeklyProjectTab({
                           display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
                           borderRadius: 12, cursor: 'pointer', textAlign: 'left', width: '100%',
                           border: isPicked ? '2px solid #f97316' : '1.5px solid rgba(249,115,22,0.2)',
-                          background: isPicked ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.05)',
+                          background: isPicked ? 'rgba(249,115,22,0.12)' : 'var(--tp-lift)',
                           transition: 'all 0.15s',
                         }}
                       >
@@ -2916,7 +3092,7 @@ function WeeklyProjectTab({
             </div>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <button onClick={handleSaveToBank} className="w-full py-2 rounded-lg text-sm font-bold" style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--tp-text2)', cursor: 'pointer' }}>
+              <button onClick={handleSaveToBank} className="w-full py-2 rounded-lg text-sm font-bold" style={{ flex: 1, background: 'var(--tp-lift)', border: '1px solid var(--tp-border)', color: 'var(--tp-text2)', cursor: 'pointer' }}>
                 🗄️ Save to Bank
               </button>
               {weeklyCard && (
@@ -2936,17 +3112,17 @@ function WeeklyProjectTab({
                 <div className="flex justify-center">
                   <PokeCard card={weeklyCard as Card} showShimmerBtn />
                 </div>
-                <div className="p-5 rounded-xs" style={{ background:'rgba(255,255,255,0.07)', border:'1.5px solid rgba(255,255,255,0.9)', borderRadius:20 }}>
-                  <div className="text-xs uppercase tracking-widest mb-2" style={{ color: '#c084fc' }}>🏆 Student View Preview</div>
+                <div className="p-5 rounded-xs" style={{ background:'var(--tp-lift-2)', border:'1.5px solid var(--tp-border-bright)', borderRadius:20 }}>
+                  <div className="text-xs uppercase tracking-widest mb-2" style={{ color: 'var(--tp-accent-pink)' }}>🏆 Student View Preview</div>
                   <h3 className="font-display font-black text-base mb-2" style={{ color: 'var(--tp-text)' }}>{weeklyTitle || 'Challenge Title'}</h3>
-                  {weeklyEndDate && <p className="text-xs font-bold mb-2" style={{ color: '#f472b6' }}>📅 Due: {new Date(weeklyEndDate).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' })}</p>}
+                  {weeklyEndDate && <p className="text-xs font-bold mb-2" style={{ color: 'var(--tp-accent-pink)' }}>📅 Due: {new Date(weeklyEndDate).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' })}</p>}
                   <p className="text-sm" style={{ color: 'var(--tp-text)', lineHeight: 1.7 }}>{weeklyTask || 'Task description will appear here.'}</p>
                   {!!weeklyProject?.id && activeChallenge?.id === weeklyProject?.id && <div className="mt-3 text-xs" style={{ color: '#4cba80', fontWeight: 700 }}>✓ Published · Students can see this challenge</div>}
-                  {!!weeklyProject?.id && activeChallenge?.id !== weeklyProject?.id && <div className="mt-3 text-xs" style={{ color: '#c084fc', fontWeight: 700 }}>🗄️ Saved to Bank · Not currently live</div>}
+                  {!!weeklyProject?.id && activeChallenge?.id !== weeklyProject?.id && <div className="mt-3 text-xs" style={{ color: 'var(--tp-accent-pink)', fontWeight: 700 }}>🗄️ Saved to Bank · Not currently live</div>}
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center rounded-xs" style={{ minHeight: 380, border: '2px dashed rgba(200,160,0,0.2)', background: 'rgba(255,255,255,0.04)' }}>
+              <div className="flex flex-col items-center justify-center rounded-xs" style={{ minHeight: 380, border: '2px dashed rgba(200,160,0,0.2)', background: 'var(--tp-lift)' }}>
                 <span className="text-5xl mb-3" style={{ opacity: 0.2 }}>📋</span>
                 <span className="text-sm italic" style={{ color: 'var(--tp-muted)' }}>Fill in the challenge details and select a card</span>
               </div>
@@ -2958,16 +3134,16 @@ function WeeklyProjectTab({
       {/* ══ Bulk Award Modal ═══════════════════════════════════════════ */}
       {awardModal && (
         <div className="tp-modal-bg" onClick={() => { if (!awarding) setAwardModal(false); }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: 'rgba(10,18,48,0.92)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 20, padding: '2rem', width: '95%', maxWidth: 780, maxHeight: '90vh', overflowY: 'auto', position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--tp-raised)', border: '1px solid var(--tp-border-bright)', borderRadius: 18, padding: '2rem', width: '95%', maxWidth: 780, maxHeight: '90vh', overflowY: 'auto', position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
             <button onClick={() => setAwardModal(false)} style={{ position: 'absolute', top: 14, right: 16, background: 'none', border: 'none', fontSize: '1.3rem', cursor: 'pointer', color: 'var(--tp-text2)' }}>✕</button>
             <h3 className="font-display font-black text-xl mb-1" style={{ color: 'var(--tp-text)' }}>🏅 Award "{activeChallenge?.title}"</h3>
             <p className="text-xs mb-5 italic" style={{ color: 'var(--tp-muted)' }}>Tick each student in the column matching their achievement level. Each student can only receive one rarity.</p>
             {awardError && <div className="tp-err mb-4 text-sm">{awardError}</div>}
             <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
               {([
-                { key: 'common', label: 'Common', icon: '⭐', desc: 'Completed the task', color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', border: 'rgba(200,160,0,0.3)' },
+                { key: 'common', label: 'Common', icon: '⭐', desc: 'Completed the task', color: 'var(--tp-accent-pink)', bg: 'rgba(167,139,250,0.08)', border: 'rgba(200,160,0,0.3)' },
                 { key: 'silver', label: 'Silver', icon: '✦', desc: 'Good effort & quality', color: '#5a7a90', bg: 'rgba(56,189,248,0.08)', border: 'rgba(120,160,190,0.35)' },
-                { key: 'gold-rare', label: 'Gold', icon: '★', desc: 'Outstanding work', color: '#f472b6', bg: 'rgba(244,114,182,0.08)', border: 'rgba(212,160,23,0.35)' },
+                { key: 'gold-rare', label: 'Gold', icon: '★', desc: 'Outstanding work', color: 'var(--tp-accent-pink)', bg: 'rgba(244,114,182,0.08)', border: 'rgba(212,160,23,0.35)' },
               ] as const).map(col => (
                 <div key={col.key} style={{ border: `1px solid ${col.border}`, borderRadius: 14, padding: '1rem', background: col.bg }}>
                   <div className="text-center mb-3">
@@ -2993,7 +3169,7 @@ function WeeklyProjectTab({
                 </div>
               ))}
             </div>
-            <div className="mt-5 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="mt-5 pt-4" style={{ borderTop: '1px solid var(--tp-border)' }}>
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="text-sm" style={{ color: 'var(--tp-text)' }}>
                   {awardCount > 0
@@ -3001,7 +3177,7 @@ function WeeklyProjectTab({
                     : <span className="italic" style={{ color: 'var(--tp-muted)' }}>No students selected yet</span>}
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => setAwardModal(false)} className="tp-btn-outline" style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'var(--tp-text2)' }}>Cancel</button>
+                  <button onClick={() => setAwardModal(false)} className="tp-btn-outline" style={{ borderColor: 'var(--tp-border)', color: 'var(--tp-text2)' }}>Cancel</button>
                   <button onClick={handleAward} disabled={awarding || awardCount === 0} className="tp-btn-gold" style={{ opacity: awardCount === 0 ? 0.4 : 1,  }}>
                     {awarding ? 'Awarding…' : `🏅 Award ${awardCount > 0 ? awardCount + ' Student' + (awardCount !== 1 ? 's' : '') : ''}`}
                   </button>

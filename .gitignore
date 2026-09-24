@@ -1,3 +1,22 @@
+# Dependencies — reinstalled with `npm install`, never committed
+node_modules/
+
+# Build output — Netlify builds this itself from source
+dist/
+
+# Secrets. Never commit real keys; Netlify holds them as env vars.
 .env
+.env.*
+!.env.example
+
+# macOS clutter
 .DS_Store
-src/.DS_Store
+**/.DS_Store
+
+# Editor / tooling
+.vscode/
+.idea/
+*.log
+
+# Local build-check artifacts
+aurabot-changed-files.zip
