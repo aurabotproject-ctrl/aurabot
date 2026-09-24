@@ -79,6 +79,100 @@ function rollDice(): number {
   return Math.floor(Math.random() * 6) + 1;
 }
 
+// ── Practice mode ─────────────────────────────────────────────────────
+// A match against a computer-controlled Aurabot. Nothing in it is saved:
+// no card changes hands, no win is recorded and it doesn't count toward the
+// once-a-week limit against a classmate. The bot's cards exist only in memory.
+//
+// Difficulty only changes how the bot does its times tables — how fast it
+// answers and how often it's right — because that's the skill being practised.
+// Its cards mirror the rarities the student brings, with stats rolled from the
+// same ranges packs use, so the fight itself is always even.
+type BotLevel = 'easy' | 'medium' | 'hard';
+const BOT_LEVELS: Record<BotLevel, { label: string; blurb: string; msPerAnswer: number; accuracy: number }> = {
+  easy:   { label: 'Easy',   blurb: 'Slow and makes mistakes',  msPerAnswer: 2200, accuracy: 0.70 },
+  medium: { label: 'Medium', blurb: 'Steady and mostly right',  msPerAnswer: 1600, accuracy: 0.85 },
+  hard:   { label: 'Hard',   blurb: 'Fast and rarely wrong',    msPerAnswer: 1150, accuracy: 0.95 },
+};
+
+// Same ranges as the Shop uses when a pack is opened.
+const PRACTICE_STATS: Record<string, { hp: [number, number]; weak: [number, number]; strong: [number, number] }> = {
+  common:      { hp: [80, 100],  weak: [40, 50], strong: [50, 70] },
+  silver:      { hp: [100, 120], weak: [50, 60], strong: [60, 80] },
+  'gold-rare': { hp: [120, 140], weak: [60, 75], strong: [80, 100] },
+  prismatic:   { hp: [150, 180], weak: [75, 95], strong: [100, 130] },
+};
+const randIn = ([a, b]: [number, number]) => Math.floor(Math.random() * (b - a + 1)) + a;
+
+/** A small Aurabot portrait, drawn inline so practice needs no network. */
+function botArt(body: string, trim: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<defs><radialGradient id="bg" cx="50%" cy="38%" r="70%"><stop offset="0" stop-color="#1e2857"/><stop offset="1" stop-color="#080c22"/></radialGradient>
+<linearGradient id="b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${trim}"/><stop offset="1" stop-color="${body}"/></linearGradient></defs>
+<rect width="200" height="200" fill="url(#bg)"/>
+<line x1="100" y1="34" x2="100" y2="52" stroke="${trim}" stroke-width="5" stroke-linecap="round"/><circle cx="100" cy="30" r="7" fill="#7ff3ff"/>
+<rect x="46" y="50" width="108" height="78" rx="30" fill="url(#b)"/>
+<rect x="60" y="64" width="80" height="48" rx="16" fill="#0d1117"/>
+<ellipse cx="82" cy="88" rx="10" ry="13" fill="#7ff3ff"/><ellipse cx="118" cy="88" rx="10" ry="13" fill="#7ff3ff"/>
+<rect x="36" y="80" width="12" height="28" rx="6" fill="${body}"/><rect x="152" y="80" width="12" height="28" rx="6" fill="${body}"/>
+<rect x="62" y="132" width="76" height="46" rx="20" fill="url(#b)"/><rect x="82" y="144" width="36" height="20" rx="7" fill="#0d1117"/>
+<circle cx="100" cy="154" r="5" fill="#ec6b83"/></svg>`;
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+
+function makePracticeCard(opts: { id: string; name: string; rarity: string; art: string; desc: string; weakMove: string; strongMove: string }): Card {
+  const r = PRACTICE_STATS[opts.rarity] || PRACTICE_STATS.common;
+  const hp = randIn(r.hp), weak = randIn(r.weak), strong = randIn(r.strong);
+  // Same shape a pack-opened card has (stat1 = HP, stat2/3 = the two moves),
+  // so the battle maths treats practice cards exactly like real ones.
+  return {
+    id: opts.id, student_id: '', teacher_id: '',
+    rarity: opts.rarity as Card['rarity'],
+    card_name: opts.name, hp, type: 'robots', description: opts.desc,
+    stat1_name: 'HP', stat1_val: hp,
+    stat2_name: opts.weakMove, stat2_val: weak,
+    stat3_name: opts.strongMove, stat3_val: strong,
+    move1_name: opts.weakMove, move1_dmg: weak,
+    move2_name: opts.strongMove, move2_dmg: strong,
+    image_url: opts.art, card_source: 'generated', created_at: new Date().toISOString(),
+  };
+}
+
+const BOT_ROSTER = [
+  { name: 'Aurabot Bolt',    body: '#b23a55', trim: '#f4a3b3', weakMove: 'Zap Tap',     strongMove: 'Thunder Beam' },
+  { name: 'Aurabot Circuit', body: '#3b5bab', trim: '#b8c8ee', weakMove: 'Gear Spin',   strongMove: 'Overclock' },
+  { name: 'Aurabot Nova',    body: '#7a4fb3', trim: '#e3c6ff', weakMove: 'Star Flick',  strongMove: 'Supernova' },
+];
+
+/** The bot's deck: one robot per rarity the student brought. */
+function makeBotDeck(playerCards: Card[]): Card[] {
+  return playerCards.map((pc, i) => {
+    const b = BOT_ROSTER[i % BOT_ROSTER.length];
+    return makePracticeCard({
+      id: `practice-bot-${i}`, name: b.name, rarity: pc.rarity, art: botArt(b.body, b.trim),
+      desc: 'A training robot. Beating it wins nothing — but you get faster every time.',
+      weakMove: b.weakMove, strongMove: b.strongMove,
+    });
+  });
+}
+
+/** A loaned deck for students who don't have three rarities yet. */
+function makeTrainingDeck(): Card[] {
+  return (['common', 'silver', 'gold-rare'] as const).map((rarity, i) => makePracticeCard({
+    id: `practice-loan-${i}`, name: ['Trainee Spark', 'Trainee Cog', 'Trainee Comet'][i], rarity,
+    art: botArt(['#2f8f6b', '#b7791f', '#1f7a8c'][i], ['#9ff0c4', '#ffe0a0', '#a0e8ff'][i]),
+    desc: 'A loaned training card. Collect your own to battle for real.',
+    weakMove: 'Quick Hit', strongMove: 'Big Swing',
+  }));
+}
+
+/** A believable wrong answer — close to the right one, never negative. */
+function nearMiss(answer: number): number {
+  const off = [1, 2, 3, 4, 6, 10][Math.floor(Math.random() * 6)] * (Math.random() < 0.5 ? -1 : 1);
+  const v = answer + off;
+  return v > 0 && v !== answer ? v : answer + Math.abs(off);
+}
+
 // ── Transfer a card from loser to winner in DB ───────────────────────
 async function transferCard(cardId: string, newStudentId: string): Promise<void> {
   const { error } = await sb.from('cards').update({ student_id: newStudentId }).eq('id', cardId);
@@ -412,7 +506,28 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
   const [shakingCard, setShakingCard] = useState<'p1' | 'p2' | null>(null);
   const [damageFloats, setDamageFloats] = useState<{ id: number; side: 'p1' | 'p2'; value: string }[]>([]);
   const floatIdRef = useRef(0);
+
+  // ── Practice mode (vs a computer Aurabot — nothing is saved) ──
+  const [practice, setPractice] = useState(false);
+  const [botLevel, setBotLevel] = useState<BotLevel>('medium');
+  const [usingLoanDeck, setUsingLoanDeck] = useState(false);
+  // The bot's most recent answer, shown WITH its own question — the big
+  // question on screen has already moved on to the next one, and "12 × 2 … 96"
+  // side by side would read as a wrong times-table fact.
+  const [botAnswer, setBotAnswer] = useState<{ sum: string; given: number; right: boolean } | null>(null);
+  // The bot reads the live maths state from a ref rather than inside a state
+  // updater, so React's development double-invoke can't make it answer twice.
+  const mathStateRef = useRef<MathState | null>(null);
+  useEffect(() => { mathStateRef.current = mathState; }, [mathState]);
   const mathTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // One turn must be scored exactly once. The last answer waits 400ms before
+  // the turn resolves, and that gap used to accept more answers: a quick
+  // double-Enter on question 12 scored the turn twice (double damage, "13/12
+  // correct"), and if the stray second score landed after the next turn had
+  // begun, it hit as the other player and left the battle stuck on an empty
+  // panel. These two flags close both holes; they reset at every new roll.
+  const answersLockedRef = useRef(false);   // no more answers this turn
+  const turnScoredRef = useRef(false);      // finishMath has already run this turn
   const mathInputRef = useRef<HTMLInputElement>(null);
 
   // ── Load P1's cards ────────────────────────────────────────────────
@@ -542,7 +657,51 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
 
   const handleP1CardsPicked = (cards: Card[]) => {
     setP1Cards(cards);
+    if (practice) { startBattle(cards, makeBotDeck(cards)); return; }
     setCardPickStep('p2pick');
+  };
+
+  // ── Practice: start a match against the bot ─────────────────────────
+  const startPractice = () => {
+    setSetupError('');
+    // Drop any half-finished real match. Practice borrows the opponent slots,
+    // so leaving a verified classmate in place would let a later real battle
+    // start with no opponent id — and quietly skip recording the result.
+    setP2Ready(false);
+    setP2AllCards([]);
+    setOpponentId('');
+    setVerifyPin('');
+    setVerifyError('');
+    setTransferredCard(null);
+    setTransferError('');
+    setPractice(true);
+    setOpponentName(`Aurabot (${BOT_LEVELS[botLevel].label})`);
+    setOpponentStudentId('');   // no real opponent — nothing to record or transfer
+    winRecordedRef.current = false;
+    if (p1CanBattle) {
+      // Your own cards, picked the normal way — practise with the deck you'd really use.
+      setUsingLoanDeck(false);
+      setCardPickStep('p1pick');
+      setP1Cards([]);
+      setScreen('cardpick');
+    } else {
+      // Not three rarities yet: lend a training deck so newer students can still practise.
+      const loan = makeTrainingDeck();
+      setUsingLoanDeck(true);
+      setP1Cards(loan);
+      startBattle(loan, makeBotDeck(loan));
+    }
+  };
+
+  const leavePractice = () => {
+    setPractice(false);
+    setUsingLoanDeck(false);
+    setOpponentName('');
+    setBotAnswer(null);
+    setMathState(null);
+    setTurnPhase('roll');
+    setWinnerSide(null);
+    setScreen('setup');
   };
 
   const handleP2CardsPicked = (cards: Card[]) => {
@@ -557,7 +716,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
       p1Idx: 0, p2Idx: 0,
       p1HP: p1[0].hp, p2HP: p2[0].hp,
       p1MaxHP: p1[0].hp, p2MaxHP: p2[0].hp,
-      turn: 'p1', log: ['⚔ Battle started! Player 1 goes first.'],
+      turn: 'p1', log: [practice ? '🤖 Practice match — nothing is won or lost. You go first.' : '⚔ Battle started! Player 1 goes first.'],
       p1CorrectAnswers: 0, p2CorrectAnswers: 0,
       totalDamageP1: 0, totalDamageP2: 0,
     };
@@ -584,6 +743,8 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
         const statUsed: 1 | 2 = final % 2 === 1 ? 1 : 2;
 
         const questions = Array.from({ length: 12 }, genQuestion);
+        answersLockedRef.current = false;
+        turnScoredRef.current = false;
         const ms: MathState = {
           questions, currentQ: 0, correct: 0, answered: 0,
           timeLeft: 20, input: '', flash: null,
@@ -608,6 +769,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
       setMathState(prev => {
         if (!prev) return null;
         if (prev.timeLeft <= 1) {
+          answersLockedRef.current = true;
           clearInterval(mathTimerRef.current!);
           setTimeout(() => finishMath(prev.correct, prev.statUsed, prev.diceValue), 50);
           return { ...prev, timeLeft: 0 };
@@ -622,6 +784,8 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
   // ── Submit answer ─────────────────────────────────────────────────
   const handleAnswer = useCallback(() => {
     if (!mathState || turnPhase !== 'math' || mathState.timeLeft === 0) return;
+    if (practice && battle.turn === 'p2') return;   // the bot answers for itself
+    if (answersLockedRef.current) return;             // last answer already in — see turnScoredRef
     const input = parseInt(mathState.input);
     if (isNaN(input)) return;
 
@@ -633,6 +797,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
     const nextQ = mathState.currentQ + 1;
 
     if (nextQ >= 12) {
+      answersLockedRef.current = true;
       clearInterval(mathTimerRef.current!);
       const final = { ...mathState, correct: newCorrect, answered: mathState.answered + 1, input: '', flash: correct ? 'correct' as const : 'wrong' as const };
       setMathState(final);
@@ -648,10 +813,13 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
       } : null);
       setTimeout(() => setMathState(prev => prev ? { ...prev, flash: null } : null), 300);
     }
-  }, [mathState, turnPhase]);
+  }, [mathState, turnPhase, practice, battle.turn]);
 
   // ── Finish math, compute and apply damage ────────────────────────
   const finishMath = useCallback((correct: number, statUsed: 1 | 2, diceVal: number) => {
+    if (turnScoredRef.current) return;
+    turnScoredRef.current = true;
+    answersLockedRef.current = true;
     setTurnPhase('resolve');
 
     setBattle(prev => {
@@ -713,7 +881,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
             setScreen('gameover');
             setShowConfetti(true);
             setTimeout(() => setShowConfetti(false), 4000);
-            if (!winRecordedRef.current && myStudentId && opponentStudentId) {
+            if (!practice && !winRecordedRef.current && myStudentId && opponentStudentId) {
               winRecordedRef.current = true;
               recordArenaWin(myStudentId, opponentStudentId).catch(console.warn);
               // Transfer: p2 loses → pick random card from p2's battle cards
@@ -736,7 +904,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
             setScreen('gameover');
             setShowConfetti(true);
             setTimeout(() => setShowConfetti(false), 4000);
-            if (!winRecordedRef.current && myStudentId && opponentStudentId) {
+            if (!practice && !winRecordedRef.current && myStudentId && opponentStudentId) {
               winRecordedRef.current = true;
               recordArenaWin(opponentStudentId, myStudentId).catch(console.warn);
               // Transfer: p1 loses → pick random card from p1's battle cards, give to p2
@@ -751,7 +919,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
 
       return newState;
     });
-  }, [session, opponentName, myStudentId, opponentStudentId]);
+  }, [session, opponentName, myStudentId, opponentStudentId, practice]);
 
   // ── Card transfer after loss ──────────────────────────────────────
   const doCardTransfer = async (loserBattleCards: Card[], winnerStudentId: string) => {
@@ -768,6 +936,52 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
     }
     setTransferLoading(false);
   };
+
+  // ── Practice: the bot rolls its own dice ──────────────────────────
+  const botsTurn = practice && screen === 'battle' && battle.turn === 'p2';
+  useEffect(() => {
+    if (!botsTurn || turnPhase !== 'roll') return;
+    const t = setTimeout(() => handleRoll(), 1100);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [botsTurn, turnPhase]);
+
+  // ── Practice: the bot answers its times tables ────────────────────
+  // Uses the same 20-second clock and the same scoring as a student: +1 for
+  // a right answer, -1 for a wrong one, 12 questions at most.
+  useEffect(() => {
+    if (!botsTurn || turnPhase !== 'math') return;
+    const level = BOT_LEVELS[botLevel];
+    let cancelled = false;
+    let t: ReturnType<typeof setTimeout>;
+    setBotAnswer(null);
+
+    const tick = () => {
+      if (cancelled) return;
+      const ms = mathStateRef.current;
+      if (!ms || ms.timeLeft <= 0 || answersLockedRef.current) return;   // clock ran out; the timer finishes the turn
+      const q = ms.questions[ms.currentQ];
+      const right = Math.random() < level.accuracy;
+      setBotAnswer({ sum: `${q.num1} × ${q.num2}`, given: right ? q.answer : nearMiss(q.answer), right });
+
+      const newCorrect = right ? ms.correct + 1 : Math.max(0, ms.correct - 1);
+      const nextQ = ms.currentQ + 1;
+      if (nextQ >= 12) {
+        answersLockedRef.current = true;
+        if (mathTimerRef.current) clearInterval(mathTimerRef.current);
+        setMathState({ ...ms, correct: newCorrect, answered: ms.answered + 1, flash: right ? 'correct' : 'wrong' });
+        setTimeout(() => { if (!cancelled) finishMath(newCorrect, ms.statUsed, ms.diceValue); }, 600);
+        return;
+      }
+      setMathState({ ...ms, correct: newCorrect, answered: ms.answered + 1, currentQ: nextQ, flash: right ? 'correct' : 'wrong' });
+      setTimeout(() => { if (!cancelled) setMathState(prev => prev ? { ...prev, flash: null } : null); }, 300);
+      // A little variation so it feels like thinking, not a metronome.
+      t = setTimeout(tick, level.msPerAnswer * (0.75 + Math.random() * 0.5));
+    };
+    t = setTimeout(tick, level.msPerAnswer);
+    return () => { cancelled = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [botsTurn, turnPhase]);
 
   // ── Next turn ─────────────────────────────────────────────────────
   const handleNextTurn = () => {
@@ -934,6 +1148,46 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
               </button>
             </div>
           </div>
+
+          {/* ── Practice vs Aurabot ── */}
+          <div style={{ ...panelStyle, width: '100%', maxWidth: 820, padding: '1.6rem 2rem', marginTop: '1.25rem', border: '1px solid rgba(236,107,131,0.28)', background: 'linear-gradient(135deg, rgba(204,51,85,0.10), rgba(13,17,23,0.88) 55%)' }}>
+            <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <img src={botArt('#b23a55', '#f4a3b3')} alt="" style={{ width: 84, height: 84, borderRadius: 16, flexShrink: 0, boxShadow: '0 8px 24px rgba(204,51,85,0.25)' }} />
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <div style={{ ...monoStyle, fontSize: '0.62rem', letterSpacing: '0.25em', color: '#ec6b83', marginBottom: 4 }}>◈ PRACTICE MODE</div>
+                <div style={{ fontFamily: "'Cinzel',serif", fontWeight: 900, fontSize: '1.25rem', color: '#f2e8d8', letterSpacing: '0.06em', marginBottom: 6 }}>Battle Aurabot</div>
+                <div style={{ ...monoStyle, fontSize: '0.72rem', color: 'rgba(168,230,255,0.55)', lineHeight: 1.6 }}>
+                  Practise against the computer. <strong style={{ color: '#a8e6ff' }}>No cards are won or lost</strong>, and it doesn't use up your weekly battles.
+                  {p1Ready && !p1CanBattle && <><br />You'll borrow a training deck until you've collected 3 rarities.</>}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', marginTop: '1.25rem', flexWrap: 'wrap' }}>
+              <div role="group" aria-label="Aurabot difficulty" style={{ display: 'flex', gap: 6, flex: 1, minWidth: 260 }}>
+                {(Object.keys(BOT_LEVELS) as BotLevel[]).map(lv => {
+                  const on = botLevel === lv;
+                  return (
+                    <button key={lv} onClick={() => setBotLevel(lv)} aria-pressed={on} style={{
+                      flex: 1, padding: '10px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
+                      border: `1px solid ${on ? '#ec6b83' : 'rgba(168,230,255,0.15)'}`,
+                      background: on ? 'rgba(204,51,85,0.18)' : 'rgba(168,230,255,0.03)',
+                      color: on ? '#f2e8d8' : 'rgba(168,230,255,0.6)', transition: 'all 0.15s',
+                    }}>
+                      <div style={{ fontFamily: "'Cinzel',serif", fontWeight: 800, fontSize: '0.85rem', letterSpacing: '0.08em' }}>{BOT_LEVELS[lv].label}</div>
+                      <div style={{ ...monoStyle, fontSize: '0.58rem', opacity: 0.7, marginTop: 3 }}>{BOT_LEVELS[lv].blurb}</div>
+                    </button>
+                  );
+                })}
+              </div>
+              <button onClick={startPractice} disabled={!p1Ready} style={{
+                padding: '12px 28px', borderRadius: 10, border: 'none', cursor: p1Ready ? 'pointer' : 'not-allowed',
+                background: p1Ready ? '#cc3355' : 'rgba(204,51,85,0.25)', color: '#fff',
+                fontFamily: "'Cinzel',serif", fontWeight: 900, fontSize: '0.95rem', letterSpacing: '0.1em',
+                boxShadow: p1Ready ? '0 6px 22px rgba(204,51,85,0.35)' : 'none', whiteSpace: 'nowrap',
+              }}>🤖 START PRACTICE</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -941,6 +1195,11 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
       {screen === 'cardpick' && (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '2rem 1rem' }}>
           <div style={{ ...panelStyle, width: '100%', maxWidth: 900, padding: '2rem' }}>
+            {practice && (
+              <div style={{ textAlign: 'center', marginBottom: '0.5rem', ...monoStyle, fontSize: '0.7rem', letterSpacing: '0.2em', color: '#ec6b83' }}>
+                🤖 PRACTICE vs {p2Name.toUpperCase()} · NOTHING IS WON OR LOST
+              </div>
+            )}
             {cardPickStep === 'p1pick' && (
               <CardPicker
                 playerName={p1Name}
@@ -968,6 +1227,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
             )}
             <div style={{ textAlign: 'center', marginTop: '1rem' }}>
               <button onClick={() => {
+                if (practice) { leavePractice(); return; }
                 if (cardPickStep === 'p2pick') { setCardPickStep('p1pick'); setP1Cards([]); }
                 else { setScreen('setup'); }
               }} style={{ background: 'transparent', border: '1px solid rgba(168,230,255,0.15)', borderRadius: 8, color: 'rgba(168,230,255,0.4)', padding: '8px 20px', cursor: 'pointer', ...monoStyle, fontSize: '0.75rem' }}>
@@ -991,6 +1251,12 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
             }}>
               {currentPlayerName.toUpperCase()}'S TURN
             </div>
+            {practice && (
+              <div style={{ marginTop: 8, ...monoStyle, fontSize: '0.62rem', letterSpacing: '0.22em', color: '#ec6b83' }}>
+                🤖 PRACTICE MATCH{usingLoanDeck ? ' · TRAINING DECK' : ''} · NOTHING IS WON OR LOST
+                <button onClick={leavePractice} style={{ marginLeft: 12, background: 'transparent', border: '1px solid rgba(236,107,131,0.35)', borderRadius: 6, color: '#ec6b83', padding: '2px 10px', cursor: 'pointer', ...monoStyle, fontSize: '0.6rem', letterSpacing: '0.12em' }}>QUIT</button>
+              </div>
+            )}
           </div>
 
           {/* Cards row */}
@@ -1031,8 +1297,8 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                   Odd = Stat 1 &nbsp;·&nbsp; Even = Stat 2
                 </p>
 
-                <div onClick={handleRoll} style={{
-                  cursor: diceRolling ? 'default' : 'pointer',
+                <div onClick={botsTurn ? undefined : handleRoll} style={{
+                  cursor: diceRolling || botsTurn ? 'default' : 'pointer',
                   transition: 'transform 0.15s',
                   transform: diceRolling ? `rotate(${Math.random() * 40 - 20}deg) scale(1.1)` : 'scale(1)',
                   userSelect: 'none',
@@ -1040,6 +1306,11 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                   <DiceFace value={diceValue} rolling={diceRolling} />
                 </div>
 
+                {botsTurn ? (
+                  <div style={{ ...monoStyle, fontSize: '0.8rem', color: '#ec6b83', letterSpacing: '0.12em', padding: '12px 0' }}>
+                    🤖 {diceRolling ? 'AURABOT IS ROLLING…' : 'AURABOT IS GETTING READY…'}
+                  </div>
+                ) : (
                 <button onClick={handleRoll} disabled={diceRolling} style={{
                   padding: '12px 36px', borderRadius: 10, border: '1px solid rgba(168,230,255,0.3)',
                   background: diceRolling ? 'rgba(168,230,255,0.04)' : 'rgba(168,230,255,0.1)',
@@ -1051,6 +1322,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                 }}>
                   {diceRolling ? 'ROLLING…' : '🎲 ROLL DICE'}
                 </button>
+                )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%', marginTop: 4 }}>
                   {[1, 2].map(s => {
@@ -1105,6 +1377,25 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                     {q.num1} × {q.num2} = ?
                   </div>
 
+                  {botsTurn ? (
+                    <>
+                      <div aria-live="polite" style={{
+                        minWidth: 220, padding: '10px 16px', textAlign: 'center', ...monoStyle, borderRadius: 10,
+                        border: `2px solid ${botAnswer ? (botAnswer.right ? '#4caf82' : '#f44336') : 'rgba(236,107,131,0.35)'}`,
+                        background: 'rgba(13,17,23,0.8)', minHeight: 58,
+                      }}>
+                        {botAnswer ? (
+                          <>
+                            <div style={{ fontSize: '0.58rem', letterSpacing: '0.2em', color: 'rgba(168,230,255,0.4)', marginBottom: 4 }}>LAST ANSWER</div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: botAnswer.right ? '#4caf82' : '#f44336' }}>
+                              {botAnswer.sum} = {botAnswer.given} {botAnswer.right ? '✓' : '✗'}
+                            </div>
+                          </>
+                        ) : <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'rgba(168,230,255,0.4)', paddingTop: 8 }}>thinking…</div>}
+                      </div>
+                      <div style={{ ...monoStyle, fontSize: '0.72rem', color: '#ec6b83', letterSpacing: '0.12em' }}>🤖 AURABOT IS ANSWERING — WATCH ITS SCORE</div>
+                    </>
+                  ) : (<>
                   <input
                     ref={mathInputRef}
                     type="number"
@@ -1128,6 +1419,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
                     fontFamily: "'Cinzel',serif", fontWeight: 800, fontSize: '0.9rem', letterSpacing: '0.1em',
                     cursor: 'pointer', boxShadow: '0 0 14px rgba(168,230,255,0.12)',
                   }}>ANSWER</button>
+                  </>)}
 
                   <div style={{ fontSize: '0.62rem', color: 'rgba(168,230,255,0.28)', ...monoStyle }}>
                     {mathState.currentQ + 1}/12 · Wrong answers subtract from your score!
@@ -1201,7 +1493,9 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
             marginBottom: '0.5rem',
           }}>{winner} WINS!</h1>
-          <p style={{ color: 'rgba(168,230,255,0.4)', ...monoStyle, letterSpacing: '0.2em', fontSize: '0.72rem', marginBottom: '2rem' }}>BATTLE COMPLETE</p>
+          <p style={{ color: practice ? '#ec6b83' : 'rgba(168,230,255,0.4)', ...monoStyle, letterSpacing: '0.2em', fontSize: '0.72rem', marginBottom: '2rem' }}>
+            {practice ? `PRACTICE COMPLETE · ${BOT_LEVELS[botLevel].label.toUpperCase()}` : 'BATTLE COMPLETE'}
+          </p>
 
           {/* Stats */}
           <div style={{ ...panelStyle, maxWidth: 360, width: '100%', padding: '1.5rem', marginBottom: '1.5rem' }}>
@@ -1218,7 +1512,21 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
             ))}
           </div>
 
+          {/* ── Practice: nothing changed hands ── */}
+          {practice && (
+            <div style={{ ...panelStyle, maxWidth: 400, width: '100%', padding: '1.5rem', marginBottom: '1.5rem', border: '1px solid rgba(236,107,131,0.3)' }}>
+              <div style={{ fontSize: '0.6rem', letterSpacing: '0.25em', color: '#ec6b83', ...monoStyle, marginBottom: 10 }}>◈ PRACTICE MATCH</div>
+              <p style={{ ...monoStyle, fontSize: '0.8rem', color: 'rgba(168,230,255,0.75)', lineHeight: 1.7, margin: 0 }}>
+                {winnerSide === 'p1'
+                  ? (botLevel === 'hard' ? 'You beat Hard mode — you\'re ready for a real battle! 🏆' : `Nice win! Try ${botLevel === 'easy' ? 'Medium' : 'Hard'} next.`)
+                  : 'Aurabot won this time. Every round makes your times tables faster.'}
+                <br /><span style={{ color: 'rgba(168,230,255,0.45)', fontSize: '0.72rem' }}>No cards were won or lost — your collection is exactly as it was.</span>
+              </p>
+            </div>
+          )}
+
           {/* ── Card transfer result ── */}
+          {!practice && (
           <div style={{ ...panelStyle, maxWidth: 400, width: '100%', padding: '1.5rem', marginBottom: '1.5rem' }}>
             <div style={{ fontSize: '0.6rem', letterSpacing: '0.25em', color: 'rgba(168,230,255,0.3)', ...monoStyle, marginBottom: 12 }}>◈ CARD TRANSFER</div>
 
@@ -1261,7 +1569,20 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
               <p style={{ ...monoStyle, fontSize: '0.72rem', color: 'rgba(168,230,255,0.3)' }}>Processing…</p>
             )}
           </div>
+          )}
 
+          {practice ? (
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button onClick={() => { setMathState(null); setBotAnswer(null); setWinnerSide(null); setTurnPhase('roll'); startPractice(); }}
+              style={{ padding: '12px 28px', borderRadius: 10, background: '#cc3355', border: 'none', color: '#fff', fontFamily: "'Cinzel',serif", fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem', letterSpacing: '0.1em', boxShadow: '0 6px 22px rgba(204,51,85,0.35)' }}>
+              🤖 PRACTICE AGAIN
+            </button>
+            <button onClick={leavePractice}
+              style={{ padding: '12px 28px', borderRadius: 10, background: 'transparent', border: '1px solid rgba(168,230,255,0.25)', color: '#a8e6ff', cursor: 'pointer', ...monoStyle, fontSize: '0.8rem' }}>
+              ⚔ Back to the Arena
+            </button>
+          </div>
+          ) : (
           <div style={{ display: 'flex', gap: 12 }}>
             <button onClick={() => {
               setScreen('setup');
@@ -1287,6 +1608,7 @@ function ArenaPage({ session }: { session: NonNullable<Session> }) {
               ← Collection
             </button>
           </div>
+          )}
         </div>
       )}
 
