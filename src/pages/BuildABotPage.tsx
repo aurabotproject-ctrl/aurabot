@@ -75,6 +75,34 @@ const StickerContent = ({ type }: { type: string }) => {
 
 // ── Merge helpers ─────────────────────────────────────────────────────────────
 
+const STICKERS = ['apple', 'smiley', 'heart', 'thumbsup', 'lips'];
+const isRealColor = (c: unknown) =>
+  typeof c === 'string' && c.trim() !== '' && !['transparent', 'none'].includes(c.trim().toLowerCase());
+
+// The colour a new shape should take: the first actual body part's colour.
+// Stickers and screens don't count — a sticker's colour is 'transparent', and
+// copying that onto new shapes is what was making some robots come out clear.
+const pickBaseColor = (els: BotEl[]): string => {
+  for (const e of els) {
+    if (e.type === 'face' || e.type === 'chest' || STICKERS.includes(e.type)) continue;
+    if (e.type === 'group') {
+      const inner = pickBaseColor(e.children || []);
+      if (inner !== BOT_COLOR) return inner;
+      continue;
+    }
+    if (isRealColor(e.color)) return e.color;
+  }
+  return BOT_COLOR;
+};
+
+// Robots saved before the fix may contain see-through body parts. Give them
+// the default body colour back so they follow the student's colour theme.
+const repairColors = (els: BotEl[]): BotEl[] => els.map(e => {
+  const fixed = (e.type === 'face' || e.type === 'chest' || STICKERS.includes(e.type) || e.type === 'group' || isRealColor(e.color))
+    ? e : { ...e, color: BOT_COLOR };
+  return e.children ? { ...fixed, children: repairColors(e.children) } : fixed;
+});
+
 const canMerge = (el: BotEl) =>
   ['rect', 'circle', 'group', 'apple', 'smiley', 'heart', 'thumbsup', 'lips'].includes(el.type);
 
@@ -200,7 +228,7 @@ export default function BuildABotPage({ onBack, userId }: BuildABotPageProps) {
   const [elements, setElements] = useState<BotEl[]>(() => {
     try {
       const raw = localStorage.getItem(savedBotKey);
-      if (raw) return JSON.parse(raw);
+      if (raw) return repairColors(JSON.parse(raw));
     } catch {}
     return INITIAL_ELEMENTS;
   });
@@ -230,7 +258,7 @@ export default function BuildABotPage({ onBack, userId }: BuildABotPageProps) {
     const baseW = maxX - minX;
     const baseH = maxY - minY;
     const groupChildren = allShapes.map(s => ({ ...s, cx: s.cx - groupCx, cy: s.cy - groupCy }));
-    const newGroup: BotEl = { id: generateId(), type: 'group', cx: groupCx, cy: groupCy, w: baseW, h: baseH, baseW, baseH, rotation: 0, scale: 1, children: groupChildren, color: allShapes[0].color };
+    const newGroup: BotEl = { id: generateId(), type: 'group', cx: groupCx, cy: groupCy, w: baseW, h: baseH, baseW, baseH, rotation: 0, scale: 1, children: groupChildren, color: pickBaseColor(allShapes) };
     setElements(prev => [...prev.filter(e => e.id !== el1.id && e.id !== el2.id), newGroup]);
     setSelectedId(newGroup.id);
   };
@@ -307,7 +335,7 @@ export default function BuildABotPage({ onBack, userId }: BuildABotPageProps) {
   // ── Toolbar actions ────────────────────────────────────────────────────────
 
   const addShape = (type: ElementType) => {
-    const baseColor = elements.find(e => e.type !== 'face' && e.type !== 'chest')?.color || BOT_COLOR;
+    const baseColor = pickBaseColor(elements);
     const isSticker = ['apple','smiley','heart','thumbsup','lips'].includes(type);
     const newEl: BotEl = { id: generateId(), type, cx: 280, cy: 400, w: (type === 'face' || type === 'chest') ? 240 : isSticker ? 100 : 150, h: (type === 'face' || type === 'chest') ? 140 : isSticker ? 100 : 150, rotation: 0, rx: type === 'circle' ? '50%' : 24, color: (type === 'face' || type === 'chest') ? DARK_SCREEN : isSticker ? 'transparent' : baseColor };
     setElements([...elements, newEl]);
@@ -345,7 +373,7 @@ export default function BuildABotPage({ onBack, userId }: BuildABotPageProps) {
   const updateColor = (color: string) => {
     setElements(elements.map(e => {
       if (['face','chest','apple','smiley','heart','thumbsup','lips'].includes(e.type)) return e;
-      if (e.type === 'group') return { ...e, color, children: (e.children || []).map(c => ({ ...c, color })) };
+      if (e.type === 'group') return { ...e, color, children: (e.children || []).map(c => (STICKERS.includes(c.type) || c.type === 'face' || c.type === 'chest') ? c : ({ ...c, color })) };
       return { ...e, color };
     }));
   };

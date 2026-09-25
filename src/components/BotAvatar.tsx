@@ -98,6 +98,20 @@ export function getBotBounds(elements: BotEl[]) {
 
 /* ─── Colour remapping ───────────────────────────────────────────────────── */
 
+const STICKER_TYPES = ['apple', 'smiley', 'heart', 'thumbsup', 'lips'];
+
+/** True for colours that would render as nothing: missing, 'transparent', or fully see-through. */
+export function isBlankColor(c: unknown): boolean {
+  if (typeof c !== 'string') return true;
+  const v = c.trim().toLowerCase();
+  if (!v || v === 'transparent' || v === 'none') return true;
+  if (/^#[0-9a-f]{8}$/.test(v)) return v.endsWith('00');
+  if (/^#[0-9a-f]{4}$/.test(v)) return v.endsWith('0');
+  const m = v.match(/^(?:rgba|hsla)\(.*[,\/]\s*([\d.]+%?)\s*\)$/);
+  if (m) return parseFloat(m[1]) === 0;
+  return false;
+}
+
 export function remapBotElements(botElements: BotEl[], robotColor: ColorTheme): (BotEl & { _bodyBg?: string })[] {
   const bodyBg = (robotColor as any).gradient
     ? (robotColor as any).gradient
@@ -105,7 +119,11 @@ export function remapBotElements(botElements: BotEl[], robotColor: ColorTheme): 
 
   const remapColor = (c: string, type?: string): string => {
     if (type === 'face' || type === 'chest') return DARK_SCREEN;
-    if (c === BOT_DEFAULT_COLOR) return robotColor.mid;
+    if (type && STICKER_TYPES.includes(type)) return 'transparent';
+    // Body parts saved with no real colour follow the robot's colour theme.
+    // The builder used to give new shapes a 'transparent' colour whenever a
+    // sticker was the first part in the list, which made robots look clear.
+    if (c === BOT_DEFAULT_COLOR || isBlankColor(c)) return robotColor.mid;
     return c;
   };
 
@@ -463,7 +481,8 @@ const DEFAULT_BOT_ELEMENTS: BotEl[] = [
 ];
 
 export function TeacherBotThumbnail({ colorIndex, botElements, facePixels, starPoints, size = 100 }: TeacherBotThumbnailProps) {
-  const theme = ALL_COLOR_THEMES[Math.min(colorIndex, ALL_COLOR_THEMES.length - 1)];
+  const idx = Number.isFinite(colorIndex) && colorIndex >= 0 ? Math.floor(colorIndex) : 0;
+  const theme = ALL_COLOR_THEMES[idx % ALL_COLOR_THEMES.length];
   const elements = botElements ?? DEFAULT_BOT_ELEMENTS;
 
   return (
